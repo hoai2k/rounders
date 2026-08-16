@@ -676,7 +676,7 @@
     $("charInfo").textContent = bits.join(" · ");
 
     $("hint").textContent = state.mode === "edit"
-      ? "Pick a piece above the viewer, then drag the pink dot to move it, the green square to resize, the yellow dot to turn it. Arrow keys nudge, shift-arrows go faster. Aim with a gamepad stick to check the pose through its whole arc."
+      ? "Pick a piece above the viewer, then drag the pink dot to move it, the green square to resize, the yellow dot to turn it. Arrow keys change character; on a gamepad the d-pad nudges the piece and the triggers resize it."
       : state.mode === "anchor"
         ? "Drag the anchors on the source image: body pivot (pink) is the physics center, mount (yellow) is the grip's reach, green sets the ball radius. Weapon: grip → muzzle. Arm: shoulder → hand."
         : "Preview. Aim with a gamepad stick (or the aim slider), and press Edit mode to place the pieces.";
@@ -1018,11 +1018,12 @@
       return;
     }
     if (typing) return;
-    const step = e.shiftKey ? 8 : 1;
-    const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-    if (!d || state.mode !== "edit") return;
+    // Arrows walk the roster grid (3 across), the way the eye expects when the
+    // grid is right there. Nudging a piece is the d-pad on a gamepad.
+    const move = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 }[e.key];
+    if (move === undefined) return;
     e.preventDefault();
-    edit(state.id, () => nudge(d[0], d[1]));
+    cycleCharacter(move);
   });
 
   // Move the selected piece by a screen-space delta (arrow keys, d-pad).
@@ -1208,7 +1209,9 @@
 
   function cycleCharacter(dir) {
     const i = CHARACTERS.findIndex((c) => c.id === state.id);
-    select(CHARACTERS[(i + dir + CHARACTERS.length) % CHARACTERS.length].id);
+    const next = CHARACTERS[(i + dir + CHARACTERS.length) % CHARACTERS.length];
+    select(next.id);
+    document.querySelector(`.tile[data-id="${next.id}"]`)?.scrollIntoView({ block: "nearest" });
   }
   function cyclePiece(dir) {
     const list = pieces();
@@ -1225,7 +1228,7 @@
   buildRoster();
   select(state.id);
   setMode(state.mode);
-  $("gizmoHint").textContent = "drag: pink = move · green = size · yellow = turn — arrows nudge, gamepad aims";
+  $("gizmoHint").textContent = "drag: pink = move · green = size · yellow = turn — arrow keys change character";
 
   let last = performance.now();
   function loop(now) {

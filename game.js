@@ -2425,7 +2425,7 @@
       }
       ctx.restore();
 
-      drawHealthRing(p, r);
+      drawHealthBar(p, r);
       drawAmmoPips(p, r);
 
       if (p.blockTimer > 0 || p.spawnGrace > 0) {
@@ -2452,33 +2452,47 @@
       ctx.fillStyle = hexAlpha(p.color, 0.9);
       ctx.font = "700 15px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(p.name, p.x, p.y - r - 24);
+      ctx.fillText(p.name, p.x, p.y - r - 32);
     }
   }
 
-  // Health reads as a ring hugging the fighter: a dark track with the player's
-  // colour drawn clockwise from the top, so a glance at the body tells you both
-  // who they are and how close they are to going down.
-  function drawHealthRing(p, r) {
-    const ringR = r + 8;
+  // Health is a bar riding just above the fighter. Its LENGTH tracks max health,
+  // so a Stone Soup or Juggernaut pickup visibly grows the bar rather than just
+  // refilling a fixed ring — you can read who is the tank at a glance.
+  const HEALTH_BAR_BASE_HP = 100;   // width below is calibrated to this
+  const HEALTH_BAR_BASE_W = 52;
+  function drawHealthBar(p, r) {
     const frac = clamp(p.hp / p.stats.maxHp, 0, 1);
-    ctx.lineWidth = 5;
-    ctx.lineCap = "butt";
-    ctx.strokeStyle = "rgba(10,8,18,0.55)";
+    const w = clamp(HEALTH_BAR_BASE_W * (p.stats.maxHp / HEALTH_BAR_BASE_HP), 32, 190);
+    const h = 7;
+    const x = -w / 2;
+    const y = -r - 20;
+
+    ctx.save();
+    // track
+    ctx.fillStyle = "rgba(10,8,18,0.72)";
+    ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+    ctx.roundRect(x, y, w, h, h / 2);
+    ctx.fill();
     ctx.stroke();
-    if (frac <= 0) return;
-    // the last sliver flashes so a nearly-dead fighter is unmissable
-    const low = frac < 0.28;
-    ctx.strokeStyle = low
-      ? `rgba(255,90,110,${0.72 + 0.28 * Math.abs(Math.sin(world.time * 9))})`
-      : p.color;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.arc(0, 0, ringR, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-    ctx.stroke();
-    ctx.lineCap = "butt";
+
+    if (frac > 0) {
+      const low = frac < 0.28;
+      ctx.fillStyle = low
+        ? `rgba(255,90,110,${0.75 + 0.25 * Math.abs(Math.sin(world.time * 9))})`
+        : p.color;
+      ctx.beginPath();
+      ctx.roundRect(x + 1.5, y + 1.5, Math.max(2, (w - 3) * frac), h - 3, (h - 3) / 2);
+      ctx.fill();
+      // top highlight so the fill reads as a solid bar over busy backdrops
+      ctx.fillStyle = "rgba(255,255,255,0.28)";
+      ctx.beginPath();
+      ctx.roundRect(x + 2.5, y + 2, Math.max(1, (w - 5) * frac), 1.6, 1);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   // Ammo sits on the weapon side as a little fan of rounds that empties as you

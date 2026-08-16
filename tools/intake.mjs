@@ -15,11 +15,15 @@
 // and its color bleed is removed from the outline. Only backdrop connected to
 // the border is cut, so a magenta detail on a magenta screen survives.
 //
-// The delivered file is always preserved, moved to art-source/characters/.
+// Files that had to be keyed are preserved as delivered in
+// assets/images/characters/archive/, so a cutout can be redone later; files
+// that already had alpha are simply moved into place unchanged.
 //
 // Options:
 //   --dry-run             report what would happen, write nothing
-//   --copy                copy originals to art-source instead of moving them
+//   --copy                copy originals to the archive instead of moving them
+//   --archive <dir>       where originals are kept (default characters/archive)
+//   --archive-all         archive every delivered file, not just keyed ones
 //   --key #ff00ff         force the backdrop color instead of detecting it
 //   --force               key even if the image already has transparency
 //   --tolerance 0.16      how far from the key color still counts as backdrop
@@ -28,7 +32,7 @@
 //   --shrink 0.06         bias edge pixels toward transparent (kills halos)
 //   --no-connected        cut every backdrop-colored pixel, not just the border region
 //   --out <dir>           repository root (default: the repo this script lives in)
-import { readdir, readFile, writeFile, mkdir, rename, copyFile, stat } from "node:fs/promises";
+import { readdir, readFile, writeFile, mkdir, rename, copyFile, unlink, stat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { basename, extname, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,6 +50,8 @@ const opts = {
   root: ROOT,
   dryRun: false,
   copy: false,
+  archive: null,
+  archiveAll: false,
   force: false,
   key: null,
   tolerance: undefined,
@@ -59,6 +65,8 @@ for (let i = 0; i < argv.length; i += 1) {
   const a = argv[i];
   if (a === "--dry-run") opts.dryRun = true;
   else if (a === "--copy") opts.copy = true;
+  else if (a === "--archive") opts.archive = resolve(argv[++i]);
+  else if (a === "--archive-all") opts.archiveAll = true;
   else if (a === "--force") opts.force = true;
   else if (a === "--no-connected") opts.connected = false;
   else if (a === "--key") opts.key = parseHex(argv[++i]);
@@ -67,6 +75,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (a.startsWith("--")) fail(`unknown option ${a}`);
   else opts.inbox = resolve(a);
 }
+
+const archiveDir = () => opts.archive || join(opts.root, "assets/images/characters/archive");
 
 function fail(msg) {
   console.error(`intake: ${msg}`);
@@ -146,6 +156,7 @@ async function main() {
   const ids = await characterIds();
   const rows = [];
   const problems = [];
+  let archived = 0;
 
   for (const name of files.sort()) {
     const file = join(opts.inbox, name);
@@ -209,11 +220,18 @@ async function main() {
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, encodePng(img.width, img.height, img.rgba));
 
-    const keep = join(opts.root, "art-source/characters", name);
-    await mkdir(dirname(keep), { recursive: true });
-    if (opts.copy) await copyFile(file, keep);
-    else await rename(file, keep);
-    if (converted) await rename(converted, join(opts.root, "art-source/characters", `${basename(converted).replace(/^\.intake-/, "")}`)).catch(() => {});
+    // Only art we actually rewrote needs its original kept; a file that already
+    // had alpha went out byte-for-similar and would just be a duplicate.
+    if (res.action === "keyed" || opts.archiveAll) {
+      const keep = join(archiveDir(), name);
+      await mkdir(dirname(keep), { recursive: true });
+      if (opts.copy) await copyFile(file, keep);
+      else await rename(file, keep).catch(async () => { await copyFile(file, keep); await unlink(file); });
+      archived += 1;
+    } else if (!opts.copy) {
+      await unlink(file);
+    }
+    if (converted) await unlink(converted).catch(() => {});
   }
 
   if (rows.length) {
@@ -226,7 +244,7 @@ async function main() {
   }
   console.log(
     `\n${rows.length} file(s) ${opts.dryRun ? "would be processed" : "processed"}`
-    + `${rows.length && !opts.dryRun ? `; originals ${opts.copy ? "copied" : "moved"} to art-source/characters/` : ""}.`
+    + `${archived ? `; ${archived} original(s) kept in ${archiveDir().replace(`${opts.root}/`, "")}/` : ""}.`
   );
   if (problems.length) {
     console.log(`\n${problems.length} needing attention:`);

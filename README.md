@@ -56,7 +56,9 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
   into `assets/images/` (see `image-requests.md`). Characters whose art is split
   into body/weapon/arm parts under `assets/images/characters/render/` are drawn
   composed — the body mirrors with facing while the weapon aims where the player
-  aims. Tune the composition at `/workbench`.
+  aims and the arms bridge body to weapon. Tune the composition at `/workbench`,
+  or turn the whole thing off with **Settings → Visuals → Use Procedural
+  Characters** to play with the built-in vector art.
 - **Simultaneous drafting** — when several players lose a round, they all draft at
   once, each with their own hand and controls.
 - Bots (three difficulties), controller rumble, screen shake, synth SFX, and a
@@ -80,7 +82,8 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 | `js/characters.js` | The 24 characters + procedural renderer |
 | `js/rig.js` | Composed sprites: loads body/weapon/arm parts, detects anchors, draws the aimable rig |
 | `js/chroma.js` | Backdrop keying (magenta/green screen → transparent), shared by intake and runtime |
-| `tools/intake.mjs` | `npm run intake` — keys and files delivered art, keeps originals in `art-source/` |
+| `tools/intake.mjs` | `npm run intake` — keys and files delivered art, archives the originals |
+| `tools/fitrig.mjs` | `npm run fitrig` — fits the render parts against the canonical art into `rigs.json` |
 | `workbench/` | Sprite workbench (anchors + weapon/hand placement → `rigs.json`) and art intake page |
 | `index.html`, `styles.css` | UI |
 | `server.mjs` | Zero-dependency static server |

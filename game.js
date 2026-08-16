@@ -2,7 +2,7 @@
 (() => {
   "use strict";
 
-  const { CARDS, RARITIES, CHARACTERS, LEVELS, drawCharacter, arenaImage } = window.ROUNDERS;
+  const { CARDS, RARITIES, CHARACTERS, LEVELS, drawCharacter, setProceduralCharacters, arenaImage } = window.ROUNDERS;
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -32,6 +32,7 @@
     draftCount: 4,
     levelChoice: -1, // -1 random
     hazards: true,
+    proceduralCharacters: false,
     haptics: true,
     shake: true,
     music: true,
@@ -2848,6 +2849,10 @@
       bindSetting(`${rarity}Weight`, `${rarity}WeightValue`, v => settings.rarityWeights[rarity] = Number(v));
     }
     document.getElementById("hazards").addEventListener("change", e => settings.hazards = e.target.checked);
+    document.getElementById("proceduralCharacters").addEventListener("change", e => {
+      settings.proceduralCharacters = e.target.checked;
+      setProceduralCharacters(e.target.checked);
+    });
     document.getElementById("haptics").addEventListener("change", e => settings.haptics = e.target.checked);
     document.getElementById("shake").addEventListener("change", e => settings.shake = e.target.checked);
   }

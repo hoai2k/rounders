@@ -23,7 +23,16 @@ the parts here are incomplete.
 Don't hand-place files here if they arrived on a solid backdrop — drop them in
 `intake/` at the repo root and run `npm run intake`, which keys the backdrop
 out, writes the transparent PNG here, and keeps the delivered original in
-`art-source/characters/`.
+`../archive/`.
+
+## When the parts aren't on the same canvas
+
+The current cast is delivered the other way: every part is drawn full-frame on
+its own canvas, so nothing shares a position or a scale. `npm run fitrig`
+recovers the composition from the canonical hero image — it matches each part's
+silhouette into the canonical silhouette and writes the resulting mount, weapon
+scale and arm anchors to `rigs.json`. Re-run it whenever new parts land; tune
+anything it gets wrong in `/workbench`.
 
 ## Export tips
 
@@ -44,6 +53,14 @@ out, writes the transparent PNG here, and keeps the delivered original in
 - Transparent background is preferred; a flat magenta/green screen is fine and
   gets keyed out at intake (and, as a safety net, at load time if an un-keyed
   file ever makes it in). No drop shadow baked in.
+
+## Opening the game from disk
+
+Composing needs to read the images' pixels, which the browser forbids for
+`file://` pages. Opened straight off disk the game falls back to the canonical
+hero art (and to the procedural renderer where that is missing) — everything
+still runs, the weapon just doesn't aim. Use `npm start` (or the deployed site)
+to see the composed rigs.
 
 ## Anchors
 

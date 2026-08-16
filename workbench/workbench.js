@@ -33,7 +33,7 @@
     r: 52,
     aim: 0,
     spin: false,
-    faceLeft: false,
+    faceLeft: false,      // which way the body is turned — movement, not aim
     showRefs: true,
     onion: false,
     drag: null,
@@ -69,6 +69,7 @@
       rig: {
         bodyScale: R.rig.bodyScale,
         bodyRotation: R.rig.bodyRotation || 0,
+        bodyOffset: clone(R.rig.bodyOffset || { x: 0, y: 0 }),
         weapon: {
           distance: R.rig.weapon.distance,
           rotation: R.rig.weapon.rotation,
@@ -183,17 +184,22 @@
 
   // ------------------------------------------------------------ geometry
 
-  // Edit mode always poses the character at the default aim — facing right,
-  // level — so the handles and the references mean the same thing every time.
+  // Aim and facing are separate, the way the game drives them: the aim slider
+  // (or the right stick) points the weapon, while facing (the left stick, i.e.
+  // which way the character is moving) turns the body. Edit and anchor modes
+  // pose the character straight ahead so handles mean the same thing every time.
   function aimVec() {
-    if (state.mode === "edit") return { x: 1, y: 0 };
+    if (state.mode !== "view") return { x: 1, y: 0 };
     const a = rad(state.aim);
-    return { x: Math.cos(a) * (state.faceLeft ? -1 : 1), y: Math.sin(a) };
+    return { x: Math.cos(a), y: Math.sin(a) };
+  }
+  function facing() {
+    return state.mode !== "view" ? 1 : (state.faceLeft ? -1 : 1);
   }
 
   function frame() {
     const A = aimVec();
-    const T = rig.transform(state.id, state.r, A.x, A.y, 0);
+    const T = rig.transform(state.id, state.r, A.x, A.y, 0, facing());
     if (!T) return null;
     return { T, cx: view.clientWidth / 2 + state.pan.x, cy: view.clientHeight / 2 + state.pan.y, z: state.zoom, A };
   }
@@ -315,6 +321,11 @@
     }
     record(state.id);
     if (state.mode === "anchor") {
+      if (state.part === "body") {
+        renderBodyFit();
+        renderBodyGizmo();
+        return;
+      }
       renderAnchor();
       if (state.part === "arm") renderArmGizmo();
       else renderHandles(anchorHandles());
@@ -341,7 +352,7 @@
     }
 
     const A = aimVec();
-    drawCharacter(ctx, ch, state.r, { t: 0, aimX: A.x, aimY: A.y });
+    drawCharacter(ctx, ch, state.r, { t: 0, aimX: A.x, aimY: A.y, facing: facing() });
 
     if (state.mode === "edit" && state.showRefs) {
       // Drawn on top so the ball can be lined up against the circle it has to
@@ -477,6 +488,107 @@
     ctx.restore();
   }
 
+  // Body tab: the job here is to sit the ball on the collision circle at the
+  // same size every character uses, so this shows the body exactly as the game
+  // draws it with that circle over the top — move, size and turn the art until
+  // they agree.
+  function renderBodyFit() {
+    const rec = record(state.id);
+    const a = rig.assets(state.id);
+    if (!rec || !a.body) return;
+    const cx = view.clientWidth / 2 + state.pan.x;
+    const cy = view.clientHeight / 2 + state.pan.y;
+    const ch = CHARACTERS.find((c) => c.id === state.id);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(state.zoom, state.zoom);
+
+    if (state.showRefs) {
+      ctx.save();
+      ctx.globalAlpha = 0.28;
+      drawCharacter(ctx, ch, state.r, { t: 0, aimX: 1, aimY: 0, useImage: false });
+      ctx.restore();
+    }
+
+    const k = (state.r / Math.max(1e-3, rec.body.radius)) * rec.rig.bodyScale;
+    ctx.save();
+    ctx.translate(rec.rig.bodyOffset.x * state.r, rec.rig.bodyOffset.y * state.r);
+    ctx.rotate(rad(rec.rig.bodyRotation));
+    ctx.drawImage(a.body, -rec.body.pivot.x * k, -rec.body.pivot.y * k, a.body.width * k, a.body.height * k);
+    ctx.restore();
+
+    // the circle the ball has to match, plus the centre it turns about
+    ctx.strokeStyle = "rgba(110,231,135,0.95)";
+    ctx.lineWidth = 2 / state.zoom;
+    ctx.setLineDash([6 / state.zoom, 5 / state.zoom]);
+    ctx.beginPath();
+    ctx.arc(0, 0, state.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1 / state.zoom;
+    ctx.beginPath();
+    ctx.moveTo(-state.r * 1.3, 0); ctx.lineTo(state.r * 1.3, 0);
+    ctx.moveTo(0, -state.r * 1.3); ctx.lineTo(0, state.r * 1.3);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function bodyGizmo() {
+    const rec = record(state.id);
+    if (!rec) return null;
+    const cx = view.clientWidth / 2 + state.pan.x;
+    const cy = view.clientHeight / 2 + state.pan.y;
+    const o = {
+      x: cx + rec.rig.bodyOffset.x * state.r * state.zoom,
+      y: cy + rec.rig.bodyOffset.y * state.r * state.zoom
+    };
+    const d = state.r * rec.rig.bodyScale * state.zoom + 26;
+    const a = rad(rec.rig.bodyRotation);
+    return {
+      origin: o,
+      move: o,
+      scale: { x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d },
+      rotate: { x: o.x + Math.cos(a + Math.PI / 2) * d * 0.78, y: o.y + Math.sin(a + Math.PI / 2) * d * 0.78 }
+    };
+  }
+
+  function renderBodyGizmo() {
+    const g = bodyGizmo();
+    if (g) drawGizmo(g);
+  }
+
+  function drawGizmo(g) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(g.origin.x, g.origin.y); ctx.lineTo(g.scale.x, g.scale.y);
+    ctx.moveTo(g.origin.x, g.origin.y); ctx.lineTo(g.rotate.x, g.rotate.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const dot = (p, color, square) => {
+      ctx.fillStyle = color;
+      ctx.strokeStyle = "#14121c";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (square) ctx.rect(p.x - 6, p.y - 6, 12, 12); else ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    };
+    dot(g.move, "#ff4d8f");
+    dot(g.scale, "#6ee787", true);
+    dot(g.rotate, "#ffd24d");
+    ctx.fillStyle = "#efe9ff";
+    ctx.font = "11px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("move", g.move.x, g.move.y - 12);
+    ctx.fillText("size", g.scale.x, g.scale.y - 12);
+    ctx.fillText("turn", g.rotate.x, g.rotate.y - 12);
+    ctx.restore();
+  }
+
   // Anchor/arm mode: the arm sprites sit on the weapon, so each gets a
   // move / size / turn gizmo in weapon-image space.
   function armGizmo() {
@@ -506,35 +618,7 @@
 
   function renderArmGizmo() {
     const g = armGizmo();
-    if (!g) return;
-    ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,0.35)";
-    ctx.setLineDash([4, 4]);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(g.origin.x, g.origin.y); ctx.lineTo(g.scale.x, g.scale.y);
-    ctx.moveTo(g.origin.x, g.origin.y); ctx.lineTo(g.rotate.x, g.rotate.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    const dot = (p, color, square) => {
-      ctx.fillStyle = color;
-      ctx.strokeStyle = "#14121c";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      if (square) ctx.rect(p.x - 6, p.y - 6, 12, 12); else ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    };
-    dot(g.move, "#ff4d8f");
-    dot(g.scale, "#6ee787", true);
-    dot(g.rotate, "#ffd24d");
-    ctx.fillStyle = "#efe9ff";
-    ctx.font = "11px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("move", g.move.x, g.move.y - 12);
-    ctx.fillText("size", g.scale.x, g.scale.y - 12);
-    ctx.fillText("turn", g.rotate.x, g.rotate.y - 12);
-    ctx.restore();
+    if (g) drawGizmo(g);
   }
 
   function renderHandles(list) {
@@ -643,8 +727,8 @@
           ? "The arms sit on the weapon: drag the pink dot to place this arm, the green square to size it, the yellow dot to turn it. Pick which arm above the viewer."
           : state.part === "weapon"
             ? "Grip → muzzle is the weapon's aim line: whatever angle you set here is the direction the weapon points when the player aims, and the muzzle is where shots come from."
-            : "Body: pink is the physics center the character is positioned by, green sets the ball radius that matches the collision circle.")
-        : "Preview. Aim with a gamepad stick (or the aim slider), and press Edit mode to set the weapon distance.";
+            : "Match the ball to the green circle — every character uses the same one. Drag pink to move the art, the green square to size it, yellow to turn it.")
+        : "Preview. The right stick aims and the left stick turns the body (facing follows movement, not aim), or use the aim slider and the Face left box.";
   }
 
   // ---------------------------------------------- edit-mode part selector
@@ -740,10 +824,18 @@
       );
     } else {
       box.append(
-        num("Pivot X", () => rec.body.pivot.x, (v) => { rec.body.pivot.x = v; }, { step: 1 }),
-        num("Pivot Y", () => rec.body.pivot.y, (v) => { rec.body.pivot.y = v; }, { step: 1 }),
-        num("Ball radius", () => rec.body.radius, (v) => { rec.body.radius = Math.max(4, v); }, { step: 1 }),
-        slider("Body scale", () => rec.rig.bodyScale, (v) => { rec.rig.bodyScale = v; }, 0.2, 3, 0.005)
+        slider("Scale", () => rec.rig.bodyScale, (v) => { rec.rig.bodyScale = v; }, 0.3, 2.5, 0.005),
+        num("Position X (r)", () => rec.rig.bodyOffset.x, (v) => { rec.rig.bodyOffset.x = v; }, { step: 0.01 }),
+        num("Position Y (r)", () => rec.rig.bodyOffset.y, (v) => { rec.rig.bodyOffset.y = v; }, { step: 0.01 }),
+        slider("Rotation°", () => rec.rig.bodyRotation, (v) => { rec.rig.bodyRotation = v; }, -180, 180, 0.5)
+      );
+      const h3 = document.createElement("h3");
+      h3.textContent = "Detected ball";
+      box.appendChild(h3);
+      box.append(
+        num("Pivot X (px)", () => rec.body.pivot.x, (v) => { rec.body.pivot.x = v; }, { step: 1 }),
+        num("Pivot Y (px)", () => rec.body.pivot.y, (v) => { rec.body.pivot.y = v; }, { step: 1 }),
+        num("Radius (px)", () => rec.body.radius, (v) => { rec.body.radius = Math.max(4, v); }, { step: 1 })
       );
     }
 
@@ -914,6 +1006,21 @@
         state.drag = { grip: true, before: before() };
         return;
       }
+    } else if (state.mode === "anchor" && state.part === "body") {
+      const g = bodyGizmo();
+      if (g) {
+        for (const op of ["scale", "rotate", "move"]) {
+          if (nearBy(pos, g[op])) {
+            const rec = record(state.id);
+            state.drag = {
+              body: op, start: pos, origin: g.origin,
+              base: { offset: clone(rec.rig.bodyOffset), scale: rec.rig.bodyScale, rotation: rec.rig.bodyRotation },
+              before: before()
+            };
+            return;
+          }
+        }
+      }
     } else if (state.mode === "anchor" && state.part === "arm") {
       const g = armGizmo();
       if (g) {
@@ -946,6 +1053,28 @@
     touch(state.id);
   }
 
+  // Body tab: move / size / turn the body art against the collision circle.
+  function dragBody(pos) {
+    const rec = record(state.id);
+    if (!rec) return;
+    const d = state.drag;
+    if (d.body === "move") {
+      rec.rig.bodyOffset = {
+        x: d.base.offset.x + (pos.x - d.start.x) / (state.r * state.zoom),
+        y: d.base.offset.y + (pos.y - d.start.y) / (state.r * state.zoom)
+      };
+    } else if (d.body === "scale") {
+      const d0 = Math.max(8, Math.hypot(d.start.x - d.origin.x, d.start.y - d.origin.y));
+      const d1 = Math.hypot(pos.x - d.origin.x, pos.y - d.origin.y);
+      rec.rig.bodyScale = clamp(d.base.scale * (d1 / d0), 0.2, 4);
+    } else {
+      const a0 = Math.atan2(d.start.y - d.origin.y, d.start.x - d.origin.x);
+      const a1 = Math.atan2(pos.y - d.origin.y, pos.x - d.origin.x);
+      rec.rig.bodyRotation = ((d.base.rotation + deg(a1 - a0) + 540) % 360) - 180;
+    }
+    touch(state.id);
+  }
+
   function dragArm(pos) {
     const rec = record(state.id);
     const img = anchorImage();
@@ -973,6 +1102,8 @@
       state.pan = { x: pos.x - state.drag.pan.x, y: pos.y - state.drag.pan.y };
     } else if (state.drag.anchor) {
       applyAnchorDrag(state.drag.anchor, pos);
+    } else if (state.drag.body) {
+      dragBody(pos);
     } else if (state.drag.arm) {
       dragArm(pos);
     } else if (state.drag.grip) {
@@ -1000,6 +1131,9 @@
   }
 
   function fitAnchorZoom() {
+    // The body tab works at preview scale (it is the composed body against the
+    // collision circle), the others at image scale.
+    if (state.part === "body") { setZoom(2); return; }
     const img = anchorImage();
     if (!img) return;
     setZoom(Math.min((view.clientWidth - 60) / img.width, (view.clientHeight - 60) / img.height));
@@ -1035,6 +1169,11 @@
     } else if (state.mode === "anchor" && state.part === "arm") {
       const arm = rec.rig.arms[state.arm];
       if (arm) arm.hold = { x: arm.hold.x + dx / state.zoom, y: arm.hold.y + dy / state.zoom };
+    } else if (state.mode === "anchor" && state.part === "body") {
+      rec.rig.bodyOffset = {
+        x: rec.rig.bodyOffset.x + dx / (state.r * state.zoom),
+        y: rec.rig.bodyOffset.y + dy / (state.r * state.zoom)
+      };
     }
     touch(state.id);
   }
@@ -1045,6 +1184,9 @@
     if (state.mode === "anchor" && state.part === "arm") {
       const arm = rec.rig.arms[state.arm];
       if (arm) arm.scale = clamp(arm.scale * factor, 0.02, 3);
+      touch(state.id);
+    } else if (state.mode === "anchor" && state.part === "body") {
+      rec.rig.bodyScale = clamp(rec.rig.bodyScale * factor, 0.2, 4);
       touch(state.id);
     }
   }
@@ -1068,6 +1210,7 @@
     $("selPanel").hidden = mode === "view";
     state.pan = { x: 0, y: 0 };
     if (mode === "anchor") fitAnchorZoom(); else setZoom(2);
+    if (mode === "anchor" && state.part === "body") setZoom(2);
     buildParts();
     buildSelPanel();
     syncHead();
@@ -1170,22 +1313,24 @@
       label.classList.add("live");
     }
 
-    // Right stick, falling back to the left one. Aiming is a preview thing:
-    // edit mode holds the default pose so the handles stay put under the mouse.
+    // Right stick aims, left stick turns the body — the same split the game
+    // uses, so a character can walk left while shooting right. Preview only:
+    // edit and anchor modes hold the default pose.
     const ax = (i) => (pad.axes.length > i ? pad.axes[i] : 0);
-    let x = ax(2), y = ax(3);
-    if (Math.hypot(x, y) < 0.25) { x = ax(0); y = ax(1); }
-    if (Math.hypot(x, y) >= 0.25 && state.mode !== "edit") {
-      const a = Math.atan2(y, x);
-      const facing = Math.cos(a) < 0;
-      state.faceLeft = facing;
-      $("faceLeft").checked = facing;
-      const local = facing ? Math.atan2(y, -x) : a;
-      state.aim = round(deg(local), 1);
-      $("aim").value = Math.round(state.aim);
-      $("aimOut").textContent = `${Math.round(state.aim)}°`;
-      state.spin = false;
-      $("spin").checked = false;
+    if (state.mode === "view") {
+      const rx = ax(2), ry = ax(3);
+      if (Math.hypot(rx, ry) >= 0.25) {
+        state.aim = round(deg(Math.atan2(ry, rx)), 1);
+        $("aim").value = Math.round(state.aim);
+        $("aimOut").textContent = `${Math.round(state.aim)}°`;
+        state.spin = false;
+        $("spin").checked = false;
+      }
+      const lx = ax(0);
+      if (Math.abs(lx) >= 0.3) {
+        state.faceLeft = lx < 0;
+        $("faceLeft").checked = state.faceLeft;
+      }
     }
 
     const pressed = (i) => !!(pad.buttons[i] && pad.buttons[i].pressed);

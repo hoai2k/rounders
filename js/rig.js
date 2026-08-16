@@ -610,6 +610,7 @@
       rig: {
         bodyScale: 1,
         bodyRotation: 0,
+        bodyOffset: { x: 0, y: 0 },
         weapon: {
           // Placed and sized to the procedural weapon's geometry: the grip sits
           // `distance` radii out along the aim and the muzzle lands at
@@ -699,6 +700,7 @@
       rig: {
         bodyScale: num(sr.bodyScale, auto.rig.bodyScale),
         bodyRotation: num(sr.bodyRotation, auto.rig.bodyRotation),
+        bodyOffset: pt(sr.bodyOffset, auto.rig.bodyOffset),
         weapon: {
           distance: num(srw.distance, auto.rig.weapon.distance),
           rotation: num(srw.rotation, auto.rig.weapon.rotation),
@@ -754,11 +756,18 @@
 
   // Transform used by both the renderer and the workbench overlay.
   // Returns null when the character has no usable rig.
-  function transform(id, r, aimX = 1, aimY = 0, wob = 0) {
+  // `facing` is which way the character is turned — the game takes it from the
+  // player's movement, not from the aim, so a fighter can back away while still
+  // shooting where the stick points. Left unset it falls back to the aim, which
+  // is what menus and portraits want.
+  function transform(id, r, aimX = 1, aimY = 0, wob = 0, facingIn = 0) {
     const R = getResolved(id);
     if (!R) return null;
-    const facing = aimX < 0 ? -1 : 1;
-    const k = (r / Math.max(1e-3, R.body.radius)) * R.rig.bodyScale;
+    const facing = facingIn < 0 ? -1 : facingIn > 0 ? 1 : (aimX < 0 ? -1 : 1);
+    const k = r / Math.max(1e-3, R.body.radius);
+    // The body's own scale/offset/rotation only adjust the body art against the
+    // collision circle; the weapon and arms are unaffected by them.
+    const kBody = k * R.rig.bodyScale;
     // In the mirrored frame the aim vector flips back on x.
     const aimAngle = Math.atan2(aimY, aimX * facing);
 
@@ -790,7 +799,7 @@
         y: (R.body.mount.y - R.body.pivot.y) * k + R.rig.weapon.offset.y * r + wob
       };
     return {
-      R, facing, k, kw, angle, mount, wob,
+      R, facing, k, kBody, kw, angle, mount, wob,
       bodyImg: entry(id).body, weaponImg: entry(id).weapon
     };
   }
@@ -889,7 +898,7 @@
     const id = typeof ch === "string" ? ch : ch.id;
     const e = entry(id);
     if (e.state !== "ready") return false;
-    const T = transform(id, r, opts.aimX ?? 1, opts.aimY ?? 0, opts.wob || 0);
+    const T = transform(id, r, opts.aimX ?? 1, opts.aimY ?? 0, opts.wob || 0, opts.facing || 0);
     if (!T) return false;
 
     ctx.save();
@@ -897,12 +906,12 @@
     drawArms(ctx, T, "back");
     if (T.R.rig.weapon.behind) drawWeapon(ctx, T);
     ctx.save();
-    ctx.translate(0, T.wob);
+    ctx.translate(T.R.rig.bodyOffset.x * r, T.R.rig.bodyOffset.y * r + T.wob);
     if (T.R.rig.bodyRotation) ctx.rotate((T.R.rig.bodyRotation * Math.PI) / 180);
     ctx.drawImage(
       e.body,
-      -T.R.body.pivot.x * T.k, -T.R.body.pivot.y * T.k,
-      e.body.width * T.k, e.body.height * T.k
+      -T.R.body.pivot.x * T.kBody, -T.R.body.pivot.y * T.kBody,
+      e.body.width * T.kBody, e.body.height * T.kBody
     );
     ctx.restore();
     drawArms(ctx, T, "mid");
@@ -914,9 +923,9 @@
 
   // World-space muzzle position for a character drawn at (0,0), useful for
   // spawning shots and muzzle flashes exactly at the barrel.
-  function muzzle(ch, r, aimX = 1, aimY = 0, wob = 0) {
+  function muzzle(ch, r, aimX = 1, aimY = 0, wob = 0, facing = 0) {
     const id = typeof ch === "string" ? ch : ch.id;
-    const T = transform(id, r, aimX, aimY, wob);
+    const T = transform(id, r, aimX, aimY, wob, facing);
     if (!T) return null;
     const p = holdPoint(T, T.R.weapon.muzzle);
     return { x: p.x * T.facing, y: p.y };

@@ -19,7 +19,7 @@
     // ---------------------------------------------------------------- TITLE
     title: {
       eyebrow: "1–4 player arena brawler",
-      tagline: "Round fighters. Absurd power cards. 25 arenas with attitude.",
+      tagline: "Round shooters. Power cards. Arenas with attitude.",
       pressStart: "PRESS START",
       hint: "Any key · any controller button · or click to begin",
       fullscreenBlocked: "Fullscreen needs a key or click — use the fullscreen button"
@@ -28,7 +28,7 @@
     // ------------------------------------------------------- CHARACTER SELECT
     menu: {
       eyebrow: "1–4 player arena brawler",
-      tagline: "Losers draft, winners sweat. Last one standing takes the round.",
+      tagline: "Losers power-up, winners sweat. Last dot standing takes the round.",
 
       // shown inside an empty slot
       slotJoinPrompt: "Press A to join",

@@ -26,7 +26,6 @@
   const titleScreen = document.getElementById("title");
   const iconBar = document.getElementById("iconBar");
   const nowPlayingBar = document.getElementById("nowPlaying");
-  const addBotBtn = () => document.getElementById("addBotBtn");
   const startBtn = () => document.getElementById("startBtn");
   const settingsPanel = document.getElementById("settings");
   const howPanel = document.getElementById("how");
@@ -297,6 +296,10 @@
 
   function updateLobby(pads) {
     if (world.state !== "menu") return;
+    // Sampled before the join pass: a pad that is not in the lobby yet is
+    // joining with this press, not asking for a bot.
+    const wantsBot = pressed.has("KeyY") ||
+      pads.some(pad => buttonEdge(pad, 3) && slotJoined("pad", pad.index));
     // keyboard joins: any of WASD (player 1) or the arrow keys (player 2)
     keyboardSchemes.forEach((scheme, i) => {
       if (slotJoined("keyboard", i)) return;
@@ -311,6 +314,12 @@
         addSlot({ type: "pad", gamepadIndex: pad.index, label: pad.id.split("(")[0].trim() || `Controller ${pad.index + 1}` });
       }
     }
+    // Y takes an open slot as a bot (needs someone in the lobby first)
+    if (wantsBot && lobbySlots.length >= 1 && lobbySlots.length < settings.playerCount) {
+      addBot();
+      world.joinedThisFrame = true;
+    }
+
     // per-slot input: cycle / lock / leave
     for (const slot of [...lobbySlots]) {
       if (slot.type === "bot") continue;
@@ -352,23 +361,24 @@
       const slot = lobbySlots[i];
       if (!slot) {
         cells.push(`
-          <article class="join-slot empty">
+          <article class="join-slot empty pickable" data-slot="${i}" role="button" tabindex="-1">
             <div class="slot-portrait empty-portrait">?</div>
             <strong>${escapeHtml(str("menu.slotOpenTitle"))}</strong>
             <span class="slot-join">${escapeHtml(str("menu.slotJoinPrompt"))}</span>
+            ${i > 0 ? `<span class="slot-bot-hint">${escapeHtml(str("menu.slotBotPrompt"))}</span>` : ""}
           </article>`);
         continue;
       }
       const ch = CHARACTERS[slot.charIndex];
       cells.push(`
-        <article class="join-slot joined ${slot.locked ? "locked" : ""}" style="--pcol:${playerColors[i]}">
+        <article class="join-slot joined ${slot.locked ? "locked" : ""}${slot.type === "pad" ? "" : " pickable"}" data-slot="${i}" style="--pcol:${playerColors[i]}">
           <div class="slot-arrows">${slot.locked || slot.type === "bot" ? "" : "◀&nbsp;&nbsp;&nbsp;▶"}</div>
           <div class="slot-portrait"><canvas data-portrait="${slot.charIndex}" width="96" height="96"></canvas></div>
           <strong>${ch.name} <em>${ch.title}</em></strong>
           <span class="slot-blurb">${ch.blurb}</span>
           <span class="slot-input">${slot.type === "bot" ? escapeHtml(str("menu.slotBot")) : escapeHtml(slot.label)}</span>
           <span class="slot-state">${escapeHtml(slot.locked || slot.type === "bot" ? str("menu.slotReady") : str("menu.slotChoosing"))}</span>
-          ${slot.type === "bot" ? `<button type="button" class="bot-remove" data-remove-bot="${i}">${escapeHtml(str("menu.botRemove"))}</button>` : ""}
+
         </article>`);
     }
     joinSlots.innerHTML = cells.join("");
@@ -388,13 +398,52 @@
     addSlot({ type: "bot", label: str("menu.slotBot") });
   }
 
-  // Add Bot appears once someone has joined; Start Match once there are 2+.
+  // Clicking a slot walks it through the seats a mouse can hand out:
+  // keyboard 1 → keyboard 2 → bot → empty, skipping keyboards already taken.
+  function cycleSlotByClick(index) {
+    const slot = lobbySlots[index];
+    if (slot && slot.type === "pad") return;     // that seat belongs to a controller
+    const takenByOther = i => lobbySlots.some(sl => sl !== slot && sl.type === "keyboard" && sl.schemeIndex === i);
+    const options = [];
+    for (const i of [0, 1]) if (!takenByOther(i)) options.push({ kind: "keyboard", schemeIndex: i });
+    options.push({ kind: "bot" });
+    options.push({ kind: "none" });
+
+    const currentKind = !slot ? "none" : slot.type === "bot" ? "bot" : "keyboard";
+    const at = options.findIndex(o => o.kind === currentKind &&
+      (o.kind !== "keyboard" || o.schemeIndex === slot.schemeIndex));
+    const next = options[(at + 1 + options.length) % options.length];
+
+    if (next.kind === "none") {
+      if (slot) removeSlot(slot);
+      return;
+    }
+    if (!slot) {
+      if (lobbySlots.length >= settings.playerCount) { showToast(str("menu.lobbyFull")); return; }
+      if (next.kind === "bot") addBot();
+      else addSlot({ type: "keyboard", schemeIndex: next.schemeIndex, label: keyboardSchemes[next.schemeIndex].label });
+      return;
+    }
+    if (next.kind === "bot") {
+      slot.type = "bot";
+      slot.schemeIndex = undefined;
+      slot.label = str("menu.slotBot");
+      slot.locked = true;
+    } else {
+      slot.type = "keyboard";
+      slot.schemeIndex = next.schemeIndex;
+      slot.label = keyboardSchemes[next.schemeIndex].label;
+      slot.locked = false;
+    }
+    sfx("card");
+    renderLobby();
+  }
+
+  // Start Match appears once there are two or more fighters.
   function syncLobbyActions() {
-    const bot = addBotBtn();
     const start = startBtn();
-    if (!bot || !start) return;
+    if (!start) return;
     const wasHidden = start.classList.contains("hidden");
-    bot.classList.toggle("hidden", lobbySlots.length < 1 || lobbySlots.length >= settings.playerCount);
     start.classList.toggle("hidden", lobbySlots.length < 2);
     if (wasHidden && !start.classList.contains("hidden") && world.state === "menu") {
       const controls = visibleControls();
@@ -460,11 +509,6 @@
     if (world.chromeIcons !== showIcons) {
       world.chromeIcons = showIcons;
       iconBar.classList.toggle("hidden", !showIcons);
-    }
-    const iconsTop = world.state === "paused";
-    if (world.chromeIconsTop !== iconsTop) {
-      world.chromeIconsTop = iconsTop;
-      iconBar.classList.toggle("at-top", iconsTop);
     }
     if (nowPlayingBar && world.chromeTracks !== showTracks) {
       world.chromeTracks = showTracks;
@@ -1876,51 +1920,59 @@
 
   // -------------------------------------------------------------------- HUD
   function buildHud() {
-    hud.innerHTML = "";
+    hud.innerHTML = '<div class="hud-col left"></div><div class="hud-col right"></div>';
+    const cols = [hud.querySelector(".hud-col.left"), hud.querySelector(".hud-col.right")];
     hudRefs = [];
-    for (const p of players) {
+    players.forEach((p, i) => {
       const el = document.createElement("article");
       el.className = "hud-card";
       el.style.setProperty("--pcol", p.color);
       el.innerHTML = `
-        <div class="hud-portrait"><canvas width="64" height="64"></canvas></div>
-        <div class="hud-body">
-          <div class="hud-top"><span class="hud-name">${escapeHtml(p.name)}</span><span class="hud-score"></span></div>
-          <div class="bar"><i></i><b></b></div>
-          <div class="hud-ammo"></div>
-          <div class="hud-cards"></div>
-        </div>`;
+        <div class="hud-head">
+          <div class="hud-portrait"><canvas width="64" height="64"></canvas></div>
+          <div class="hud-id">
+            <span class="hud-name">${escapeHtml(p.name)}</span>
+            <span class="hud-score"></span>
+          </div>
+        </div>
+        <div class="hud-cards"></div>`;
       const pc = el.querySelector("canvas").getContext("2d");
       pc.translate(26, 36);
       drawCharacter(pc, p.character, 17, { t: 0, aimX: 1 });
-      hud.appendChild(el);
+      cols[i % 2].appendChild(el);
       hudRefs.push({
         p, el,
         score: el.querySelector(".hud-score"),
-        bar: el.querySelector(".bar i"),
-        barGhost: el.querySelector(".bar b"),
-        ammo: el.querySelector(".hud-ammo"),
         cards: el.querySelector(".hud-cards"),
-        lastCards: -1, lastAmmo: -1, lastReload: false
+        lastCards: -1
       });
-    }
+    });
     updateHud(true);
+  }
+
+  // Park the two card columns in the letterbox margins when the window is wider
+  // than 16:9; on an exact fit they tuck into the arena corners instead.
+  function layoutHud(marginX, marginY) {
+    const roomy = marginX >= 150;
+    if (world.hudRoomy !== roomy) {
+      world.hudRoomy = roomy;
+      hud.classList.toggle("tight", !roomy);
+    }
+    const inset = roomy ? Math.max(8, marginX - 236) : 10;
+    const top = roomy ? Math.max(10, marginY + 10) : marginY + 10;
+    if (world.hudInset !== inset || world.hudTop !== top) {
+      world.hudInset = inset;
+      world.hudTop = top;
+      hud.style.setProperty("--hud-inset", `${Math.round(inset)}px`);
+      hud.style.setProperty("--hud-top", `${Math.round(top)}px`);
+    }
   }
 
   function updateHud(force = false) {
     for (const ref of hudRefs) {
       const p = ref.p;
       ref.el.classList.toggle("dead", !p.alive);
-      const hpPct = clamp(p.hp / p.stats.maxHp, 0, 1) * 100;
-      ref.bar.style.width = `${hpPct}%`;
       ref.score.textContent = str("hud.score", { score: p.score, limit: settings.scoreLimit });
-      const reloading = p.reloadTimer > 0;
-      if (force || p.ammo !== ref.lastAmmo || reloading !== ref.lastReload) {
-        ref.lastAmmo = p.ammo; ref.lastReload = reloading;
-        ref.ammo.innerHTML = reloading
-          ? `<span class="reloading">${escapeHtml(str("hud.reloading"))}</span>`
-          : Array.from({ length: p.stats.maxAmmo }, (_, i) => `<i class="${i < p.ammo ? "full" : ""}"></i>`).join("");
-      }
       if (force || p.cards.length !== ref.lastCards) {
         ref.lastCards = p.cards.length;
         const shown = p.cards.slice(-3);
@@ -1942,10 +1994,12 @@
       ((world.state === "settings" || world.state === "how") && (world.panelReturn !== "paused" || !players.length));
     const inGame = !onMenuScreen;
     const dpr = canvas.height / innerHeight;
-    const hudReserve = inGame && hud.offsetHeight ? Math.min(150, hud.offsetHeight + 14) * dpr : 0;
-    const scale = Math.min(canvas.width / world.width, (canvas.height - hudReserve) / world.height);
+    // the arena always takes the largest 16:9 fit — health and ammo ride on the
+    // fighters themselves, so nothing needs to be reserved at the bottom
+    const scale = Math.min(canvas.width / world.width, canvas.height / world.height);
     const ox = (canvas.width - world.width * scale) / 2;
-    const oy = (canvas.height - hudReserve - world.height * scale) / 2;
+    const oy = (canvas.height - world.height * scale) / 2;
+    if (inGame) layoutHud(ox / dpr, oy / dpr);
     ctx.save();
     ctx.fillStyle = "#0a0a12";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2343,29 +2397,24 @@
   function drawPlayersAll() {
     for (const p of players) {
       if (!p.alive) continue;
+      const r = p.stats.radius;
       ctx.save();
       ctx.translate(p.x, p.y);
-      const r = p.stats.radius;
+
       // shadow
       ctx.fillStyle = "rgba(0,0,0,0.28)";
       ctx.beginPath();
       ctx.ellipse(0, r + 9, r * 0.95, 8, 0, 0, Math.PI * 2);
       ctx.fill();
+
+      // body (the lean is cosmetic, so the gauges below stay upright)
+      ctx.save();
       ctx.rotate(clamp(p.vx / 1400, -0.4, 0.4));
-      // player color ring
-      ctx.strokeStyle = p.color;
-      ctx.lineWidth = 4;
-      ctx.globalAlpha = 0.9;
-      ctx.beginPath();
-      ctx.arc(0, 0, r + 7, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
       drawCharacter(ctx, p.character, r, {
         t: world.time + p.botSeed,
         aimX: p.aimX, aimY: p.aimY, facing: p.facing,
         blink: p.blinkClock % 4 > 3.8
       });
-      // status tints
       if (p.chillTimer > 0) {
         ctx.fillStyle = "rgba(140,220,255,0.3)";
         ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
@@ -2374,30 +2423,90 @@
         ctx.fillStyle = "rgba(255,120,40,0.22)";
         ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
       }
+      ctx.restore();
+
+      drawHealthRing(p, r);
+      drawAmmoPips(p, r);
+
       if (p.blockTimer > 0 || p.spawnGrace > 0) {
         ctx.strokeStyle = p.blockTimer > 0 ? "#ffffff" : "rgba(255,255,255,0.45)";
         ctx.lineWidth = p.blockTimer > 0 ? 7 : 3;
         ctx.beginPath();
-        ctx.arc(0, 0, r + 13 + Math.sin(performance.now() / 45) * 3, 0, Math.PI * 2);
+        ctx.arc(0, 0, r + 15 + Math.sin(performance.now() / 45) * 3, 0, Math.PI * 2);
         ctx.stroke();
       }
-      // active ready ring
+      // active ability ready
       if (p.stats.active && p.activeCooldown <= 0) {
         ctx.strokeStyle = "rgba(255,77,143,0.8)";
         ctx.lineWidth = 3;
         ctx.setLineDash([6, 8]);
         ctx.lineDashOffset = -world.time * 40;
         ctx.beginPath();
-        ctx.arc(0, 0, r + 18, 0, Math.PI * 2);
+        ctx.arc(0, 0, r + 21, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
       }
       ctx.restore();
+
       // name tag
       ctx.fillStyle = hexAlpha(p.color, 0.9);
       ctx.font = "700 15px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(p.name, p.x, p.y - p.stats.radius - 22);
+      ctx.fillText(p.name, p.x, p.y - r - 24);
+    }
+  }
+
+  // Health reads as a ring hugging the fighter: a dark track with the player's
+  // colour drawn clockwise from the top, so a glance at the body tells you both
+  // who they are and how close they are to going down.
+  function drawHealthRing(p, r) {
+    const ringR = r + 8;
+    const frac = clamp(p.hp / p.stats.maxHp, 0, 1);
+    ctx.lineWidth = 5;
+    ctx.lineCap = "butt";
+    ctx.strokeStyle = "rgba(10,8,18,0.55)";
+    ctx.beginPath();
+    ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+    ctx.stroke();
+    if (frac <= 0) return;
+    // the last sliver flashes so a nearly-dead fighter is unmissable
+    const low = frac < 0.28;
+    ctx.strokeStyle = low
+      ? `rgba(255,90,110,${0.72 + 0.28 * Math.abs(Math.sin(world.time * 9))})`
+      : p.color;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.arc(0, 0, ringR, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+    ctx.stroke();
+    ctx.lineCap = "butt";
+  }
+
+  // Ammo sits on the weapon side as a little fan of rounds that empties as you
+  // fire; while reloading the fan refills left-to-right.
+  function drawAmmoPips(p, r) {
+    const n = Math.max(1, Math.round(p.stats.maxAmmo));
+    if (n > 14) return;                       // absurd magazines would ring the body
+    const aim = Math.atan2(p.aimY, p.aimX);
+    const step = Math.min(0.19, 1.5 / n);
+    const pipR = r + 20;
+    const reloading = p.reloadTimer > 0;
+    const filled = reloading
+      ? (1 - clamp(p.reloadTimer / Math.max(0.01, p.stats.reload), 0, 1)) * n
+      : p.ammo;
+    for (let i = 0; i < n; i += 1) {
+      const a = aim + (i - (n - 1) / 2) * step;
+      const x = Math.cos(a) * pipR;
+      const y = Math.sin(a) * pipR;
+      const on = i < filled;
+      ctx.beginPath();
+      ctx.arc(x, y, on ? 3.1 : 2.2, 0, Math.PI * 2);
+      ctx.fillStyle = on ? (reloading ? "rgba(255,255,255,0.92)" : "#ffe169") : "rgba(12,10,20,0.5)";
+      ctx.fill();
+      if (on) {
+        ctx.strokeStyle = "rgba(12,10,20,0.75)";
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
     }
   }
 
@@ -2983,15 +3092,10 @@
   // --------------------------------------------------------------------- UI
   function bindUi() {
     document.getElementById("startBtn").addEventListener("click", startMatch);
-    document.getElementById("addBotBtn").addEventListener("click", addBot);
     joinSlots.addEventListener("click", e => {
-      const btn = e.target.closest("[data-remove-bot]");
-      if (!btn) return;
-      const idx = Number(btn.dataset.removeBot);
-      if (lobbySlots[idx] && lobbySlots[idx].type === "bot") {
-        lobbySlots.splice(idx, 1);
-        renderLobby();
-      }
+      const cell = e.target.closest("[data-slot]");
+      if (!cell || world.state !== "menu") return;
+      cycleSlotByClick(Number(cell.dataset.slot));
     });
     document.getElementById("resumeBtn").addEventListener("click", () => togglePause(false));
     document.getElementById("musicPrev").addEventListener("click", () => skipTrack(-1));

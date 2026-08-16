@@ -40,8 +40,10 @@
       slotBot: "Bot",
       botRemove: "✕ remove",
 
-      // buttons that appear as the lobby fills up
-      addBot: "+ Add Bot",
+      // second line on every empty slot except the first
+      slotBotPrompt: "(Y to add bot)",
+
+      // appears once two or more fighters are in
       startMatch: "Start Match",
 
       lobbyFull: "Lobby is full",

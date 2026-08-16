@@ -162,6 +162,11 @@ Pillars:
 - [x] Pause = "Game Paused" + Resume / Settings / Quit to Menu
 - [x] Spatial controller navigation (rows crossed with left/right)
 - [x] All UI text extracted to `js/strings.js`
+- [x] Add Bot button replaced by "(Y to add bot)" on every slot but the first
+- [x] Slots are mouse-selectable: click cycles keyboard 1 → keyboard 2 → bot → empty
+- [x] Arena renders at full 16:9; health rings + ammo pips ride on the fighters
+      (ROUNDS-style) and player cards sit in the letterbox margins
+- [x] Icon row stays bottom-right everywhere; song widget moved to bottom-left
 - [x] **Arch logo art**: `assets/images/logo-arch.png` (keyed from
       `rounders_logo_arch_v3.png`) replaces the text logo on the title screen
       and main menu; UI palette shifted to match (gunmetal panels, steel-bevel

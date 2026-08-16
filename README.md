@@ -1,6 +1,8 @@
-# Rounder
+# Rounders
 
-Rounder is a local multiplayer arena roguelite prototype inspired by the broad design pattern of short physics duels plus comeback card drafting. It uses original names, visuals, and card presentation so the project can grow into its own game.
+**Rounders** is a colorful 1–4 player local arena brawler in the spirit of ROUNDS:
+short physics duels between round little fighters, where everyone who loses a round
+drafts a power card — all at the same time — and comes back angrier.
 
 ## Play
 
@@ -10,37 +12,52 @@ Open `index.html` in a browser, or run the local server:
 npm start
 ```
 
-The default URL is `http://127.0.0.1:4173`.
+Default URL: `http://127.0.0.1:4173`.
 
-Keyboard:
+### Controls
 
-- Player 1: A/D move, W jump, F shoot, G block
-- Player 2: Arrow keys move/jump, `/` shoot, `.` block
+| | Move | Jump | Shoot | Block / Active |
+|---|---|---|---|---|
+| Keyboard 1 | A / D | W | F | G |
+| Keyboard 2 | ◀ / ▶ | ▲ | / | . |
+| Controller | Left stick | A | RT / RB | LT / LB / B |
 
-Controller:
+Join the lobby with your **shoot** button (or any pad button), pick one of the
+**12 characters** with ◀ ▶, and lock in with shoot. `M` toggles music,
+`Esc`/`P` pauses.
 
-- Left stick or D-pad moves
-- A jumps
-- RT/RB shoots
-- LT/LB blocks
-- Start rematches after a match ends
+## What's inside
 
-## Current Base
+- **52 hand-designed power cards** across six color-coded rarities — Common,
+  Uncommon, Rare, Epic, Legendary, and **Mythic** (active abilities on your block
+  button). Every card states exactly what it does.
+- **25 themed arenas**, each with its own palette, weather, and signature mechanic:
+  ice, conveyors, wind gusts, low gravity, bounce pads, moving platforms,
+  teleporters, crumbling floors, rising tides, timed lightning, syrup pools,
+  black-hole voids, and more. Every round is a random arena (or lock one in
+  Settings).
+- **12 playable characters** — round bodies, signature weapons, big personalities.
+  Fully procedural art, with automatic upgrade to generated images when dropped
+  into `assets/images/` (see `image-requests.md`).
+- **Simultaneous drafting** — when several players lose a round, they all draft at
+  once, each with their own hand and controls.
+- Bots (three difficulties), controller rumble, screen shake, synth SFX, and a
+  2-track soundtrack.
 
-- 2-4 local players
-- Keyboard and browser Gamepad API support
-- Controller haptics where the browser and controller expose vibration
-- Arena platform physics
-- Ammo, reloads, blocking, ricochets, knockback, hazards
-- Loser draft between rounds
-- Common, uncommon, and rare cards
-- Settings for player count, score limit, draft count, hazards, haptics, and screen shake
+## Project docs
 
-## Next Good Additions
+- `PROJECT-STATE.md` — workstream tracker for the redesign
+- `image-requests.md` — prompts + file paths for all optional generated art
+- `AUDIT.md` — variety/balance audit findings
+- `CLAUDE.md` — repo policies
 
-- Better character select and controller assignment UI
-- More maps and map modifiers
-- More cards and clear card synergy tags
-- Optional bots for empty slots
-- Audio pass
-- Balance presets for casual, chaos, and competitive play
+## Code layout
+
+| File | Purpose |
+|---|---|
+| `game.js` | Engine: physics, combat, arena features, draft flow, rendering, menus |
+| `js/cards.js` | The 52-card set + rarity metadata |
+| `js/levels.js` | The 25 arenas |
+| `js/characters.js` | The 12 characters + procedural renderer |
+| `index.html`, `styles.css` | UI |
+| `server.mjs` | Zero-dependency static server |

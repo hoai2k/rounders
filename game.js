@@ -1,5 +1,8 @@
+// Rounders — engine. Content lives in js/cards.js, js/levels.js, js/characters.js.
 (() => {
   "use strict";
+
+  const { CARDS, RARITIES, CHARACTERS, LEVELS, drawCharacter, arenaImage } = window.ROUNDERS;
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -9,35 +12,30 @@
   const settingsPanel = document.getElementById("settings");
   const howPanel = document.getElementById("how");
   const draftPanel = document.getElementById("draft");
-  const draftCards = document.getElementById("draftCards");
-  const draftPrompt = document.getElementById("draftPrompt");
+  const draftGrid = document.getElementById("draftGrid");
+  const draftTitle = document.getElementById("draftTitle");
   const joinSlots = document.getElementById("joinSlots");
-  const onlineGames = document.getElementById("onlineGames");
   const battleSplash = document.getElementById("battleSplash");
   const battleKicker = document.getElementById("battleKicker");
   const battleTitle = document.getElementById("battleTitle");
   const battleSub = document.getElementById("battleSub");
+  const arenaBanner = document.getElementById("arenaBanner");
+  const arenaName = document.getElementById("arenaName");
+  const arenaTag = document.getElementById("arenaTag");
   const pausePanel = document.getElementById("pausePanel");
 
   const settings = {
     playerCount: 4,
-    botCount: 0,
-    botDifficulty: 1,
+    botDifficulty: 2,
     scoreLimit: 5,
-    draftCount: 5,
+    draftCount: 4,
+    levelChoice: -1, // -1 random
     hazards: true,
     haptics: true,
     shake: true,
     music: true,
     musicVolume: 0.2,
-    rarityWeights: {
-      common: 9,
-      uncommon: 6,
-      rare: 4,
-      epic: 3,
-      legendary: 2,
-      mythical: 1
-    }
+    rarityWeights: Object.fromEntries(Object.entries(RARITIES).map(([k, v]) => [k, v.weight]))
   };
 
   const world = {
@@ -47,1392 +45,361 @@
     airDrag: 0.996,
     floorDrag: 0.86,
     state: "menu",
-    timeScale: 1,
     winner: null,
     roundWinner: null,
-    pendingDraftPlayer: null,
-    draftQueue: [],
-    splashTimer: 0,
-    draftPlayer: null,
-    draftOptions: [],
-    draftIndex: 0,
+    drafters: [],
+    levelIndex: 0,
+    lastLevelIndex: -1,
     roundFreeze: 0,
     shake: 0,
-    mapIndex: 0,
-    nextMap: 0,
+    time: 0,
     menuIndex: 0,
-    menuStickLock: false,
     joinedThisFrame: false,
-    pausedThisFrame: false
+    pausedThisFrame: false,
+    windPhase: Math.random() * 10,
+    lightningTimer: 0,
+    lightningX: 0,
+    lightningFlash: 0,
+    tideLevel: 900,
+    weather: []
   };
 
-  const colors = ["#ff5277", "#52d7ff", "#ffe169", "#74f08b"];
-  const spawnPoints = [
-    { x: 260, y: 760 },
-    { x: 1340, y: 760 },
-    { x: 420, y: 555 },
-    { x: 1180, y: 555 }
-  ];
-
-  const maps = [
-    {
-      name: "Switchback",
-      platforms: [
-        rect(0, 830, 1600, 70),
-        rect(165, 640, 330, 28),
-        rect(1105, 640, 330, 28),
-        rect(610, 505, 380, 28),
-        rect(260, 360, 260, 24),
-        rect(1080, 360, 260, 24),
-        rect(700, 250, 200, 24)
-      ],
-      hazards: [rect(740, 810, 120, 20)]
-    },
-    {
-      name: "Spokes",
-      platforms: [
-        rect(0, 830, 1600, 70),
-        rect(220, 635, 260, 26),
-        rect(1120, 635, 260, 26),
-        rect(625, 570, 350, 24),
-        rect(370, 430, 255, 24),
-        rect(975, 430, 255, 24),
-        rect(675, 300, 250, 24)
-      ],
-      hazards: [rect(130, 812, 180, 18), rect(1290, 812, 180, 18)]
-    },
-    {
-      name: "Chimney",
-      platforms: [
-        rect(0, 830, 1600, 70),
-        rect(105, 690, 320, 26),
-        rect(1175, 690, 320, 26),
-        rect(560, 640, 480, 26),
-        rect(245, 500, 260, 24),
-        rect(1095, 500, 260, 24),
-        rect(640, 395, 320, 24),
-        rect(455, 250, 230, 24),
-        rect(915, 250, 230, 24)
-      ],
-      hazards: [rect(760, 812, 80, 18)]
-    },
-    {
-      name: "Split Rail",
-      platforms: [
-        rect(0, 830, 1600, 70),
-        rect(130, 650, 360, 26),
-        rect(1110, 650, 360, 26),
-        rect(570, 595, 460, 26),
-        rect(130, 420, 250, 24),
-        rect(1220, 420, 250, 24),
-        rect(520, 350, 210, 24),
-        rect(870, 350, 210, 24),
-        rect(700, 205, 200, 24)
-      ],
-      hazards: [rect(650, 812, 90, 18), rect(860, 812, 90, 18)]
-    },
-    {
-      name: "Kettle",
-      platforms: [
-        rect(0, 830, 1600, 70),
-        rect(170, 705, 270, 26),
-        rect(1160, 705, 270, 26),
-        rect(480, 610, 220, 24),
-        rect(900, 610, 220, 24),
-        rect(650, 500, 300, 26),
-        rect(280, 365, 260, 24),
-        rect(1060, 365, 260, 24),
-        rect(665, 240, 270, 24)
-      ],
-      hazards: [rect(735, 812, 130, 18)]
-    },
-    {
-      name: "Overpass",
-      platforms: [
-        rect(0, 830, 1600, 70),
-        rect(110, 665, 310, 26),
-        rect(1180, 665, 310, 26),
-        rect(500, 690, 600, 26),
-        rect(315, 510, 260, 24),
-        rect(1025, 510, 260, 24),
-        rect(670, 405, 260, 24),
-        rect(210, 285, 230, 24),
-        rect(1160, 285, 230, 24)
-      ],
-      hazards: [rect(520, 812, 100, 18), rect(980, 812, 100, 18)]
-    },
-    {
-      name: "Needle",
-      platforms: [
-        rect(0, 830, 1600, 70),
-        rect(165, 690, 300, 26),
-        rect(1135, 690, 300, 26),
-        rect(670, 665, 260, 26),
-        rect(465, 520, 260, 24),
-        rect(875, 520, 260, 24),
-        rect(690, 370, 220, 24),
-        rect(350, 300, 190, 22),
-        rect(1060, 300, 190, 22),
-        rect(735, 185, 130, 22)
-      ],
-      hazards: [rect(150, 812, 120, 18), rect(1330, 812, 120, 18)]
-    },
-    {
-      name: "Low Tide",
-      platforms: [
-        rect(0, 830, 1600, 70),
-        rect(100, 720, 420, 26),
-        rect(1080, 720, 420, 26),
-        rect(585, 625, 430, 26),
-        rect(165, 500, 285, 24),
-        rect(1150, 500, 285, 24),
-        rect(520, 360, 230, 24),
-        rect(850, 360, 230, 24),
-        rect(660, 230, 280, 24)
-      ],
-      hazards: [rect(610, 812, 380, 18)]
-    }
-  ];
+  const playerColors = ["#ff5277", "#52d7ff", "#ffe169", "#74f08b"];
 
   const keyboardSchemes = [
-    { left: "KeyA", right: "KeyD", jump: "KeyW", shoot: "KeyF", block: "KeyG" },
-    { left: "ArrowLeft", right: "ArrowRight", jump: "ArrowUp", shoot: "Slash", block: "Period" }
+    { left: "KeyA", right: "KeyD", jump: "KeyW", shoot: "KeyF", block: "KeyG", label: "Keyboard 1 (WASD + F/G)" },
+    { left: "ArrowLeft", right: "ArrowRight", jump: "ArrowUp", shoot: "Slash", block: "Period", label: "Keyboard 2 (Arrows + / .)" }
   ];
 
   const keys = new Set();
   const pressed = new Set();
-  const gamepadSlots = new Map();
   const lastPadButtons = new Map();
   const lobbySlots = [];
-  const INSTANT_APP_ID = "96e3e93f-4644-4596-a02f-40e8ae915138";
-  const online = {
-    db: null,
-    id: null,
-    unsubGames: null,
-    games: [],
-    active: false,
-    role: null,
-    gameId: null,
-    localId: loadLocalClientId(),
-    hostId: null,
-    guestId: null,
-    remoteInput: emptyInput(),
-    lastLocalInput: emptyInput(),
-    lastInputSent: 0,
-    lastSnapshotSent: 0,
-    lastSnapshotAt: 0,
-    lastDraftPickSent: -1,
-    lastRemoteDraftPick: "",
-    hostStarted: false,
-    connected: false
-  };
 
   let players = [];
   let bullets = [];
   let particles = [];
   let fields = [];
+  let bolts = []; // lightning polylines {points, life, color}
   let last = performance.now();
   let toastTimer = 0;
   let audioCtx = null;
   let masterGain = null;
   let musicAudio = null;
   let currentTrack = 0;
+  let hudRefs = [];
 
-  const soundtrack = [
-    "assets/audio/Apex_Pursuit.mp3",
-    "assets/audio/The_Last_Overpass.mp3"
-  ];
+  const soundtrack = ["assets/audio/Apex_Pursuit.mp3", "assets/audio/The_Last_Overpass.mp3"];
 
-  const cardPool = [
-    card("heavyParcel", "Heavy Parcel", "common", "Shots hit harder and reload slower.", ["+45% damage", "+0.18s reload"], p => {
-      p.stats.damage *= 1.45;
-      p.stats.reload += 0.18;
-    }),
-    card("lightDrum", "Light Drum", "common", "A larger magazine with a softer bite.", ["+2 ammo", "-15% damage"], p => {
-      p.stats.maxAmmo += 2;
-      p.stats.damage *= 0.85;
-    }),
-    card("snapLoad", "Snap Load", "common", "Reloads become much shorter.", ["-35% reload"], p => {
-      p.stats.reload *= 0.65;
-    }),
-    card("thickSkin", "Thick Skin", "common", "More health, slower feet.", ["+45% health", "-6% speed"], p => {
-      p.stats.maxHp *= 1.45;
-      p.stats.speed *= 0.94;
-    }),
-    card("skipRounds", "Skip Rounds", "uncommon", "Bullets ricochet off the stage.", ["+2 bounces", "+0.14s reload"], p => {
-      p.stats.bounces += 2;
-      p.stats.reload += 0.14;
-    }),
-    card("scatterPin", "Scatter Pin", "uncommon", "Fire a tight cluster of weaker shots.", ["+3 pellets", "+3 ammo", "-55% damage"], p => {
-      p.stats.pellets += 3;
-      p.stats.maxAmmo += 3;
-      p.stats.damage *= 0.45;
-      p.stats.spread += 0.16;
-    }),
-    card("emberCore", "Ember Core", "uncommon", "Shots burst on contact.", ["explosive hits", "-18% fire rate"], p => {
-      p.stats.explosive += 1;
-      p.stats.fireDelay += 0.1;
-    }),
-    card("curveMind", "Curve Mind", "uncommon", "Shots bend toward nearby rivals.", ["guided bullets", "-18% damage"], p => {
-      p.stats.homing += 0.9;
-      p.stats.damage *= 0.82;
-    }),
-    card("echoGuard", "Echo Guard", "uncommon", "Blocking repeats a second pulse.", ["double block pulse", "+0.25s block cooldown"], p => {
-      p.stats.echoBlock += 1;
-      p.stats.blockCooldown += 0.25;
-    }),
-    card("pulsePalm", "Pulse Palm", "uncommon", "Blocks shove nearby opponents away.", ["block shockwave", "+25% health"], p => {
-      p.stats.blockPush += 1;
-      p.stats.maxHp *= 1.25;
-    }),
-    card("stingTrail", "Sting Trail", "rare", "Bullets leave damage over time.", ["poison shots", "+20% damage"], p => {
-      p.stats.poison += 1;
-      p.stats.damage *= 1.2;
-    }),
-    card("anchorHeart", "Anchor Heart", "rare", "Lifesteal rewards brave trades.", ["35% lifesteal", "+20% health"], p => {
-      p.stats.lifesteal += 0.35;
-      p.stats.maxHp *= 1.2;
-    }),
-    card("blinkBuckle", "Blink Buckle", "rare", "Block warps you through danger.", ["block dash", "-25% block cooldown"], p => {
-      p.stats.blockDash += 1;
-      p.stats.blockCooldown *= 0.75;
-    }),
-    card("lastWord", "Last Word", "rare", "Your last bullet auto-blocks.", ["empty magazine shield", "+0.25s reload"], p => {
-      p.stats.emptyBlock = true;
-      p.stats.reload += 0.25;
-    }),
-    card("phoenixPop", "Phoenix Pop", "rare", "Survive one knockout per round.", ["one revive", "-20% health"], p => {
-      p.stats.revives += 1;
-      p.stats.maxHp *= 0.8;
-    }),
-    card("meteorMath", "Meteor Math", "rare", "Long-travel shots gain power.", ["distance damage", "+0.2s reload"], p => {
-      p.stats.grow += 1;
-      p.stats.reload += 0.2;
-    })
-  ];
-
-  cardPool.push(
-    card("rubberBand", "Rubber Band", "common", "Move faster with softer stopping.", ["+14% speed", "-8% brake"], p => {
-      p.stats.speed *= 1.14;
-      p.stats.brake *= 0.92;
-    }),
-    card("cleanShoes", "Clean Shoes", "common", "Tighter ground control.", ["+22% acceleration", "+10% brake"], p => {
-      p.stats.accel *= 1.22;
-      p.stats.brake *= 1.1;
-    }),
-    card("floatStep", "Float Step", "common", "Better air control with a lighter jump.", ["+30% air control", "-5% jump"], p => {
-      p.stats.airAccel *= 1.3;
-      p.stats.jump *= 0.95;
-    }),
-    card("springHeel", "Spring Heel", "common", "Jump higher.", ["+18% jump"], p => {
-      p.stats.jump *= 1.18;
-    }),
-    card("fatSpring", "Fat Spring", "common", "A higher jump and a slower body.", ["+28% jump", "-8% speed"], p => {
-      p.stats.jump *= 1.28;
-      p.stats.speed *= 0.92;
-    }),
-    card("softShell", "Soft Shell", "common", "A little more health and block time.", ["+18% health", "+0.04s block"], p => {
-      p.stats.maxHp *= 1.18;
-      p.stats.blockDuration += 0.04;
-    }),
-    card("fastHands", "Fast Hands", "common", "Shoot sooner after firing.", ["-18% fire delay"], p => {
-      p.stats.fireDelay *= 0.82;
-    }),
-    card("tallStack", "Tall Stack", "common", "More ammo, longer reload.", ["+1 ammo", "+0.1s reload"], p => {
-      p.stats.maxAmmo += 1;
-      p.stats.reload += 0.1;
-    }),
-    card("hotNeedle", "Hot Needle", "common", "Faster bullets with lower damage.", ["+22% bullet speed", "-8% damage"], p => {
-      p.stats.bulletSpeed *= 1.22;
-      p.stats.damage *= 0.92;
-    }),
-    card("wideNose", "Wide Nose", "common", "Chunkier shots.", ["+12% damage", "+0.04s fire delay"], p => {
-      p.stats.damage *= 1.12;
-      p.stats.fireDelay += 0.04;
-    }),
-    card("sturdyCore", "Sturdy Core", "common", "More health and slower reloads.", ["+28% health", "+0.08s reload"], p => {
-      p.stats.maxHp *= 1.28;
-      p.stats.reload += 0.08;
-    }),
-    card("paperCut", "Paper Cut", "common", "Smaller frequent shots.", ["-22% damage", "-22% fire delay"], p => {
-      p.stats.damage *= 0.78;
-      p.stats.fireDelay *= 0.78;
-    }),
-    card("zipLine", "Zip Line", "common", "Quick feet, weaker body.", ["+18% speed", "-12% health"], p => {
-      p.stats.speed *= 1.18;
-      p.stats.maxHp *= 0.88;
-    }),
-    card("denseInk", "Dense Ink", "common", "Hits harder but travels slower.", ["+22% damage", "-14% bullet speed"], p => {
-      p.stats.damage *= 1.22;
-      p.stats.bulletSpeed *= 0.86;
-    }),
-    card("quickLatch", "Quick Latch", "common", "Block recharges faster.", ["-18% block cooldown"], p => {
-      p.stats.blockCooldown *= 0.82;
-    }),
-    card("pocketRounds", "Pocket Rounds", "common", "A bigger magazine.", ["+2 ammo"], p => {
-      p.stats.maxAmmo += 2;
-    }),
-    card("snapGuard", "Snap Guard", "common", "Shorter block, much faster recharge.", ["-0.04s block", "-28% block cooldown"], p => {
-      p.stats.blockDuration = Math.max(0.1, p.stats.blockDuration - 0.04);
-      p.stats.blockCooldown *= 0.72;
-    }),
-    card("rubberShot", "Rubber Shot", "uncommon", "A ricochet and faster bullets.", ["+1 bounce", "+12% bullet speed"], p => {
-      p.stats.bounces += 1;
-      p.stats.bulletSpeed *= 1.12;
-    }),
-    card("splitBill", "Split Bill", "uncommon", "Two-shot spread with less damage.", ["+1 pellet", "-25% damage", "+spread"], p => {
-      p.stats.pellets += 1;
-      p.stats.damage *= 0.75;
-      p.stats.spread += 0.08;
-    }),
-    card("coinFlip", "Coin Flip", "uncommon", "More burst, less certainty.", ["+2 pellets", "-35% damage", "+wide spread"], p => {
-      p.stats.pellets += 2;
-      p.stats.damage *= 0.65;
-      p.stats.spread += 0.13;
-    }),
-    card("sparkPlug", "Spark Plug", "uncommon", "Tiny explosive pressure.", ["+small explosion", "-10% damage"], p => {
-      p.stats.explosive += 0.55;
-      p.stats.damage *= 0.9;
-    }),
-    card("heavyFuse", "Heavy Fuse", "uncommon", "Bigger explosions, longer reloads.", ["+explosion", "+0.18s reload"], p => {
-      p.stats.explosive += 1;
-      p.stats.reload += 0.18;
-    }),
-    card("magnetTip", "Magnet Tip", "uncommon", "Gentle bullet guidance.", ["+homing", "-8% bullet speed"], p => {
-      p.stats.homing += 0.55;
-      p.stats.bulletSpeed *= 0.92;
-    }),
-    card("bloodOrange", "Blood Orange", "uncommon", "Light lifesteal.", ["18% lifesteal"], p => {
-      p.stats.lifesteal += 0.18;
-    }),
-    card("saltCloud", "Salt Cloud", "uncommon", "Poison lasts longer through stronger shots.", ["poison", "+10% damage"], p => {
-      p.stats.poison += 1;
-      p.stats.damage *= 1.1;
-    }),
-    card("shieldBattery", "Shield Battery", "uncommon", "Block longer and recharge slower.", ["+0.1s block", "+0.12s cooldown"], p => {
-      p.stats.blockDuration += 0.1;
-      p.stats.blockCooldown += 0.12;
-    }),
-    card("waveBox", "Wave Box", "uncommon", "Block sends pressure outward.", ["block push", "-10% speed"], p => {
-      p.stats.blockPush += 1;
-      p.stats.speed *= 0.9;
-    }),
-    card("mirrorTap", "Mirror Tap", "uncommon", "Block repeats, but not as often.", ["echo block", "+0.2s cooldown"], p => {
-      p.stats.echoBlock += 1;
-      p.stats.blockCooldown += 0.2;
-    }),
-    card("sidePocket", "Side Pocket", "uncommon", "Carry more and reload faster.", ["+1 ammo", "-18% reload"], p => {
-      p.stats.maxAmmo += 1;
-      p.stats.reload *= 0.82;
-    }),
-    card("stutterStep", "Stutter Step", "uncommon", "Sharper stopping and quicker shots.", ["+35% brake", "-10% fire delay"], p => {
-      p.stats.brake *= 1.35;
-      p.stats.fireDelay *= 0.9;
-    }),
-    card("pogoPermit", "Pogo Permit", "uncommon", "Gain an extra air jump.", ["+1 air jump", "-8% speed"], p => {
-      p.stats.extraJumps += 1;
-      p.stats.speed *= 0.92;
-    }),
-    card("featherPermit", "Feather Permit", "uncommon", "Jump higher and control air better.", ["+12% jump", "+18% air control"], p => {
-      p.stats.jump *= 1.12;
-      p.stats.airAccel *= 1.18;
-    }),
-    card("roundHouse", "Round House", "uncommon", "Bigger body, bigger health.", ["+30% health", "+10% size"], p => {
-      p.stats.maxHp *= 1.3;
-      p.stats.radius *= 1.1;
-    }),
-    card("pinBody", "Pin Body", "uncommon", "Smaller body and less health.", ["-12% size", "-10% health", "+10% speed"], p => {
-      p.stats.radius *= 0.88;
-      p.stats.maxHp *= 0.9;
-      p.stats.speed *= 1.1;
-    }),
-    card("lineDrive", "Line Drive", "uncommon", "Fast accurate shots.", ["+32% bullet speed", "-spread"], p => {
-      p.stats.bulletSpeed *= 1.32;
-      p.stats.spread *= 0.75;
-    }),
-    card("fatPacket", "Fat Packet", "uncommon", "Chunky bullets with heavy recoil feel.", ["+30% damage", "+0.08s fire delay"], p => {
-      p.stats.damage *= 1.3;
-      p.stats.fireDelay += 0.08;
-    }),
-    card("doubleTap", "Double Tap", "rare", "Fire more often with less punch.", ["-35% fire delay", "-18% damage"], p => {
-      p.stats.fireDelay *= 0.65;
-      p.stats.damage *= 0.82;
-    }),
-    card("moonBoots", "Moon Boots", "rare", "Two extra air jumps.", ["+2 air jumps", "-12% health"], p => {
-      p.stats.extraJumps += 2;
-      p.stats.maxHp *= 0.88;
-    }),
-    card("cometCore", "Comet Core", "rare", "Shots accelerate into serious hits.", ["distance damage", "+25% bullet speed"], p => {
-      p.stats.grow += 1;
-      p.stats.bulletSpeed *= 1.25;
-    }),
-    card("vampireDrum", "Vampire Drum", "rare", "A big magazine with lifesteal.", ["+3 ammo", "20% lifesteal"], p => {
-      p.stats.maxAmmo += 3;
-      p.stats.lifesteal += 0.2;
-    }),
-    card("ghostBlock", "Ghost Block", "rare", "Fast dash blocks.", ["block dash", "-18% cooldown", "+0.04s block"], p => {
-      p.stats.blockDash += 1;
-      p.stats.blockCooldown *= 0.82;
-      p.stats.blockDuration += 0.04;
-    }),
-    card("stormGlass", "Storm Glass", "rare", "Guided explosive shots.", ["homing", "explosion", "-20% damage"], p => {
-      p.stats.homing += 0.75;
-      p.stats.explosive += 0.75;
-      p.stats.damage *= 0.8;
-    }),
-    card("porcupine", "Porcupine", "rare", "Lots of tiny shots.", ["+5 pellets", "-60% damage", "+spread"], p => {
-      p.stats.pellets += 5;
-      p.stats.damage *= 0.4;
-      p.stats.spread += 0.22;
-    }),
-    card("bankShot", "Bank Shot", "rare", "Bullets love walls.", ["+4 bounces", "+10% damage"], p => {
-      p.stats.bounces += 4;
-      p.stats.damage *= 1.1;
-    }),
-    card("riotFoam", "Riot Foam", "rare", "Huge defensive presence.", ["block push", "echo block", "+25% health"], p => {
-      p.stats.blockPush += 1;
-      p.stats.echoBlock += 1;
-      p.stats.maxHp *= 1.25;
-    }),
-    card("needleStorm", "Needle Storm", "rare", "High-speed low-damage pressure.", ["+45% bullet speed", "-30% fire delay", "-35% damage"], p => {
-      p.stats.bulletSpeed *= 1.45;
-      p.stats.fireDelay *= 0.7;
-      p.stats.damage *= 0.65;
-    }),
-    card("ironLungs", "Iron Lungs", "rare", "Massive health and sluggish movement.", ["+70% health", "-18% speed"], p => {
-      p.stats.maxHp *= 1.7;
-      p.stats.speed *= 0.82;
-    }),
-    card("flashPaper", "Flash Paper", "rare", "Explosive reload-heavy glass cannon.", ["+60% damage", "explosion", "+0.35s reload", "-15% health"], p => {
-      p.stats.damage *= 1.6;
-      p.stats.explosive += 1;
-      p.stats.reload += 0.35;
-      p.stats.maxHp *= 0.85;
-    }),
-    card("secondWind", "Second Wind", "rare", "A revive and better movement.", ["one revive", "+12% speed"], p => {
-      p.stats.revives += 1;
-      p.stats.speed *= 1.12;
-    }),
-    card("luckyChamber", "Lucky Chamber", "rare", "A little bit of everything dangerous.", ["+1 ammo", "+15% damage", "+1 bounce"], p => {
-      p.stats.maxAmmo += 1;
-      p.stats.damage *= 1.15;
-      p.stats.bounces += 1;
-    })
-  );
-
-  cardPool.push(
-    card("solarLatch", "Solar Latch", "epic", "Blocks become explosive counter-zones.", ["block push", "explosion", "+0.08s block"], p => {
-      p.stats.blockPush += 1;
-      p.stats.explosive += 0.8;
-      p.stats.blockDuration += 0.08;
-    }),
-    card("starMagazine", "Star Magazine", "epic", "A huge magazine with quick reloads.", ["+5 ammo", "-20% reload", "-12% damage"], p => {
-      p.stats.maxAmmo += 5;
-      p.stats.reload *= 0.8;
-      p.stats.damage *= 0.88;
-    }),
-    card("afterImage", "After Image", "epic", "Move like a blur.", ["+30% speed", "+40% air control", "-15% health"], p => {
-      p.stats.speed *= 1.3;
-      p.stats.airAccel *= 1.4;
-      p.stats.maxHp *= 0.85;
-    }),
-    card("needleHalo", "Needle Halo", "epic", "A ring of accurate rapid fire.", ["+4 pellets", "-35% fire delay", "-55% damage"], p => {
-      p.stats.pellets += 4;
-      p.stats.fireDelay *= 0.65;
-      p.stats.damage *= 0.45;
-      p.stats.spread += 0.1;
-    }),
-    card("gravityReceipt", "Gravity Receipt", "epic", "Leap twice and hit harder from range.", ["+1 air jump", "distance damage"], p => {
-      p.stats.extraJumps += 1;
-      p.stats.grow += 1;
-    }),
-    card("cinderMap", "Cinder Map", "epic", "Burning ricochets with heavier reloads.", ["+3 bounces", "poison", "+0.18s reload"], p => {
-      p.stats.bounces += 3;
-      p.stats.poison += 1;
-      p.stats.reload += 0.18;
-    }),
-    card("vacuumSeal", "Vacuum Seal", "epic", "Guided shots and lifesteal.", ["homing", "22% lifesteal", "-10% speed"], p => {
-      p.stats.homing += 1.1;
-      p.stats.lifesteal += 0.22;
-      p.stats.speed *= 0.9;
-    }),
-    card("fortressCoin", "Fortress Coin", "epic", "Become hard to kill.", ["+90% health", "-18% speed", "+0.08s block"], p => {
-      p.stats.maxHp *= 1.9;
-      p.stats.speed *= 0.82;
-      p.stats.blockDuration += 0.08;
-    }),
-    card("prismBarrel", "Prism Barrel", "epic", "Fast splitting bullets.", ["+2 pellets", "+35% bullet speed", "-30% damage"], p => {
-      p.stats.pellets += 2;
-      p.stats.bulletSpeed *= 1.35;
-      p.stats.damage *= 0.7;
-      p.stats.spread += 0.07;
-    }),
-    card("panicButton", "Panic Button", "epic", "Blocking teleports and echoes.", ["block dash", "echo block", "+0.2s cooldown"], p => {
-      p.stats.blockDash += 1;
-      p.stats.echoBlock += 1;
-      p.stats.blockCooldown += 0.2;
-    }),
-    card("meteorPocket", "Meteor Pocket", "epic", "Explosive distance scaling.", ["explosion", "distance damage", "+0.2s reload"], p => {
-      p.stats.explosive += 1;
-      p.stats.grow += 1;
-      p.stats.reload += 0.2;
-    }),
-    card("wildOrbit", "Wild Orbit", "epic", "Wide bouncing chaos.", ["+4 pellets", "+2 bounces", "-50% damage"], p => {
-      p.stats.pellets += 4;
-      p.stats.bounces += 2;
-      p.stats.damage *= 0.5;
-      p.stats.spread += 0.24;
-    }),
-    card("goldenTrigger", "Golden Trigger", "legendary", "Ridiculous fire rate.", ["-55% fire delay", "+2 ammo", "-20% damage"], p => {
-      p.stats.fireDelay *= 0.45;
-      p.stats.maxAmmo += 2;
-      p.stats.damage *= 0.8;
-    }),
-    card("blackHoleTip", "Black Hole Tip", "legendary", "Shots hunt hard and hit harder.", ["strong homing", "+35% damage", "+0.25s reload"], p => {
-      p.stats.homing += 2.2;
-      p.stats.damage *= 1.35;
-      p.stats.reload += 0.25;
-    }),
-    card("sunburstCore", "Sunburst Core", "legendary", "Huge explosions.", ["big explosion", "+40% damage", "+0.35s reload"], p => {
-      p.stats.explosive += 2.4;
-      p.stats.damage *= 1.4;
-      p.stats.reload += 0.35;
-    }),
-    card("immortalBattery", "Immortal Battery", "legendary", "Two revives and a thicker body.", ["+2 revives", "+35% health"], p => {
-      p.stats.revives += 2;
-      p.stats.maxHp *= 1.35;
-    }),
-    card("mirrorStorm", "Mirror Storm", "legendary", "Blocks become absurd.", ["double echo", "block push", "-20% cooldown"], p => {
-      p.stats.echoBlock += 2;
-      p.stats.blockPush += 1;
-      p.stats.blockCooldown *= 0.8;
-    }),
-    card("crownOfJumps", "Crown of Jumps", "legendary", "The sky belongs to you.", ["+3 air jumps", "+20% speed"], p => {
-      p.stats.extraJumps += 3;
-      p.stats.speed *= 1.2;
-    }),
-    card("dragonDrum", "Dragon Drum", "legendary", "Massive magazine of explosive rounds.", ["+6 ammo", "explosion", "-20% fire delay", "-30% damage"], p => {
-      p.stats.maxAmmo += 6;
-      p.stats.explosive += 1;
-      p.stats.fireDelay *= 0.8;
-      p.stats.damage *= 0.7;
-    }),
-    card("royalVampire", "Royal Vampire", "legendary", "Lifesteal monster.", ["55% lifesteal", "+25% damage", "-15% health"], p => {
-      p.stats.lifesteal += 0.55;
-      p.stats.damage *= 1.25;
-      p.stats.maxHp *= 0.85;
-    })
-  );
-
-  cardPool.push(
-    card("steadyGrip", "Steady Grip", "common", "Simple control under pressure.", ["-spread", "+8% brake"], p => { p.stats.spread *= 0.8; p.stats.brake *= 1.08; }),
-    card("brassButtons", "Brass Buttons", "common", "Reload a touch faster.", ["-12% reload"], p => { p.stats.reload *= 0.88; }),
-    card("tinBoots", "Tin Boots", "common", "Small body, quick stops.", ["-6% size", "+16% brake"], p => { p.stats.radius *= 0.94; p.stats.brake *= 1.16; }),
-    card("warmPocket", "Warm Pocket", "common", "One safer extra round.", ["+1 ammo", "+10% health"], p => { p.stats.maxAmmo += 1; p.stats.maxHp *= 1.1; }),
-    card("shortFuse", "Short Fuse", "common", "Faster shooting at a cost.", ["-14% fire delay", "+0.08s reload"], p => { p.stats.fireDelay *= 0.86; p.stats.reload += 0.08; }),
-    card("highSocks", "High Socks", "common", "A little jump and speed.", ["+8% jump", "+8% speed"], p => { p.stats.jump *= 1.08; p.stats.speed *= 1.08; }),
-    card("flatStone", "Flat Stone", "common", "Shots skim faster.", ["+16% bullet speed"], p => { p.stats.bulletSpeed *= 1.16; }),
-    card("softHands", "Soft Hands", "common", "Gentler recoil and more reload.", ["-10% damage", "-20% fire delay"], p => { p.stats.damage *= 0.9; p.stats.fireDelay *= 0.8; }),
-    card("hardCandy", "Hard Candy", "common", "Thicker health with slower jump.", ["+20% health", "-6% jump"], p => { p.stats.maxHp *= 1.2; p.stats.jump *= 0.94; }),
-    card("sideStep", "Side Step", "common", "Better air drift.", ["+24% air control"], p => { p.stats.airAccel *= 1.24; }),
-
-    card("angleTax", "Angle Tax", "uncommon", "Bounces pay back in damage.", ["+2 bounces", "+8% damage"], p => { p.stats.bounces += 2; p.stats.damage *= 1.08; }),
-    card("blueSpark", "Blue Spark", "uncommon", "Quick homing pinshots.", ["homing", "+12% fire rate", "-15% damage"], p => { p.stats.homing += 0.6; p.stats.fireDelay *= 0.88; p.stats.damage *= 0.85; }),
-    card("foamStep", "Foam Step", "uncommon", "Jump more, land softer.", ["+1 air jump", "+20% brake"], p => { p.stats.extraJumps += 1; p.stats.brake *= 1.2; }),
-    card("coalPocket", "Coal Pocket", "uncommon", "Small blasts and big magazines.", ["+2 ammo", "small explosion"], p => { p.stats.maxAmmo += 2; p.stats.explosive += 0.45; }),
-    card("glassNail", "Glass Nail", "uncommon", "Sharp damage, frail frame.", ["+30% damage", "-18% health"], p => { p.stats.damage *= 1.3; p.stats.maxHp *= 0.82; }),
-    card("roundTrip", "Round Trip", "uncommon", "Ricochet faster after reloads.", ["+1 bounce", "-15% reload"], p => { p.stats.bounces += 1; p.stats.reload *= 0.85; }),
-    card("fuseRibbon", "Fuse Ribbon", "uncommon", "Better explosions, worse ammo.", ["explosion", "-1 ammo"], p => { p.stats.explosive += 0.8; p.stats.maxAmmo = Math.max(1, p.stats.maxAmmo - 1); }),
-    card("sourRain", "Sour Rain", "uncommon", "Poison pellets.", ["poison", "+1 pellet", "-20% damage"], p => { p.stats.poison += 1; p.stats.pellets += 1; p.stats.damage *= 0.8; }),
-    card("shieldSprings", "Shield Springs", "uncommon", "Block recharge and jump improve.", ["-16% cooldown", "+10% jump"], p => { p.stats.blockCooldown *= 0.84; p.stats.jump *= 1.1; }),
-    card("thinOrbit", "Thin Orbit", "uncommon", "More pellets with tight spread.", ["+2 pellets", "-30% damage"], p => { p.stats.pellets += 2; p.stats.damage *= 0.7; p.stats.spread += 0.04; }),
-
-    card("redLedger", "Red Ledger", "rare", "Damage grows as health drops.", ["+30% damage", "+20% health"], p => { p.stats.damage *= 1.3; p.stats.maxHp *= 1.2; }),
-    card("ghostRounds", "Ghost Rounds", "rare", "Fast homing pressure.", ["homing", "+28% bullet speed"], p => { p.stats.homing += 0.9; p.stats.bulletSpeed *= 1.28; }),
-    card("emberBoots", "Ember Boots", "rare", "Explosive mobility.", ["+2 air jumps", "explosion"], p => { p.stats.extraJumps += 2; p.stats.explosive += 0.7; }),
-    card("silverFoam", "Silver Foam", "rare", "Huge block zones.", ["block push", "+0.15s block"], p => { p.stats.blockPush += 1; p.stats.blockDuration += 0.15; }),
-    card("nightNeedles", "Night Needles", "rare", "Lots of fast accurate shots.", ["+3 pellets", "+20% speed", "-45% damage"], p => { p.stats.pellets += 3; p.stats.bulletSpeed *= 1.2; p.stats.damage *= 0.55; }),
-    card("plasmaTabs", "Plasma Tabs", "rare", "Explosive lifesteal.", ["explosion", "18% lifesteal"], p => { p.stats.explosive += 1; p.stats.lifesteal += 0.18; }),
-    card("orbitDebt", "Orbit Debt", "rare", "Chaos that pays off late.", ["+3 bounces", "distance damage"], p => { p.stats.bounces += 3; p.stats.grow += 1; }),
-    card("paperCrown", "Paper Crown", "rare", "Fast and fragile royalty.", ["+35% speed", "-22% health", "-18% fire delay"], p => { p.stats.speed *= 1.35; p.stats.maxHp *= 0.78; p.stats.fireDelay *= 0.82; }),
-    card("ironPalm", "Iron Palm", "rare", "Blocks shove and heal.", ["block push", "+35% health"], p => { p.stats.blockPush += 1; p.stats.maxHp *= 1.35; }),
-    card("revivalInk", "Revival Ink", "rare", "A second chance with poison.", ["one revive", "poison"], p => { p.stats.revives += 1; p.stats.poison += 1; }),
-
-    card("voidReceipt", "Void Receipt", "epic", "Homing ricochets with lifesteal.", ["homing", "+2 bounces", "20% lifesteal"], p => { p.stats.homing += 1; p.stats.bounces += 2; p.stats.lifesteal += 0.2; }),
-    card("solarChoir", "Solar Choir", "epic", "Explosive multi-shot burst.", ["+2 pellets", "explosion", "-25% damage"], p => { p.stats.pellets += 2; p.stats.explosive += 1; p.stats.damage *= 0.75; }),
-    card("blinkMarket", "Blink Market", "epic", "Dash blocks and high speed.", ["block dash", "+24% speed"], p => { p.stats.blockDash += 1; p.stats.speed *= 1.24; }),
-    card("stormStamp", "Storm Stamp", "epic", "Fast guided explosive shots.", ["homing", "explosion", "+20% bullet speed"], p => { p.stats.homing += 0.8; p.stats.explosive += 0.8; p.stats.bulletSpeed *= 1.2; }),
-    card("crownBattery", "Crown Battery", "epic", "Defensive recharge engine.", ["double echo", "-28% cooldown"], p => { p.stats.echoBlock += 2; p.stats.blockCooldown *= 0.72; }),
-    card("marbleGiant", "Marble Giant", "epic", "Big body, huge health.", ["+120% health", "+18% size", "-16% speed"], p => { p.stats.maxHp *= 2.2; p.stats.radius *= 1.18; p.stats.speed *= 0.84; }),
-    card("starNeedle", "Star Needle", "epic", "High velocity distance scaling.", ["+55% bullet speed", "distance damage"], p => { p.stats.bulletSpeed *= 1.55; p.stats.grow += 1; }),
-    card("echoJacket", "Echo Jacket", "epic", "Every block becomes a show.", ["echo block", "block push", "+0.1s block"], p => { p.stats.echoBlock += 1; p.stats.blockPush += 1; p.stats.blockDuration += 0.1; }),
-    card("rocketPocket", "Rocket Pocket", "epic", "Explosive magazine build.", ["+4 ammo", "explosion", "+0.2s reload"], p => { p.stats.maxAmmo += 4; p.stats.explosive += 1; p.stats.reload += 0.2; }),
-    card("moonLedger", "Moon Ledger", "epic", "Airborne reload monster.", ["+2 air jumps", "-22% reload"], p => { p.stats.extraJumps += 2; p.stats.reload *= 0.78; }),
-
-    card("chronoTrigger", "Chrono Trigger", "legendary", "Time-bent fire rate.", ["-45% fire delay", "+35% bullet speed"], p => { p.stats.fireDelay *= 0.55; p.stats.bulletSpeed *= 1.35; }),
-    card("novaCrown", "Nova Crown", "legendary", "Royal explosions.", ["huge explosion", "+3 ammo"], p => { p.stats.explosive += 2.2; p.stats.maxAmmo += 3; }),
-    card("blackGlass", "Black Glass", "legendary", "Terrifying homing glass cannon.", ["strong homing", "+70% damage", "-30% health"], p => { p.stats.homing += 2.2; p.stats.damage *= 1.7; p.stats.maxHp *= 0.7; }),
-    card("angelDebt", "Angel Debt", "legendary", "Revive into chaos.", ["+2 revives", "explosion", "+25% speed"], p => { p.stats.revives += 2; p.stats.explosive += 1; p.stats.speed *= 1.25; }),
-    card("infinitePocket", "Infinite Pocket", "legendary", "Ridiculous ammo economy.", ["+8 ammo", "-35% reload"], p => { p.stats.maxAmmo += 8; p.stats.reload *= 0.65; }),
-    card("stormCoffin", "Storm Coffin", "legendary", "Poison explosive tracking.", ["poison", "strong homing", "explosion"], p => { p.stats.poison += 1; p.stats.homing += 1.7; p.stats.explosive += 1.2; }),
-    card("titanStep", "Titan Step", "legendary", "Huge movement and health.", ["+80% health", "+30% jump", "+1 air jump"], p => { p.stats.maxHp *= 1.8; p.stats.jump *= 1.3; p.stats.extraJumps += 1; }),
-    card("mirrorKing", "Mirror King", "legendary", "Block kingdom.", ["triple echo", "block push", "+0.12s block"], p => { p.stats.echoBlock += 3; p.stats.blockPush += 1; p.stats.blockDuration += 0.12; }),
-    card("sunEater", "Sun Eater", "legendary", "Massive slow shots.", ["+120% damage", "big explosion", "+0.5s reload"], p => { p.stats.damage *= 2.2; p.stats.explosive += 2; p.stats.reload += 0.5; }),
-    card("royalOrbit", "Royal Orbit", "legendary", "Bouncing lifesteal storm.", ["+5 bounces", "40% lifesteal", "+1 pellet"], p => { p.stats.bounces += 5; p.stats.lifesteal += 0.4; p.stats.pellets += 1; p.stats.damage *= 0.85; })
-  );
-
-  cardPool.push(
-    mythic("hollowViolet", "Hollow Violet", "A collapsing violet blast erases the center lane.", ["G/LB: void beam", "12s cooldown"], "hollowViolet", p => { p.stats.damage *= 1.15; }),
-    mythic("greenGiant", "Green Giant", "Turn huge, furious, and very hard to stop.", ["G/LB: giant form", "10s cooldown"], "greenGiant", p => { p.stats.maxHp *= 1.25; }),
-    mythic("pocketDomain", "Pocket Domain", "Trap rivals in a shrinking pressure sphere.", ["G/LB: domain field", "13s cooldown"], "pocketDomain", p => { p.stats.blockCooldown *= 0.9; }),
-    mythic("starSword", "Star Sword", "A glowing blade wave cuts across the arena.", ["G/LB: blade wave", "9s cooldown"], "starSword", p => { p.stats.speed *= 1.12; }),
-    mythic("webSwing", "Web Swing", "Launch a sticky pull and yank yourself forward.", ["G/LB: web dash", "7s cooldown"], "webSwing", p => { p.stats.airAccel *= 1.25; }),
-    mythic("speedForce", "Speed Force", "Blink through space and leave sparks behind.", ["G/LB: lightning blink", "8s cooldown"], "speedForce", p => { p.stats.speed *= 1.18; }),
-    mythic("wizardPortal", "Wizard Portal", "Open a portal and throw a ring burst.", ["G/LB: portal burst", "10s cooldown"], "wizardPortal", p => { p.stats.extraJumps += 1; }),
-    mythic("iceQueen", "Ice Queen", "Freeze the floor and slow everyone nearby.", ["G/LB: ice field", "11s cooldown"], "iceQueen", p => { p.stats.blockDuration += 0.06; }),
-    mythic("shadowClone", "Shadow Clone", "Split into afterimages that fire decoy rounds.", ["G/LB: clone volley", "10s cooldown"], "shadowClone", p => { p.stats.pellets += 1; p.stats.damage *= 0.9; }),
-    mythic("kaijuRoar", "Kaiju Roar", "Roar a shockwave that shoves the whole map.", ["G/LB: arena roar", "12s cooldown"], "kaijuRoar", p => { p.stats.maxHp *= 1.18; }),
-    mythic("dragonBreath", "Dragon Breath", "Breathe a fan of burning shots.", ["G/LB: fire cone", "9s cooldown"], "dragonBreath", p => { p.stats.poison += 1; }),
-    mythic("laserGauntlet", "Laser Gauntlet", "Snap a bright beam from a jeweled glove.", ["G/LB: gauntlet laser", "11s cooldown"], "laserGauntlet", p => { p.stats.bulletSpeed *= 1.12; }),
-    mythic("moonKnight", "Moon Knight", "Summon crescent blades that arc outward.", ["G/LB: crescent storm", "9s cooldown"], "moonKnight", p => { p.stats.bounces += 1; }),
-    mythic("timeLoop", "Time Loop", "Rewind your position and recover health.", ["G/LB: rewind", "14s cooldown"], "timeLoop", p => { p.stats.revives += 1; }),
-    mythic("mechaSuit", "Mecha Suit", "Call missile armor for a heavy volley.", ["G/LB: missile rain", "12s cooldown"], "mechaSuit", p => { p.stats.explosive += 0.8; p.stats.maxHp *= 1.12; })
-  );
-
-  const bonusNames = [
-    "Copper Pin", "Lime Battery", "Paper Orbit", "Velvet Fuse", "Pocket Comet", "Tilted Crown", "Rust Ribbon", "Glass Engine", "Salt Lantern", "Frost Ticket",
-    "Amber Gear", "Cloud Needle", "Tin Halo", "Silver Button", "Jolt Marble", "Cinder Bell", "Neon Receipt", "Quiet Rocket", "Blue Latch", "Honey Circuit",
-    "Static Page", "Red Compass", "Moon Washer", "Lucky Rivet", "Violet Handle", "Bright Anchor", "Soft Meteor", "Iron Button", "Sour Compass", "Golden Washer",
-    "Prism Ticket", "Storm Pocket", "Thin Battery", "Royal Fuse", "Echo Lantern", "Chrome Bell", "Black Ribbon", "Solar Pin", "Ghost Engine", "Heavy Halo",
-    "Snap Crown", "Float Gear", "Dense Circuit", "Wild Marble", "Clean Rocket", "Hot Receipt", "Round Anchor", "Needle Button", "Flash Latch", "Coal Ticket",
-    "Marble Needle", "Orbit Spark", "Copper Cloud", "Lime Comet", "Paper Battery", "Velvet Rocket", "Pocket Crown", "Tilted Fuse", "Rust Engine", "Glass Lantern",
-    "Salt Halo", "Frost Button", "Amber Receipt", "Cloud Bell", "Tin Anchor", "Silver Circuit", "Jolt Gear", "Cinder Washer", "Neon Pin", "Quiet Compass",
-    "Blue Ribbon", "Honey Ticket", "Static Meteor", "Red Latch", "Moon Engine", "Lucky Halo", "Violet Fuse", "Bright Battery", "Soft Crown", "Iron Rocket",
-    "Sour Lantern", "Golden Button", "Prism Gear", "Storm Receipt", "Thin Anchor", "Royal Needle", "Echo Circuit", "Chrome Pin", "Black Comet", "Solar Washer",
-    "Ghost Ticket", "Heavy Ribbon", "Snap Battery", "Float Fuse", "Dense Bell", "Wild Engine", "Clean Halo", "Hot Crown", "Round Rocket", "Needle Compass"
-  ];
-
-  const bonusRarities = ["common", "uncommon", "rare", "epic", "legendary"];
-  const bonusEffects = [
-    p => { p.stats.speed *= 1.1; },
-    p => { p.stats.maxHp *= 1.14; },
-    p => { p.stats.damage *= 1.12; },
-    p => { p.stats.reload *= 0.9; },
-    p => { p.stats.fireDelay *= 0.9; },
-    p => { p.stats.bulletSpeed *= 1.14; },
-    p => { p.stats.maxAmmo += 1; },
-    p => { p.stats.jump *= 1.12; },
-    p => { p.stats.airAccel *= 1.18; },
-    p => { p.stats.blockCooldown *= 0.9; },
-    p => { p.stats.bounces += 1; },
-    p => { p.stats.pellets += 1; p.stats.damage *= 0.86; p.stats.spread += 0.035; },
-    p => { p.stats.explosive += 0.35; },
-    p => { p.stats.homing += 0.35; },
-    p => { p.stats.poison += 0.5; },
-    p => { p.stats.lifesteal += 0.08; },
-    p => { p.stats.extraJumps += 1; p.stats.speed *= 0.96; },
-    p => { p.stats.blockDuration += 0.04; },
-    p => { p.stats.grow += 0.5; },
-    p => { p.stats.radius *= 0.94; p.stats.maxHp *= 0.95; }
-  ];
-
-  bonusNames.forEach((name, i) => {
-    const rarity = bonusRarities[Math.floor(i / 20)];
-    const power = rarity === "legendary" ? 1.85 : rarity === "epic" ? 1.55 : rarity === "rare" ? 1.32 : rarity === "uncommon" ? 1.16 : 1;
-    cardPool.push(card(
-      `bonus${i}`,
-      name,
-      rarity,
-      "A fresh arena modifier that tilts your build in a new direction.",
-      bonusStats(i, rarity),
-      p => {
-        const before = { ...p.stats };
-        bonusEffects[i % bonusEffects.length](p);
-        scaleBonusEffect(p, before, power);
-      }
-    ));
-  });
-
-  function rect(x, y, w, h) {
-    return { x, y, w, h };
-  }
-
-  function card(id, name, rarity, description, stats, apply) {
-    return { id, name, rarity, description, stats, apply };
-  }
-
-  function mythic(id, name, description, stats, mythicId, apply) {
-    return card(id, name, "mythical", description, stats, p => {
-      p.stats.mythic = mythicId;
-      p.stats.mythicCooldown = mythicCooldown(mythicId);
-      apply(p);
-    });
-  }
-
-  function mythicCooldown(id) {
-    const times = {
-      webSwing: 7,
-      speedForce: 8,
-      starSword: 9,
-      dragonBreath: 9,
-      moonKnight: 9,
-      greenGiant: 10,
-      wizardPortal: 10,
-      shadowClone: 10,
-      iceQueen: 11,
-      laserGauntlet: 11,
-      hollowViolet: 12,
-      kaijuRoar: 12,
-      mechaSuit: 12,
-      pocketDomain: 13,
-      timeLoop: 14
-    };
-    return times[id] || 10;
-  }
-
-  function bonusStats(index, rarity) {
-    const pools = [
-      ["+speed", "+control"],
-      ["+health", "+stability"],
-      ["+damage", "+recoil"],
-      ["-reload", "+tempo"],
-      ["-fire delay", "+pressure"],
-      ["+bullet speed", "+range"],
-      ["+ammo", "+reload"],
-      ["+jump", "+air"],
-      ["+air control", "+drift"],
-      ["-block cooldown", "+defense"],
-      ["+bounce", "+angles"],
-      ["+pellet", "+spread"],
-      ["small explosion", "+pressure"],
-      ["light homing", "+tracking"],
-      ["poison", "+chip"],
-      ["lifesteal", "+sustain"],
-      ["+air jump", "-speed"],
-      ["+block time", "+defense"],
-      ["distance damage", "+range"],
-      ["smaller body", "-health"]
-    ];
-    const tier = rarity === "legendary" ? "huge" : rarity === "epic" ? "major" : rarity === "rare" ? "strong" : rarity === "uncommon" ? "solid" : "small";
-    return [tier, ...pools[index % pools.length]];
-  }
-
-  function scaleBonusEffect(player, before, power) {
-    for (const key of Object.keys(player.stats)) {
-      if (typeof player.stats[key] !== "number" || typeof before[key] !== "number") continue;
-      player.stats[key] = before[key] + (player.stats[key] - before[key]) * power;
-    }
-    player.stats.maxAmmo = Math.max(1, Math.round(player.stats.maxAmmo));
-    player.stats.pellets = Math.max(1, Math.round(player.stats.pellets));
-    player.stats.bounces = Math.max(0, Math.round(player.stats.bounces));
-    player.stats.extraJumps = Math.max(0, Math.round(player.stats.extraJumps));
-    player.stats.revives = Math.max(0, Math.round(player.stats.revives));
-  }
-
+  // ------------------------------------------------------------------ stats
   function defaultStats() {
     return {
-      maxHp: 100,
-      speed: 560,
-      accel: 12,
-      airAccel: 5.2,
-      brake: 10,
-      jump: 880,
-      damage: 44,
-      bulletSpeed: 980,
-      bulletGravity: 1300,
-      bulletDrag: 0.997,
-      bulletRestitution: 0.72,
-      maxAmmo: 3,
-      reload: 1.12,
-      fireDelay: 0.26,
-      blockCooldown: 1.55,
-      blockDuration: 0.25,
-      radius: 27,
-      pellets: 1,
-      spread: 0.04,
-      bounces: 0,
-      explosive: 0,
-      homing: 0,
-      poison: 0,
-      lifesteal: 0,
-      echoBlock: 0,
-      blockPush: 0,
-      blockDash: 0,
-      emptyBlock: false,
-      revives: 0,
-      grow: 0,
-      extraJumps: 0,
-      mythic: null,
-      mythicCooldown: 9,
-      mythicDuration: 0
+      maxHp: 100, speed: 560, accel: 12, airAccel: 5.2, brake: 10, jump: 880,
+      damage: 44, bulletSpeed: 980, bulletGravity: 1300, bulletDrag: 0.997,
+      bulletRestitution: 0.72, bulletSize: 1,
+      maxAmmo: 3, reload: 1.12, fireDelay: 0.26,
+      blockCooldown: 1.55, blockDuration: 0.25,
+      radius: 27, pellets: 1, spread: 0.04,
+      bounces: 0, explosive: 0, homing: 0, grow: 0, pierce: 0,
+      poison: 0, burn: 0, chill: 0, chain: 0, shards: 0,
+      lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
+      echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
+      guardian: 0, revives: 0, extraJumps: 0,
+      goldenShot: false, killHeal: false,
+      active: null, activeCooldown: 10
     };
   }
 
-  function makePlayer(i) {
-    const sp = spawnPoints[i];
+  function makePlayer(i, slot) {
+    const ch = CHARACTERS[slot ? slot.charIndex % CHARACTERS.length : i % CHARACTERS.length];
     return {
       id: i,
-      name: `P${i + 1}`,
-      color: colors[i],
-      x: sp.x,
-      y: sp.y,
-      renderX: sp.x,
-      renderY: sp.y,
-      vx: 0,
-      vy: 0,
-      aimX: i % 2 === 0 ? 1 : -1,
-      aimY: 0,
-      hp: 100,
-      score: 0,
-      alive: true,
-      grounded: false,
-      jumpReady: true,
-      jumpsLeft: 1,
-      ammo: 3,
-      reloadTimer: 0,
-      fireTimer: 0,
-      blockTimer: 0,
-      blockCooldown: 0,
-      mythicCooldown: 0,
-      mythicTimer: 0,
-      poisonTimer: 0,
-      poisonDps: 0,
-      roundRevives: 0,
+      name: ch.name,
+      character: ch,
+      color: playerColors[i],
+      x: 0, y: 0, vx: 0, vy: 0,
+      aimX: i % 2 === 0 ? 1 : -1, aimY: 0,
+      hp: 100, score: 0, alive: true,
+      grounded: false, groundPlatform: null, jumpsLeft: 1,
+      ammo: 3, reloadTimer: 0, fireTimer: 0,
+      blockTimer: 0, blockCooldown: 0,
+      activeCooldown: 0,
+      poisonTimer: 0, poisonDps: 0,
+      burnTimer: 0, burnDps: 0,
+      chillTimer: 0,
+      teleCooldown: 0,
+      guardianCharges: 0, roundRevives: 0,
+      trail: [],
       cards: [],
       stats: defaultStats(),
       input: emptyInput(),
-      scheme: keyboardSchemes[i] || null,
-      gamepadIndex: null,
-      bot: false,
+      scheme: slot && slot.type === "keyboard" ? keyboardSchemes[slot.schemeIndex] : null,
+      gamepadIndex: slot && slot.type === "pad" ? slot.gamepadIndex : null,
+      bot: slot ? slot.type === "bot" : false,
       botSeed: Math.random() * 1000,
       botJumpLock: 0,
       botStrafe: Math.random() < 0.5 ? -1 : 1,
-      draftStickLock: false,
+      draftLock: false,
       spawnGrace: 0.9,
-      faceBlink: Math.random() * 4
+      blinkClock: Math.random() * 4
     };
-  }
-
-  function makePlayerFromSlot(slot, index) {
-    const p = makePlayer(index);
-    p.scheme = slot.type === "keyboard" ? keyboardSchemes[index] || null : null;
-    p.gamepadIndex = slot.type === "pad" ? slot.gamepadIndex : null;
-    p.bot = slot.type === "bot";
-    if (p.bot) {
-      p.name = `Bot ${index + 1}`;
-      p.scheme = null;
-      p.gamepadIndex = null;
-    }
-    return p;
-  }
-
-  function getSafeSpawn(map, index, player) {
-    const fallback = spawnPoints[index] || spawnPoints[0] || { x: 300 + index * 220, y: 600 };
-    const r = player.stats.radius;
-    const platforms = map.platforms && map.platforms.length ? map.platforms : [rect(0, 830, 1600, 70)];
-    const candidates = platforms
-      .filter(platform => fallback.x >= platform.x - r && fallback.x <= platform.x + platform.w + r)
-      .filter(platform => !isHazardUnderSpawn(map, fallback.x, platform.y))
-      .sort((a, b) => {
-        const aFloor = a.y > world.height - 100 ? 1 : 0;
-        const bFloor = b.y > world.height - 100 ? 1 : 0;
-        if (aFloor !== bFloor) return aFloor - bFloor;
-        return Math.abs(a.y - fallback.y) - Math.abs(b.y - fallback.y);
-      });
-    const platform = candidates[0] || platforms.find(p => p.w > r * 4) || platforms[0];
-    const minX = platform.x + r + 12;
-    const maxX = platform.x + platform.w - r - 12;
-    const x = minX <= maxX ? clamp(fallback.x, minX, maxX) : platform.x + platform.w / 2;
-    const y = platform.y - r - 12;
-    return {
-      x: Number.isFinite(x) ? x : fallback.x,
-      y: Number.isFinite(y) ? y : fallback.y
-    };
-  }
-
-  function repairBadSpawn(p, index) {
-    if (!Number.isFinite(p.vx)) p.vx = 0;
-    if (!Number.isFinite(p.vy)) p.vy = 0;
-    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || (p.x === 0 && p.y === 0)) {
-      const safe = getSafeSpawn(maps[world.mapIndex], index, p);
-      p.x = safe.x;
-      p.y = safe.y;
-      p.renderX = safe.x;
-      p.renderY = safe.y;
-      p.vx = 0;
-      p.vy = 0;
-      p.spawnGrace = Math.max(p.spawnGrace, 1.2);
-    }
-  }
-
-  function isHazardUnderSpawn(map, x, platformY) {
-    return settings.hazards && map.hazards.some(h => x >= h.x - 35 && x <= h.x + h.w + 35 && Math.abs(h.y - platformY) < 40);
   }
 
   function emptyInput() {
     return {
-      move: 0,
-      aimX: 0,
-      aimY: 0,
-      jump: false,
-      shoot: false,
-      block: false,
-      pause: false,
-      jumpPressed: false,
-      shootPressed: false,
-      blockPressed: false,
-      pausePressed: false,
-      menuPressed: false,
-      leftPressed: false,
-      rightPressed: false,
-      downPressed: false
+      move: 0, aimX: 0, aimY: 0,
+      jump: false, shoot: false, block: false, pause: false,
+      jumpPressed: false, shootPressed: false, blockPressed: false, pausePressed: false,
+      menuPressed: false, leftPressed: false, rightPressed: false
     };
   }
 
-  function loadLocalClientId() {
-    const key = "rounder-online-client-id";
-    try {
-      const existing = localStorage.getItem(key);
-      if (existing) return existing;
-      const created = crypto.randomUUID ? crypto.randomUUID() : `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      localStorage.setItem(key, created);
-      return created;
-    } catch {
-      return `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  // ------------------------------------------------------------------ level
+  function currentLevel() { return LEVELS[world.levelIndex]; }
+
+  function pickNextLevel() {
+    if (settings.levelChoice >= 0) {
+      world.levelIndex = settings.levelChoice;
+      return;
     }
+    let next = Math.floor(Math.random() * LEVELS.length);
+    if (LEVELS.length > 1) {
+      while (next === world.lastLevelIndex) next = Math.floor(Math.random() * LEVELS.length);
+    }
+    world.levelIndex = next;
+    world.lastLevelIndex = next;
   }
 
-  async function ensureInstant() {
-    if (online.db) return online.db;
-    if (!window.instant) {
-      showToast("InstantDB is still loading. Try again in a second.");
-      throw new Error("InstantDB global was not loaded");
-    }
-    const { init, id } = window.instant;
-    online.id = id;
-    online.db = init({ appId: INSTANT_APP_ID });
-    online.db.subscribeConnectionStatus?.(status => {
-      online.connected = status === "authenticated";
-      renderOnlineGames();
-    });
-    watchOnlineGames();
-    return online.db;
-  }
-
-  function watchOnlineGames() {
-    if (!online.db || online.unsubGames) return;
-    online.unsubGames = online.db.subscribeQuery({ rounderGames: {} }, resp => {
-      if (resp.error) {
-        showToast(`Online error: ${resp.error.message}`);
-        return;
+  // Live platform list for this frame: statics (phase-filtered) + movers with velocity.
+  function activePlatforms(level, t) {
+    const list = [];
+    for (const p of level.platforms) {
+      if (p.phase) {
+        const cyc = ((t + p.phase.offset) % p.phase.period) / p.phase.period;
+        if (cyc > p.phase.duty) continue;
+        list.push({ ...p, vxDelta: 0, vyDelta: 0, phaseCyc: cyc });
+      } else {
+        list.push({ ...p, vxDelta: 0, vyDelta: 0 });
       }
-      online.games = (resp.data && resp.data.rounderGames ? resp.data.rounderGames : [])
-        .filter(g => g.status === "open" || g.status === "playing")
-        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-      syncOnlineGameFromDb();
-      renderOnlineGames();
+    }
+    for (const m of level.movers || []) {
+      const ph = (m.phase || 0) * Math.PI * 2;
+      const s = (Math.sin((t / m.period) * Math.PI * 2 + ph) + 1) / 2;
+      const sPrev = (Math.sin(((t - 1 / 60) / m.period) * Math.PI * 2 + ph) + 1) / 2;
+      const x = m.x + m.dx * s, y = m.y + m.dy * s;
+      list.push({ ...m, x, y, vxDelta: m.dx * (s - sPrev), vyDelta: m.dy * (s - sPrev), isMover: true });
+    }
+    return list;
+  }
+
+  function phaseAlpha(p, t) {
+    if (!p.phase) return 1;
+    const cyc = ((t + p.phase.offset) % p.phase.period) / p.phase.period;
+    if (cyc > p.phase.duty) return 0.12;
+    const remain = p.phase.duty - cyc;
+    if (remain < 0.18) return 0.4 + 0.5 * Math.abs(Math.sin(t * 18)); // warning blink
+    return 1;
+  }
+
+  function levelGravity() { return world.gravity * (currentLevel().gravityScale || 1); }
+
+  function windForce() {
+    const lv = currentLevel();
+    if (!lv.windX) return 0;
+    return lv.windX * Math.sin((world.time / (lv.gustPeriod || 6)) * Math.PI * 2 + world.windPhase);
+  }
+
+  // ------------------------------------------------------------------ lobby
+  function slotJoined(type, key) {
+    return lobbySlots.some(s => (type === "keyboard" && s.type === "keyboard" && s.schemeIndex === key) ||
+      (type === "pad" && s.type === "pad" && s.gamepadIndex === key));
+  }
+
+  function freeCharIndex() {
+    const taken = new Set(lobbySlots.map(s => s.charIndex));
+    for (let i = 0; i < CHARACTERS.length; i += 1) {
+      const idx = Math.floor(Math.random() * CHARACTERS.length);
+      if (!taken.has(idx)) return idx;
+    }
+    return Math.floor(Math.random() * CHARACTERS.length);
+  }
+
+  function addSlot(slot) {
+    if (lobbySlots.length >= settings.playerCount) {
+      showToast("Lobby is full");
+      return null;
+    }
+    slot.charIndex = freeCharIndex();
+    slot.locked = slot.type === "bot";
+    lobbySlots.push(slot);
+    ensureAudio();
+    sfx("card");
+    world.joinedThisFrame = true;
+    renderLobby();
+    return slot;
+  }
+
+  function removeSlot(slot) {
+    const i = lobbySlots.indexOf(slot);
+    if (i >= 0) lobbySlots.splice(i, 1);
+    renderLobby();
+  }
+
+  function cycleSlotChar(slot, dir) {
+    slot.charIndex = (slot.charIndex + dir + CHARACTERS.length) % CHARACTERS.length;
+    sfx("jump");
+    renderLobby();
+  }
+
+  function updateLobby(pads) {
+    if (world.state !== "menu") return;
+    // keyboard joins: press that scheme's shoot key
+    keyboardSchemes.forEach((scheme, i) => {
+      if (pressed.has(scheme.shoot) && !slotJoined("keyboard", i)) {
+        addSlot({ type: "keyboard", schemeIndex: i, label: scheme.label });
+      }
     });
-  }
-
-  async function createOnlineGame() {
-    try {
-      const db = await ensureInstant();
-      leaveOnlineGame(false);
-      const gameId = online.id();
-      online.active = false;
-      online.role = "host";
-      online.gameId = gameId;
-      online.hostId = online.localId;
-      online.guestId = null;
-      online.hostStarted = false;
-      await db.transact(db.tx.rounderGames[gameId].update({
-        name: `Rounder ${online.localId.slice(0, 4).toUpperCase()}`,
-        hostId: online.localId,
-        guestId: "",
-        status: "open",
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        settings: JSON.stringify({ scoreLimit: settings.scoreLimit }),
-        input: "",
-        draftPick: "",
-        snapshot: ""
-      }));
-      showToast("Online game created. Waiting for another player.");
-    } catch (error) {
-      showToast(`Could not create online game: ${error.message}`);
+    // pad joins: any button
+    for (const pad of pads) {
+      const anyPressed = pad.buttons.some((_, i) => buttonEdge(pad, i));
+      if (anyPressed && !slotJoined("pad", pad.index)) {
+        addSlot({ type: "pad", gamepadIndex: pad.index, label: pad.id.split("(")[0].trim() || `Controller ${pad.index + 1}` });
+      }
+    }
+    // per-slot input: cycle / lock / leave
+    for (const slot of [...lobbySlots]) {
+      if (slot.type === "bot") continue;
+      let left = false, right = false, lock = false, leave = false;
+      if (slot.type === "keyboard") {
+        const sc = keyboardSchemes[slot.schemeIndex];
+        left = pressed.has(sc.left);
+        right = pressed.has(sc.right);
+        lock = pressed.has(sc.shoot) && !world.joinedThisFrame;
+        leave = pressed.has(sc.block);
+      } else {
+        const pad = getPadByIndex(pads, slot.gamepadIndex);
+        if (pad) {
+          left = buttonEdge(pad, 14) || axisEdge(pad, 0, -1);
+          right = buttonEdge(pad, 15) || axisEdge(pad, 0, 1);
+          lock = (buttonEdge(pad, 0) || buttonEdge(pad, 2) || buttonEdge(pad, 7)) && !world.joinedThisFrame;
+          leave = buttonEdge(pad, 1) || buttonEdge(pad, 6);
+        }
+      }
+      if (leave) {
+        if (slot.locked) { slot.locked = false; renderLobby(); }
+        else removeSlot(slot);
+        continue;
+      }
+      if (!slot.locked && left) cycleSlotChar(slot, -1);
+      if (!slot.locked && right) cycleSlotChar(slot, 1);
+      if (lock && !slot.locked) { slot.locked = true; sfx("card"); renderLobby(); }
     }
   }
 
-  async function joinOnlineGame(gameId) {
-    try {
-      const db = await ensureInstant();
-      const game = online.games.find(g => g.id === gameId);
-      if (!game || game.hostId === online.localId) return;
-      leaveOnlineGame(false);
-      online.active = true;
-      online.role = "guest";
-      online.gameId = gameId;
-      online.hostId = game.hostId;
-      online.guestId = online.localId;
-      online.hostStarted = true;
-      players = [makePlayer(0), makePlayer(1)];
-      players[0].name = "Host";
-      players[1].name = "You";
-      players[1].scheme = keyboardSchemes[0];
-      world.state = "playing";
-      world.nextMap = 0;
-      menu.classList.add("hidden");
-      settingsPanel.classList.add("hidden");
-      howPanel.classList.add("hidden");
-      pausePanel.classList.add("hidden");
-      draftPanel.classList.add("hidden");
-      battleSplash.classList.add("hidden");
-      ensureAudio();
-      startMusic();
-      await db.transact(db.tx.rounderGames[gameId].update({
-        guestId: online.localId,
-        status: "playing",
-        updatedAt: Date.now()
-      }));
-      showToast("Joined online game");
-    } catch (error) {
-      showToast(`Could not join online game: ${error.message}`);
+  function renderLobby() {
+    const cells = [];
+    for (let i = 0; i < settings.playerCount; i += 1) {
+      const slot = lobbySlots[i];
+      if (!slot) {
+        cells.push(`
+          <article class="join-slot empty">
+            <div class="slot-portrait empty-portrait">?</div>
+            <strong>Open Slot</strong>
+            <span>Press F, /, or any pad button</span>
+          </article>`);
+        continue;
+      }
+      const ch = CHARACTERS[slot.charIndex];
+      cells.push(`
+        <article class="join-slot joined ${slot.locked ? "locked" : ""}" style="--pcol:${playerColors[i]}">
+          <div class="slot-arrows">${slot.locked || slot.type === "bot" ? "" : "◀&nbsp;&nbsp;&nbsp;▶"}</div>
+          <div class="slot-portrait"><canvas data-portrait="${slot.charIndex}" width="96" height="96"></canvas></div>
+          <strong>${ch.name} <em>${ch.title}</em></strong>
+          <span class="slot-blurb">${ch.blurb}</span>
+          <span class="slot-input">${slot.type === "bot" ? "Bot" : escapeHtml(slot.label)}</span>
+          <span class="slot-state">${slot.locked ? "✓ Ready" : slot.type === "bot" ? "✓ Ready" : "◀ ▶ choose · shoot to lock"}</span>
+        </article>`);
+    }
+    joinSlots.innerHTML = cells.join("");
+    for (const cv of joinSlots.querySelectorAll("canvas[data-portrait]")) {
+      const ch = CHARACTERS[Number(cv.dataset.portrait)];
+      const c2 = cv.getContext("2d");
+      c2.clearRect(0, 0, 96, 96);
+      c2.save();
+      c2.translate(48, 52);
+      drawCharacter(c2, ch, 26, { t: world.time, aimX: 1, aimY: 0 });
+      c2.restore();
     }
   }
 
-  function syncOnlineGameFromDb() {
-    if (!online.gameId) return;
-    const game = online.games.find(g => g.id === online.gameId);
-    if (!game) return;
-    if (online.role === "host" && game.guestId && !online.hostStarted) {
-      online.guestId = game.guestId;
-      startOnlineHostGame(game);
-    }
-    if (online.role === "host" && game.input) {
-      try {
-        const packet = JSON.parse(game.input);
-        if (packet.clientId === online.guestId) online.remoteInput = sanitizeInput(packet.input);
-      } catch {}
-    }
-    if (online.role === "host" && game.draftPick) {
-      try {
-        const packet = JSON.parse(game.draftPick);
-        if (packet.clientId === online.guestId) handleOnlineDraftPick(packet);
-      } catch {}
-    }
-    if (online.role === "guest" && game.snapshot) {
-      try {
-        applyOnlineSnapshot(JSON.parse(game.snapshot));
-      } catch {}
-    }
+  function addBot() {
+    addSlot({ type: "bot", label: "Bot" });
   }
 
-  function startOnlineHostGame(game) {
-    online.active = true;
-    online.hostStarted = true;
-    online.guestId = game.guestId;
-    players = [makePlayer(0), makePlayer(1)];
-    players[0].name = "You";
-    players[1].name = "Guest";
-    players[1].scheme = null;
-    rebuildGamepadSlots();
+  // ------------------------------------------------------------------ match
+  function startMatch() {
+    ensureAudio();
+    startMusic();
+    if (lobbySlots.length < 2) {
+      showToast("Need at least 2 fighters — join up or add a bot");
+      return;
+    }
+    players = lobbySlots.map((slot, i) => {
+      const p = makePlayer(i, slot);
+      if (slot.type === "bot") p.name = `${p.character.name} (Bot)`;
+      return p;
+    });
     world.state = "playing";
     world.winner = null;
     world.roundWinner = null;
-    world.pendingDraftPlayer = null;
-    world.draftQueue = [];
-    world.draftPlayer = null;
-    world.nextMap = 0;
-    world.menuIndex = 0;
-    menu.classList.add("hidden");
-    settingsPanel.classList.add("hidden");
-    howPanel.classList.add("hidden");
-    draftPanel.classList.add("hidden");
-    battleSplash.classList.add("hidden");
-    pausePanel.classList.add("hidden");
-    ensureAudio();
-    startMusic();
-    resetRound(true);
-    showToast("Online opponent joined");
+    world.drafters = [];
+    world.lastLevelIndex = -1;
+    hideAllPanels();
+    buildHud();
+    resetRound();
   }
 
-  function leaveOnlineGame(updateDb = true) {
-    if (updateDb && online.db && online.gameId && online.role === "host") {
-      online.db.transact(online.db.tx.rounderGames[online.gameId].update({
-        status: "closed",
-        updatedAt: Date.now()
-      })).catch(() => {});
-    }
-    online.active = false;
-    online.role = null;
-    online.gameId = null;
-    online.hostId = null;
-    online.guestId = null;
-    online.hostStarted = false;
-    online.remoteInput = emptyInput();
-    online.lastLocalInput = emptyInput();
-    online.lastDraftPickSent = -1;
-    online.lastRemoteDraftPick = "";
+  function hideAllPanels() {
+    for (const el of [menu, settingsPanel, howPanel, draftPanel, battleSplash, pausePanel, arenaBanner]) el.classList.add("hidden");
   }
 
-  function captureLocalInput(prev = online.lastLocalInput) {
-    const input = emptyInput();
-    readKeyboard(keyboardSchemes[0], input);
-    const pads = getPads();
-    const preferred = lobbySlots[0] && lobbySlots[0].type === "pad" ? getPadByIndex(pads, lobbySlots[0].gamepadIndex) : null;
-    const pad = preferred || pads[0];
-    if (pad) readGamepad(pad, input);
-    input.jumpPressed = input.jump && !prev.jump;
-    input.shootPressed = input.shoot && !prev.shoot;
-    input.blockPressed = input.block && !prev.block;
-    input.pausePressed = input.pause && !prev.pause;
-    return input;
-  }
-
-  function sanitizeInput(input) {
-    const clean = emptyInput();
-    if (!input) return clean;
-    clean.move = clamp(Number(input.move) || 0, -1, 1);
-    clean.aimX = clamp(Number(input.aimX) || 0, -1, 1);
-    clean.aimY = clamp(Number(input.aimY) || 0, -1, 1);
-    for (const key of ["jump", "shoot", "block", "pause", "jumpPressed", "shootPressed", "blockPressed", "pausePressed", "menuPressed", "leftPressed", "rightPressed", "downPressed"]) {
-      clean[key] = Boolean(input[key]);
-    }
-    return clean;
-  }
-
-  function updateOnlineGuestInput() {
-    if (!online.active || online.role !== "guest" || !online.db || !online.gameId) return;
-    const input = captureLocalInput(online.lastLocalInput);
-    online.lastLocalInput = input;
-    if (players[1]) players[1].input = input;
-    const now = performance.now();
-    if (now - online.lastInputSent < 40) return;
-    online.lastInputSent = now;
-    online.db.transact(online.db.tx.rounderGames[online.gameId].update({
-      input: JSON.stringify({ clientId: online.localId, t: Date.now(), input: compactInput(input) }),
-      updatedAt: Date.now()
-    })).catch(error => showToast(`Input sync failed: ${error.message}`));
-  }
-
-  function compactInput(input) {
-    return {
-      move: input.move,
-      aimX: input.aimX,
-      aimY: input.aimY,
-      jump: input.jump,
-      shoot: input.shoot,
-      block: input.block,
-      pause: input.pause,
-      jumpPressed: input.jumpPressed,
-      shootPressed: input.shootPressed,
-      blockPressed: input.blockPressed,
-      pausePressed: input.pausePressed,
-      menuPressed: input.menuPressed,
-      leftPressed: input.leftPressed,
-      rightPressed: input.rightPressed,
-      downPressed: input.downPressed
-    };
-  }
-
-  function sendOnlineDraftPick(index) {
-    if (!online.active || online.role !== "guest" || !online.db || !online.gameId) return;
-    if (online.lastDraftPickSent === index) return;
-    online.lastDraftPickSent = index;
-    online.db.transact(online.db.tx.rounderGames[online.gameId].update({
-      draftPick: JSON.stringify({ clientId: online.localId, t: Date.now(), index }),
-      updatedAt: Date.now()
-    })).catch(error => showToast(`Draft sync failed: ${error.message}`));
-  }
-
-  function handleOnlineDraftPick(packet) {
-    const key = `${packet.t}:${packet.index}`;
-    if (online.lastRemoteDraftPick === key) return;
-    if (world.state !== "draft" || !world.draftPlayer || world.draftPlayer.id !== 1) return;
-    online.lastRemoteDraftPick = key;
-    world.draftIndex = clamp(Number(packet.index) || 0, 0, world.draftOptions.length - 1);
-    pickDraft();
-  }
-
-  function publishOnlineSnapshot(force = false) {
-    if (!online.active || online.role !== "host" || !online.db || !online.gameId) return;
-    const now = performance.now();
-    if (!force && now - online.lastSnapshotSent < 55) return;
-    online.lastSnapshotSent = now;
-    online.db.transact(online.db.tx.rounderGames[online.gameId].update({
-      status: world.state === "ended" ? "ended" : "playing",
-      snapshot: JSON.stringify(makeOnlineSnapshot()),
-      updatedAt: Date.now()
-    })).catch(() => {});
-  }
-
-  function makeOnlineSnapshot() {
-    return {
-      state: world.state,
-      mapIndex: world.mapIndex,
-      nextMap: world.nextMap,
-      roundFreeze: world.roundFreeze,
-      winnerId: world.winner ? world.winner.id : null,
-      roundWinnerId: world.roundWinner ? world.roundWinner.id : null,
-      pendingDraftPlayerId: world.pendingDraftPlayer ? world.pendingDraftPlayer.id : null,
-      draftPlayerId: world.draftPlayer ? world.draftPlayer.id : null,
-      draftIndex: world.draftIndex,
-      draftOptions: world.draftOptions.map(c => c.id),
-      players: players.map(p => ({
-        id: p.id,
-        name: p.name,
-        color: p.color,
-        x: p.x,
-        y: p.y,
-        renderX: p.renderX,
-        renderY: p.renderY,
-        vx: p.vx,
-        vy: p.vy,
-        aimX: p.aimX,
-        aimY: p.aimY,
-        hp: p.hp,
-        score: p.score,
-        alive: p.alive,
-        grounded: p.grounded,
-        ammo: p.ammo,
-        blockTimer: p.blockTimer,
-        mythicCooldown: p.mythicCooldown,
-        mythicTimer: p.mythicTimer,
-        spawnGrace: p.spawnGrace,
-        faceBlink: p.faceBlink,
-        stats: { maxHp: p.stats.maxHp, maxAmmo: p.stats.maxAmmo, radius: p.stats.radius, mythic: p.stats.mythic, mythicCooldown: p.stats.mythicCooldown },
-        cards: p.cards.map(c => c.name)
-      })),
-      bullets: bullets.map(b => ({ ...b, ownerId: b.owner ? b.owner.id : null, owner: undefined })),
-      fields: fields.map(f => ({ ...f, ownerId: f.owner ? f.owner.id : null, owner: undefined }))
-    };
-  }
-
-  function applyOnlineSnapshot(snapshot) {
-    online.lastSnapshotAt = performance.now();
-    world.state = snapshot.state || "playing";
-    world.mapIndex = snapshot.mapIndex || 0;
-    world.nextMap = snapshot.nextMap || 0;
-    world.roundFreeze = snapshot.roundFreeze || 0;
-    players = (snapshot.players || []).map((sp, i) => {
-      const p = players[i] || makePlayer(i);
-      Object.assign(p, sp);
-      p.stats = { ...defaultStats(), ...(sp.stats || {}) };
-      p.cards = (sp.cards || []).map(name => ({ name }));
-      p.input = i === 1 ? online.lastLocalInput : emptyInput();
-      return p;
-    });
-    world.winner = snapshot.winnerId === null || snapshot.winnerId === undefined ? null : players.find(p => p.id === snapshot.winnerId) || null;
-    world.roundWinner = snapshot.roundWinnerId === null || snapshot.roundWinnerId === undefined ? null : players.find(p => p.id === snapshot.roundWinnerId) || null;
-    world.pendingDraftPlayer = snapshot.pendingDraftPlayerId === null || snapshot.pendingDraftPlayerId === undefined ? null : players.find(p => p.id === snapshot.pendingDraftPlayerId) || null;
-    world.draftPlayer = snapshot.draftPlayerId === null || snapshot.draftPlayerId === undefined ? null : players.find(p => p.id === snapshot.draftPlayerId) || null;
-    world.draftIndex = snapshot.draftIndex || 0;
-    world.draftOptions = (snapshot.draftOptions || []).map(id => cardPool.find(c => c.id === id)).filter(Boolean);
-    bullets = (snapshot.bullets || []).map(b => ({ ...b, owner: players.find(p => p.id === b.ownerId) || null }));
-    fields = (snapshot.fields || []).map(f => ({ ...f, owner: players.find(p => p.id === f.ownerId) || null }));
-    menu.classList.add("hidden");
-    pausePanel.classList.add("hidden");
-    if (world.state === "draft" && world.draftPlayer && world.draftOptions.length) {
-      renderDraftPanelFromState();
-      draftPanel.classList.remove("hidden");
-      battleSplash.classList.add("hidden");
-    } else {
-      draftPanel.classList.add("hidden");
-    }
-    if (world.state === "round-won" && world.roundWinner && world.pendingDraftPlayer) {
-      battleKicker.textContent = "Battle won";
-      battleTitle.textContent = `${world.roundWinner.name} wins`;
-      battleTitle.style.color = world.roundWinner.color;
-      battleSub.textContent = `${world.pendingDraftPlayer.name} drafts next`;
-      battleSplash.classList.remove("hidden");
-    } else if (world.state !== "round-won") {
-      battleSplash.classList.add("hidden");
-    }
-  }
-
-  function resetRound(fullReset = false) {
-    if (fullReset) world.nextMap = 0;
-    world.mapIndex = world.nextMap % maps.length;
-    const map = maps[world.mapIndex];
-    world.nextMap += 1;
+  function resetRound() {
+    pickNextLevel();
+    const level = currentLevel();
     bullets = [];
     particles = [];
     fields = [];
+    bolts = [];
+    world.weather = [];
+    world.lightningTimer = level.lightning ? level.lightning.period : 0;
+    world.lightningFlash = 0;
+    world.tideLevel = level.tide ? level.tide.min : world.height + 100;
     players.forEach((p, i) => {
-      const sp = getSafeSpawn(map, i, p);
-      p.x = sp.x;
-      p.y = sp.y;
-      p.renderX = sp.x;
-      p.renderY = sp.y;
-      p.vx = 0;
-      p.vy = 0;
-      p.aimX = i % 2 === 0 ? 1 : -1;
-      p.aimY = 0;
+      const sp = level.spawns[i % level.spawns.length];
+      p.x = sp.x; p.y = sp.y;
+      p.vx = 0; p.vy = 0;
+      p.aimX = p.x < world.width / 2 ? 1 : -1; p.aimY = 0;
       p.hp = p.stats.maxHp;
       p.alive = true;
       p.grounded = false;
-      p.jumpReady = true;
+      p.groundPlatform = null;
       p.jumpsLeft = 1 + p.stats.extraJumps;
       p.ammo = p.stats.maxAmmo;
-      p.reloadTimer = 0;
-      p.fireTimer = 0;
-      p.blockTimer = 0;
-      p.blockCooldown = 0;
-      p.mythicCooldown = 0;
-      p.mythicTimer = 0;
-      p.poisonTimer = 0;
-      p.poisonDps = 0;
+      p.reloadTimer = 0; p.fireTimer = 0;
+      p.blockTimer = 0; p.blockCooldown = 0;
+      p.activeCooldown = 0;
+      p.poisonTimer = 0; p.burnTimer = 0; p.chillTimer = 0;
+      p.teleCooldown = 0;
+      p.guardianCharges = p.stats.guardian;
       p.roundRevives = p.stats.revives;
+      p.trail = [];
       p.spawnGrace = 1.6;
-      repairBadSpawn(p, i);
     });
-    showToast(`${map.name} arena`);
-    world.roundFreeze = 0.8;
-  }
-
-  function startMatch() {
-    leaveOnlineGame();
-    ensureAudio();
-    startMusic();
-    const slots = activeMatchSlots();
-    if (slots.length < 2) {
-      showToast("Need 2 players. Press buttons on 2 controllers.");
-      return;
-    }
-    players = slots.map((slot, i) => makePlayerFromSlot(slot, i));
-    rebuildGamepadSlots();
-    world.state = "playing";
-    world.winner = null;
-    world.roundWinner = null;
-    world.pendingDraftPlayer = null;
-    world.draftQueue = [];
-    world.draftPlayer = null;
-    world.nextMap = 0;
-    world.menuIndex = 0;
-    menu.classList.add("hidden");
-    settingsPanel.classList.add("hidden");
-    howPanel.classList.add("hidden");
-    draftPanel.classList.add("hidden");
-    battleSplash.classList.add("hidden");
-    pausePanel.classList.add("hidden");
-    resetRound(true);
-  }
-
-  function activeMatchSlots() {
-    const slots = lobbySlots.length
-      ? lobbySlots.slice(0, settings.playerCount)
-      : [
-          { type: "keyboard", label: "Keyboard P1" },
-          ...(settings.botCount > 0 ? [] : [{ type: "keyboard", label: "Keyboard P2" }])
-        ];
-    const botSlots = Math.min(settings.botCount, settings.playerCount - slots.length);
-    for (let i = 0; i < botSlots; i += 1) {
-      slots.push({ type: "bot", label: `Bot ${i + 1}` });
-    }
-    if (slots.length < 2 && settings.playerCount > slots.length) {
-      slots.push({ type: "keyboard", label: `Keyboard P${slots.length + 1}` });
-    }
-    return slots.slice(0, settings.playerCount);
+    world.roundFreeze = 1.1;
+    arenaName.textContent = level.name;
+    arenaTag.textContent = level.tagline;
+    arenaBanner.classList.remove("hidden");
+    setTimeout(() => arenaBanner.classList.add("hidden"), 2100);
   }
 
   function endRound(winner) {
@@ -1443,93 +410,29 @@
     if (winner.score >= settings.scoreLimit) {
       world.state = "ended";
       world.winner = winner;
-      showToast(`${winner.name} wins. Press Start / Enter for rematch.`);
-      publishOnlineSnapshot(true);
+      showToast(`${winner.name} takes the match! Enter / Start for rematch.`);
       return;
     }
-    if (online.active) {
-      world.draftQueue = [players.find(p => p !== winner) || winner];
-      showRoundSplash(winner, world.draftQueue[0]);
-      return;
-    }
-    world.draftQueue = players
-      .filter(p => p !== winner)
-      .sort((a, b) => a.score - b.score || a.id - b.id);
-    showRoundSplash(winner, world.draftQueue[0]);
-  }
-
-  function showRoundSplash(winner, draftPlayer) {
     world.state = "round-won";
     world.roundWinner = winner;
-    world.pendingDraftPlayer = draftPlayer;
-    battleKicker.textContent = "Battle won";
-    battleTitle.textContent = `${winner.name} wins`;
+    const losers = players.filter(p => p !== winner).sort((a, b) => a.score - b.score || a.id - b.id);
+    battleKicker.textContent = "Round " + players.reduce((s, p) => s + p.score, 0);
+    battleTitle.textContent = `${winner.name} wins the round`;
     battleTitle.style.color = winner.color;
-    battleSub.textContent = `${draftPlayer.name} drafts next`;
+    battleSub.textContent = losers.length > 1 ? "The fallen draft new powers…" : `${losers[0].name} drafts a new power…`;
     battleSplash.classList.remove("hidden");
     sfx("win");
     setTimeout(() => {
       if (world.state === "round-won") {
-        if (online.active && online.role !== "host") return;
         battleSplash.classList.add("hidden");
-        beginDraft(draftPlayer);
+        beginDraft(losers);
       }
-    }, 1350);
-    publishOnlineSnapshot(true);
+    }, 1500);
   }
 
-  function beginDraft(player) {
-    world.state = "draft";
-    world.draftPlayer = player;
-    world.draftIndex = 0;
-    world.draftOptions = drawCards(settings.draftCount);
-    draftPrompt.textContent = `${player.name} drafts a counter-card`;
-    renderDraftPanelFromState();
-    draftPanel.classList.remove("hidden");
-    pulse(player, 0.25, 90);
-    publishOnlineSnapshot(true);
-    if (player.bot) {
-      setTimeout(() => {
-        if (world.state === "draft" && world.draftPlayer === player) {
-          world.draftIndex = Math.floor(Math.random() * world.draftOptions.length);
-          pickDraft();
-        }
-      }, 650);
-    }
-  }
-
-  function renderDraftPanelFromState() {
-    const player = world.draftPlayer;
-    draftPrompt.textContent = `${player ? player.name : "Player"} drafts a counter-card`;
-    draftCards.innerHTML = "";
-    world.draftOptions.forEach((c, i) => {
-      const el = document.createElement("article");
-      el.className = `card ${c.rarity}${i === 0 ? " selected" : ""}`;
-      el.innerHTML = `
-        <span class="rarity">${c.rarity}</span>
-        <strong>${c.name}</strong>
-        <p>${c.description}</p>
-        <div class="stat-list">${c.stats.map(s => `<span>${s}</span>`).join("")}</div>
-      `;
-      el.dataset.cardIndex = String(i);
-      el.addEventListener("pointerdown", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        world.draftIndex = i;
-        renderDraftSelection();
-        if (online.active && online.role === "guest") {
-          sendOnlineDraftPick(i);
-          return;
-        }
-        pickDraft();
-      });
-      draftCards.appendChild(el);
-    });
-    renderDraftSelection();
-  }
-
-  function drawCards(count) {
-    const bag = [...cardPool];
+  // ---------------------------------------------------------------- drafting
+  function drawCards(count, exclude = []) {
+    const bag = CARDS.filter(c => !exclude.includes(c));
     const weighted = [];
     for (const c of bag) {
       const n = Math.max(0, Math.round(settings.rarityWeights[c.rarity] ?? 1));
@@ -1547,49 +450,130 @@
     return picked;
   }
 
-  function pickDraft() {
-    const p = world.draftPlayer;
-    const c = world.draftOptions[world.draftIndex];
-    if (world.state !== "draft" || !p || !c) return;
-    if (online.active && online.role === "guest") {
-      sendOnlineDraftPick(world.draftIndex);
-      return;
-    }
-    world.state = "draft-picked";
-    p.cards.push(c);
-    c.apply(p);
-    sfx("card");
-    p.hp = p.stats.maxHp;
-    p.ammo = p.stats.maxAmmo;
-    pulse(p, 0.55, 160);
-    showToast(`${p.name} picked ${c.name}`);
-    draftPanel.classList.add("hidden");
-    setTimeout(() => {
-      if (world.state === "draft-picked") {
-        world.draftQueue = world.draftQueue.filter(next => next !== p);
-        const nextDrafter = world.draftQueue[0];
-        if (nextDrafter) {
-          beginDraft(nextDrafter);
-        } else {
-          world.state = "playing";
-          resetRound();
-          publishOnlineSnapshot(true);
-        }
+  // All losers draft simultaneously, each with their own hand + controls.
+  function beginDraft(losers) {
+    world.state = "draft";
+    world.drafters = losers.map(p => ({
+      player: p,
+      options: drawCards(settings.draftCount),
+      index: 0,
+      picked: false
+    }));
+    draftTitle.textContent = losers.length > 1 ? "Draft — everyone picks at once" : `${losers[0].name} drafts`;
+    renderDraftPanel();
+    draftPanel.classList.remove("hidden");
+    for (const d of world.drafters) {
+      if (d.player.bot) {
+        setTimeout(() => {
+          if (world.state === "draft" && !d.picked) {
+            d.index = Math.floor(Math.random() * d.options.length);
+            confirmPick(d);
+          }
+        }, 700 + Math.random() * 900);
       }
-    }, 360);
-    publishOnlineSnapshot(true);
+    }
   }
 
-  function applyInputs(pads = getPads()) {
-    if (online.active && online.role === "guest") {
-      updateOnlineGuestInput();
-      return;
+  function renderDraftPanel() {
+    draftGrid.innerHTML = "";
+    draftGrid.classList.toggle("multi", world.drafters.length > 1);
+    world.drafters.forEach((d, di) => {
+      const row = document.createElement("div");
+      row.className = "draft-row";
+      row.style.setProperty("--pcol", d.player.color);
+      const head = document.createElement("div");
+      head.className = "draft-row-head";
+      head.innerHTML = `<canvas width="56" height="56"></canvas><div><strong>${escapeHtml(d.player.name)}</strong><span>${d.picked ? "Locked in!" : "◀ ▶ browse · shoot to pick"}</span></div>`;
+      const pc = head.querySelector("canvas").getContext("2d");
+      pc.translate(28, 31);
+      drawCharacter(pc, d.player.character, 16, { t: 0, aimX: 1 });
+      row.appendChild(head);
+      const hand = document.createElement("div");
+      hand.className = "draft-hand";
+      d.options.forEach((c, i) => {
+        const rar = RARITIES[c.rarity];
+        const el = document.createElement("article");
+        el.className = `card r-${c.rarity}${i === d.index ? " selected" : ""}${d.picked && i === d.index ? " picked" : ""}`;
+        el.style.setProperty("--rcol", rar.color);
+        el.style.setProperty("--rglow", rar.glow);
+        el.innerHTML = `
+          <span class="rarity">${rar.name}</span>
+          <strong class="card-name">${c.name}</strong>
+          <em class="card-tagline">${c.tagline}</em>
+          <p class="card-desc">${c.description}</p>
+          <div class="stat-list">${c.effects.map(s => `<span>${s}</span>`).join("")}</div>
+        `;
+        el.addEventListener("pointerdown", event => {
+          event.preventDefault();
+          if (world.state !== "draft" || d.picked || d.player.bot) return;
+          d.index = i;
+          confirmPick(d);
+        });
+        hand.appendChild(el);
+      });
+      row.appendChild(hand);
+      draftGrid.appendChild(row);
+      d.rowEl = row;
+    });
+  }
+
+  function refreshDraftSelection(d) {
+    if (!d.rowEl) return;
+    [...d.rowEl.querySelectorAll(".card")].forEach((el, i) => {
+      el.classList.toggle("selected", i === d.index);
+      el.classList.toggle("picked", d.picked && i === d.index);
+    });
+    const state = d.rowEl.querySelector(".draft-row-head span");
+    if (state) state.textContent = d.picked ? "Locked in!" : "◀ ▶ browse · shoot to pick";
+  }
+
+  function confirmPick(d) {
+    if (d.picked || world.state !== "draft") return;
+    const c = d.options[d.index];
+    d.picked = true;
+    d.player.cards.push(c);
+    c.apply(d.player);
+    d.player.hp = d.player.stats.maxHp;
+    d.player.ammo = d.player.stats.maxAmmo;
+    sfx("card");
+    pulse(d.player, 0.5, 150);
+    refreshDraftSelection(d);
+    showToast(`${d.player.name} picked ${c.name}`);
+    if (world.drafters.every(x => x.picked)) {
+      setTimeout(() => {
+        if (world.state === "draft") {
+          draftPanel.classList.add("hidden");
+          world.state = "playing";
+          buildHud();
+          resetRound();
+        }
+      }, 650);
     }
+  }
+
+  function updateDraftInput() {
+    for (const d of world.drafters) {
+      const p = d.player;
+      if (p.bot || d.picked) continue;
+      const move = p.input.rightPressed ? 1 : p.input.leftPressed ? -1 : 0;
+      if (move && !p.draftLock) {
+        d.index = (d.index + move + d.options.length) % d.options.length;
+        p.draftLock = true;
+        sfx("jump");
+        refreshDraftSelection(d);
+      }
+      if (!p.input.leftPressed && !p.input.rightPressed) p.draftLock = false;
+      if (p.input.shootPressed || p.input.jumpPressed) confirmPick(d);
+    }
+  }
+
+  // ------------------------------------------------------------------ input
+  function applyInputs(pads) {
     for (const p of players) {
       const prev = p.input;
       const input = emptyInput();
       if (p.bot) {
-        readBot(p, input);
+        if (world.state === "playing") readBot(p, input);
       } else {
         if (p.scheme) readKeyboard(p.scheme, input);
         const pad = getPadByIndex(pads, p.gamepadIndex);
@@ -1601,92 +585,6 @@
       input.pausePressed = input.pause && !prev.pause;
       p.input = input;
     }
-    if (online.active && online.role === "host" && players[1]) {
-      const prev = players[1].input;
-      const remote = sanitizeInput(online.remoteInput);
-      remote.jumpPressed = remote.jump && !prev.jump;
-      remote.shootPressed = remote.shoot && !prev.shoot;
-      remote.blockPressed = remote.block && !prev.block;
-      remote.pausePressed = remote.pause && !prev.pause;
-      players[1].input = remote;
-    }
-  }
-
-  function readBot(p, input) {
-    const target = nearestBotTarget(p);
-    if (!target) return;
-    const skill = botDifficulty();
-    const dx = target.x - p.x;
-    const dy = target.y - p.y;
-    const distance = Math.hypot(dx, dy) || 1;
-    const lead = clamp(distance / Math.max(600, p.stats.bulletSpeed), 0, 0.55);
-    const wobble = (1 - skill.aim) * 260;
-    const aimX = dx + target.vx * lead + Math.sin(performance.now() / 330 + p.botSeed) * wobble;
-    const aimY = dy + target.vy * lead - 38 + Math.cos(performance.now() / 420 + p.botSeed) * wobble;
-    const aimMag = Math.hypot(aimX, aimY) || 1;
-    input.aimX = aimX / aimMag;
-    input.aimY = aimY / aimMag;
-
-    const ideal = 430 + (p.id % 2) * 80;
-    if (Math.abs(dx) > ideal) input.move = Math.sign(dx);
-    else if (Math.abs(dx) < 220) input.move = -Math.sign(dx || p.botStrafe);
-    else input.move = Math.sin(performance.now() / 650 + p.botSeed) > 0 ? p.botStrafe : -p.botStrafe;
-
-    if (p.x < 110) input.move = 1;
-    if (p.x > world.width - 110) input.move = -1;
-    p.botJumpLock = Math.max(0, p.botJumpLock - 1 / 60);
-    const shouldJump = p.grounded && p.botJumpLock <= 0 && (dy < -85 || Math.random() < skill.wander || isBotWallAhead(p, input.move));
-    if (shouldJump) {
-      input.jump = true;
-      p.botJumpLock = 0.35 + Math.random() * 0.25;
-    }
-
-    const aimDot = (dx / distance) * input.aimX + (dy / distance) * input.aimY;
-    input.shoot = distance < 980 && aimDot > 0.72 && p.reloadTimer <= 0 && Math.random() < skill.shoot;
-    input.block = botThreatened(p) && Math.random() < skill.block;
-  }
-
-  function nearestBotTarget(bot) {
-    let best = null;
-    let bestD = Infinity;
-    for (const p of players) {
-      if (!p.alive || p === bot) continue;
-      const d = Math.hypot(p.x - bot.x, p.y - bot.y);
-      if (d < bestD) {
-        bestD = d;
-        best = p;
-      }
-    }
-    return best;
-  }
-
-  function isBotWallAhead(p, move) {
-    if (!move) return false;
-    const r = p.stats.radius;
-    const probe = { x: p.x + move * (r + 14), y: p.y, r };
-    return maps[world.mapIndex].platforms.some(platform => circleRect(probe, platform));
-  }
-
-  function botThreatened(p) {
-    return bullets.some(b => {
-      if (b.owner === p) return false;
-      const d = Math.hypot(b.x - p.x, b.y - p.y);
-      if (d > 165) return false;
-      const toward = ((p.x - b.x) * b.vx + (p.y - b.y) * b.vy) > 0;
-      return toward || d < 75;
-    });
-  }
-
-  function botDifficulty() {
-    return settings.botDifficulty === 3
-      ? { aim: 1.0, shoot: 0.66, block: 0.25, wander: 0.008 }
-      : settings.botDifficulty === 2
-        ? { aim: 0.78, shoot: 0.5, block: 0.12, wander: 0.012 }
-        : { aim: 0.52, shoot: 0.3, block: 0.03, wander: 0.018 };
-  }
-
-  function botDifficultyLabel(value) {
-    return Number(value) === 3 ? "Hard" : Number(value) === 2 ? "Normal" : "Easy";
   }
 
   function readKeyboard(scheme, input) {
@@ -1707,64 +605,44 @@
     const ly = axis(pad.axes[1]);
     const rx = axis(pad.axes[2]);
     const ry = axis(pad.axes[3]);
-    const altX = axis(pad.axes[6]);
-    const altY = axis(pad.axes[7]);
     const dLeft = button(pad, 14);
     const dRight = button(pad, 15);
     const dUp = button(pad, 12);
-    const dDown = button(pad, 13);
     const dMove = (dRight ? 1 : 0) - (dLeft ? 1 : 0);
-    const axisMove = Math.abs(lx) > 0 ? lx : altX;
-    input.move += Math.abs(axisMove) > 0 ? axisMove : dMove;
+    input.move += Math.abs(lx) > 0 ? lx : dMove;
     if (Math.hypot(rx, ry) > 0.2) {
-      input.aimX = rx;
-      input.aimY = ry;
+      input.aimX = rx; input.aimY = ry;
     } else if (Math.hypot(lx, ly) > 0.2) {
-      input.aimX = lx;
-      input.aimY = ly;
+      input.aimX = lx; input.aimY = ly;
     } else {
-      input.aimX = input.move || 0;
-      input.aimY = 0;
+      input.aimX = input.move || 0; input.aimY = 0;
     }
-    input.jump ||= button(pad, 0) || dUp || altY < -0.55;
+    input.jump ||= button(pad, 0) || dUp;
     input.shoot ||= button(pad, 2) || button(pad, 5) || button(pad, 7);
     input.block ||= button(pad, 1) || button(pad, 3) || button(pad, 4) || button(pad, 6);
     input.pause ||= button(pad, 9);
-    input.menuPressed ||= button(pad, 8) || button(pad, 9);
-    input.leftPressed ||= dLeft || axisMove < -0.55;
-    input.rightPressed ||= dRight || axisMove > 0.55;
-    input.downPressed ||= dDown || altY > 0.55;
+    input.menuPressed ||= buttonEdge(pad, 9);
+    input.leftPressed ||= buttonEdge(pad, 14) || axisEdge(pad, 0, -1);
+    input.rightPressed ||= buttonEdge(pad, 15) || axisEdge(pad, 0, 1);
   }
 
-  function axis(v) {
-    return Math.abs(v || 0) > 0.18 ? v : 0;
-  }
-
-  function button(pad, index) {
-    return Boolean(pad.buttons[index] && pad.buttons[index].pressed);
-  }
-
-  function buttonEdge(pad, index) {
+  function axis(v) { return Math.abs(v || 0) > 0.18 ? v : 0; }
+  function button(pad, i) { return Boolean(pad.buttons[i] && pad.buttons[i].pressed); }
+  function buttonEdge(pad, i) {
     const lastButtons = lastPadButtons.get(pad.index) || [];
-    return button(pad, index) && !lastButtons[index];
+    return button(pad, i) && !lastButtons[i];
   }
-
-  function axisEdge(pad, axisIndex, direction) {
+  function axisEdge(pad, axisIndex, dir) {
     const lastAxes = lastPadButtons.get(`axes-${pad.index}`) || [];
     const current = axis(pad.axes[axisIndex]);
     const previous = Math.abs(lastAxes[axisIndex] || 0) > 0.18 ? lastAxes[axisIndex] : 0;
-    return direction < 0 ? current < -0.55 && previous >= -0.55 : current > 0.55 && previous <= 0.55;
+    return dir < 0 ? current < -0.55 && previous >= -0.55 : current > 0.55 && previous <= 0.55;
   }
-
-  function getPads() {
-    return navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
-  }
-
+  function getPads() { return navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : []; }
   function getPadByIndex(pads, index) {
     if (index === null || index === undefined) return null;
     return pads.find(pad => pad.index === index) || null;
   }
-
   function rememberGamepads() {
     for (const pad of getPads()) {
       lastPadButtons.set(pad.index, pad.buttons.map(b => b.pressed));
@@ -1772,22 +650,89 @@
     }
   }
 
+  // -------------------------------------------------------------------- bot
+  function readBot(p, input) {
+    const target = nearestBotTarget(p);
+    if (!target) return;
+    const skill = botDifficulty();
+    const dx = target.x - p.x;
+    const dy = target.y - p.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    const lead = clamp(distance / Math.max(600, p.stats.bulletSpeed), 0, 0.55);
+    const wobble = (1 - skill.aim) * 260;
+    const ax = dx + target.vx * lead + Math.sin(performance.now() / 330 + p.botSeed) * wobble;
+    const ay = dy + target.vy * lead - 38 + Math.cos(performance.now() / 420 + p.botSeed) * wobble;
+    const mag = Math.hypot(ax, ay) || 1;
+    input.aimX = ax / mag;
+    input.aimY = ay / mag;
+
+    const ideal = 430 + (p.id % 2) * 80;
+    if (Math.abs(dx) > ideal) input.move = Math.sign(dx);
+    else if (Math.abs(dx) < 220) input.move = -Math.sign(dx || p.botStrafe);
+    else input.move = Math.sin(performance.now() / 650 + p.botSeed) > 0 ? p.botStrafe : -p.botStrafe;
+
+    if (p.x < 110) input.move = 1;
+    if (p.x > world.width - 110) input.move = -1;
+    p.botJumpLock = Math.max(0, p.botJumpLock - 1 / 60);
+    const shouldJump = p.grounded && p.botJumpLock <= 0 && (dy < -85 || Math.random() < skill.wander || isBotWallAhead(p, input.move));
+    if (shouldJump) {
+      input.jump = true;
+      p.botJumpLock = 0.35 + Math.random() * 0.25;
+    }
+    const aimDot = (dx / distance) * input.aimX + (dy / distance) * input.aimY;
+    input.shoot = distance < 980 && aimDot > 0.72 && p.reloadTimer <= 0 && Math.random() < skill.shoot;
+    input.block = botThreatened(p) && Math.random() < skill.block;
+  }
+
+  function nearestBotTarget(bot) {
+    let best = null, bestD = Infinity;
+    for (const p of players) {
+      if (!p.alive || p === bot) continue;
+      const d = Math.hypot(p.x - bot.x, p.y - bot.y);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    return best;
+  }
+
+  function isBotWallAhead(p, move) {
+    if (!move) return false;
+    const r = p.stats.radius;
+    const probe = { x: p.x + move * (r + 14), y: p.y, r };
+    return activePlatforms(currentLevel(), world.time).some(platform => circleRect(probe, platform));
+  }
+
+  function botThreatened(p) {
+    return bullets.some(b => {
+      if (b.owner === p) return false;
+      const d = Math.hypot(b.x - p.x, b.y - p.y);
+      if (d > 165) return false;
+      const toward = ((p.x - b.x) * b.vx + (p.y - b.y) * b.vy) > 0;
+      return toward || d < 75;
+    });
+  }
+
+  function botDifficulty() {
+    return settings.botDifficulty === 3
+      ? { aim: 1.0, shoot: 0.66, block: 0.25, wander: 0.008 }
+      : settings.botDifficulty === 2
+        ? { aim: 0.78, shoot: 0.5, block: 0.12, wander: 0.012 }
+        : { aim: 0.52, shoot: 0.3, block: 0.03, wander: 0.018 };
+  }
+
+  function botDifficultyLabel(v) { return Number(v) === 3 ? "Hard" : Number(v) === 2 ? "Normal" : "Easy"; }
+
+  // ------------------------------------------------------------------ update
   function update(dt) {
     const pads = getPads();
     world.joinedThisFrame = false;
     world.pausedThisFrame = false;
-    if (online.active && online.role === "guest") {
-      updateOnlineGuestInput();
-      if (world.state === "draft" && world.draftPlayer && world.draftPlayer.id === 1) updateDraftInput();
-      updateParticles(dt);
-      return;
-    }
-    if (world.state === "menu") updateLobbyJoins(pads);
-    if (world.state !== "menu" && world.state !== "settings" && world.state !== "how") assignGamepads(pads);
+    world.time += dt;
+    if (world.state === "menu") updateLobby(pads);
     applyInputs(pads);
 
     if (world.state === "menu" || world.state === "settings" || world.state === "how") {
       updateMenuControls(pads);
+      updateWeatherMenu(dt);
       updateParticles(dt);
       return;
     }
@@ -1798,27 +743,16 @@
       updateParticles(dt);
       return;
     }
-
-    if (players.some(p => p.input.menuPressed) && world.state === "ended") startMatch();
-
-    if (world.state === "round-won") {
-      updateParticles(dt);
-      publishOnlineSnapshot();
+    if (players.some(p => p.input.menuPressed) && world.state === "ended") {
+      restoreLobbyFromPlayers();
+      startMatch();
       return;
     }
+    if (world.state === "round-won") { updateParticles(dt); return; }
+    if (world.state === "draft") { updateDraftInput(); updateParticles(dt); return; }
+    if (world.state !== "playing") { updateParticles(dt); return; }
 
-    if (world.state === "draft") {
-      updateDraftInput();
-      updateParticles(dt);
-      publishOnlineSnapshot();
-      return;
-    }
-
-    if (world.state !== "playing") {
-      updateParticles(dt);
-      return;
-    }
-
+    updateWeather(dt);
     if (world.roundFreeze > 0) {
       world.roundFreeze -= dt;
       updateParticles(dt);
@@ -1826,51 +760,102 @@
     }
 
     const step = Math.min(dt, 1 / 45);
+    updateArena(step);
     updatePlayers(step);
     updateBullets(step);
     updateFields(step);
     updateParticles(step);
+    updateBolts(step);
+    updateHud();
     checkRoundEnd();
-    publishOnlineSnapshot();
   }
 
-  function updateDraftInput() {
-    const p = world.draftPlayer;
-    if (!p) return;
-    const move = p.input.rightPressed ? 1 : p.input.leftPressed ? -1 : 0;
-    if (move && !p.draftStickLock) {
-      world.draftIndex = (world.draftIndex + move + world.draftOptions.length) % world.draftOptions.length;
-      p.draftStickLock = true;
-      pulse(p, 0.12, 40);
-      renderDraftSelection();
+  function restoreLobbyFromPlayers() {
+    // keep same lineup for rematch, reset cards/scores
+    for (const p of players) {
+      p.cards = [];
+      p.stats = defaultStats();
+      p.score = 0;
     }
-    if (!p.input.leftPressed && !p.input.rightPressed) p.draftStickLock = false;
-    if (p.input.shootPressed || p.input.jumpPressed) pickDraft();
   }
 
-  function renderDraftSelection() {
-    [...draftCards.children].forEach((el, i) => {
-      el.classList.toggle("selected", i === world.draftIndex);
-    });
+  // ------------------------------------------------------------- arena tick
+  function updateArena(dt) {
+    const level = currentLevel();
+    // tide
+    if (level.tide) {
+      const s = (Math.sin((world.time / level.tide.period) * Math.PI * 2 - Math.PI / 2) + 1) / 2;
+      world.tideLevel = level.tide.min + (level.tide.max - level.tide.min) * s;
+    }
+    // lightning
+    if (level.lightning && settings.hazards) {
+      world.lightningFlash = Math.max(0, world.lightningFlash - dt);
+      world.lightningTimer -= dt;
+      if (world.lightningTimer <= 0) {
+        strikeLightning();
+        world.lightningTimer = level.lightning.period * (0.75 + Math.random() * 0.5);
+      }
+    }
   }
 
+  function strikeLightning() {
+    const level = currentLevel();
+    const targets = players.filter(p => p.alive);
+    const tx = targets.length && Math.random() < 0.7
+      ? targets[Math.floor(Math.random() * targets.length)].x + rand(-60, 60)
+      : rand(120, world.width - 120);
+    world.lightningX = clamp(tx, 80, world.width - 80);
+    // warn phase handled via timer offset: schedule actual strike after warn
+    const warn = level.lightning.warn;
+    fields.push({ type: "lightning-warn", x: world.lightningX, y: 0, r: 55, life: warn, owner: null });
+    setTimeout(() => {
+      if (world.state !== "playing") return;
+      world.lightningFlash = 0.22;
+      world.shake = Math.max(world.shake, 14);
+      sfx("hit");
+      boltVisual(world.lightningX, 0, world.lightningX + rand(-20, 20), world.height, "#ffe95e", 0.35);
+      for (const p of players) {
+        if (!p.alive) continue;
+        if (Math.abs(p.x - world.lightningX) < 70) {
+          hurt(p, 42, null, 0, -1);
+          p.vy -= 420;
+        }
+      }
+    }, warn * 1000);
+  }
+
+  // ----------------------------------------------------------------- players
   function updatePlayers(dt) {
-    const map = maps[world.mapIndex];
-    for (const [index, p] of players.entries()) {
+    const level = currentLevel();
+    const plats = activePlatforms(level, world.time);
+    const wind = windForce();
+    for (const p of players) {
       if (!p.alive) continue;
-      repairBadSpawn(p, index);
       p.fireTimer = Math.max(0, p.fireTimer - dt);
       p.blockCooldown = Math.max(0, p.blockCooldown - dt);
       p.blockTimer = Math.max(0, p.blockTimer - dt);
-      p.mythicCooldown = Math.max(0, p.mythicCooldown - dt);
-      p.mythicTimer = Math.max(0, p.mythicTimer - dt);
+      p.activeCooldown = Math.max(0, p.activeCooldown - dt);
       p.spawnGrace = Math.max(0, p.spawnGrace - dt);
-      p.faceBlink += dt;
+      p.teleCooldown = Math.max(0, p.teleCooldown - dt);
+      p.blinkClock += dt;
 
+      // trail for chronoshift
+      p.trail.push({ x: p.x, y: p.y });
+      if (p.trail.length > 120) p.trail.shift();
+
+      // DoTs & sustain
       if (p.poisonTimer > 0) {
         p.poisonTimer -= dt;
-        hurt(p, p.poisonDps * dt, null, 0, 0);
+        hurtRaw(p, p.poisonDps * dt, p.poisonAttacker);
+        if (Math.random() < dt * 14) puffOne(p.x + rand(-14, 14), p.y + rand(-14, 14), "#63d43a");
       }
+      if (p.burnTimer > 0) {
+        p.burnTimer -= dt;
+        hurtRaw(p, p.burnDps * dt, p.burnAttacker);
+        if (Math.random() < dt * 20) puffOne(p.x + rand(-14, 14), p.y - rand(0, 20), "#ff9e3d");
+      }
+      if (p.chillTimer > 0) p.chillTimer -= dt;
+      if (p.stats.regen > 0) p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.regen * dt);
 
       if (p.reloadTimer > 0) {
         p.reloadTimer -= dt;
@@ -1880,382 +865,125 @@
         }
       }
 
-      const move = clamp(p.input.move, -1, 1);
-      const targetVx = move * p.stats.speed;
-      const accel = p.grounded ? p.stats.accel : p.stats.airAccel;
-      p.vx += (targetVx - p.vx) * clamp(accel * dt, 0, 1);
-      if (!move && p.grounded) p.vx += (0 - p.vx) * clamp(p.stats.brake * dt, 0, 1);
-      if (move) {
-        p.aimX = move;
-        p.aimY = 0;
+      const chillMul = p.chillTimer > 0 ? 0.55 : 1;
+      const adrenalineMul = p.stats.adrenaline > 0 && p.hp / p.stats.maxHp < 0.35 ? 1 + p.stats.adrenaline : 1;
+      let speed = p.stats.speed * chillMul * adrenalineMul;
+      // syrup zones
+      for (const z of level.zones || []) {
+        if (circleRect(p, z)) { speed *= 0.45; break; }
       }
+
+      const move = clamp(p.input.move, -1, 1);
+      const onIce = p.groundPlatform && p.groundPlatform.ice;
+      const targetVx = move * speed;
+      let accel = p.grounded ? p.stats.accel : p.stats.airAccel;
+      let brake = p.stats.brake;
+      if (onIce && p.grounded) { accel *= 0.3; brake *= 0.08; }
+      p.vx += (targetVx - p.vx) * clamp(accel * dt, 0, 1);
+      if (!move && p.grounded) p.vx += (0 - p.vx) * clamp(brake * dt, 0, 1);
+
+      if (move) { p.aimX = move; p.aimY = 0; }
       if (Math.abs(p.input.aimX) > 0.2 || Math.abs(p.input.aimY) > 0.2) {
         const mag = Math.hypot(p.input.aimX, p.input.aimY) || 1;
         p.aimX = p.input.aimX / mag;
         p.aimY = p.input.aimY / mag;
       }
       const aimMag = Math.hypot(p.aimX, p.aimY) || 1;
-      p.aimX /= aimMag;
-      p.aimY /= aimMag;
+      p.aimX /= aimMag; p.aimY /= aimMag;
 
       if (p.input.jumpPressed && p.jumpsLeft > 0) {
-        p.vy = -p.stats.jump;
+        p.vy = -p.stats.jump * (p.chillTimer > 0 ? 0.75 : 1);
         p.jumpsLeft -= 1;
-        p.jumpReady = p.jumpsLeft > 0;
         p.grounded = false;
+        p.groundPlatform = null;
         pulse(p, 0.12, 25);
         sfx("jump");
-        puff(p.x, p.y + p.stats.radius, p.color, 12);
+        puff(p.x, p.y + p.stats.radius, "#ffffff", 10);
       }
 
-      if (p.input.blockPressed && !tryMythic(p)) tryBlock(p);
+      if (p.input.blockPressed && !tryActive(p)) tryBlock(p);
       if (p.input.shoot) tryShoot(p);
 
-      p.vy += world.gravity * dt;
-      p.vx *= p.grounded ? world.floorDrag : world.airDrag;
+      p.vy += levelGravity() * dt;
+      if (wind) p.vx += wind * 0.55 * dt;
+      p.vx *= p.grounded && !onIce ? world.floorDrag : world.airDrag;
+      // carry by mover
+      if (p.grounded && p.groundPlatform && p.groundPlatform.isMover) {
+        p.x += p.groundPlatform.vxDelta;
+        p.y += p.groundPlatform.vyDelta;
+      }
+      // conveyor
+      if (p.grounded && p.groundPlatform && p.groundPlatform.conveyor) {
+        p.x += p.groundPlatform.conveyor * dt;
+      }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.grounded = false;
+      p.groundPlatform = null;
 
-      collidePlayerWithMap(p, map);
-      p.renderX = Number.isFinite(p.x) ? p.x : p.renderX;
-      p.renderY = Number.isFinite(p.y) ? p.y : p.renderY;
+      collidePlayer(p, plats);
+
+      // bounce pads
+      for (const pad of level.bouncePads || []) {
+        if (p.vy > 0 &&
+            p.x > pad.x - 10 && p.x < pad.x + pad.w + 10 &&
+            p.y + p.stats.radius > pad.y && p.y + p.stats.radius < pad.y + 46) {
+          p.vy = -pad.power * (currentLevel().gravityScale ? Math.sqrt(currentLevel().gravityScale) : 1);
+          p.grounded = false;
+          sfx("bounce");
+          burst(p.x, pad.y, currentLevel().palette.accent, 16, 300);
+          pulse(p, 0.2, 60);
+        }
+      }
+
+      // teleporters
+      for (const t of level.teleporters || []) {
+        if (p.teleCooldown <= 0) {
+          const near = (x, y) => Math.hypot(p.x - x, p.y - y) < 40;
+          let dest = null;
+          if (near(t.ax, t.ay)) dest = { x: t.bx, y: t.by };
+          else if (near(t.bx, t.by)) dest = { x: t.ax, y: t.ay };
+          if (dest) {
+            burst(p.x, p.y, currentLevel().palette.accent, 20, 320);
+            p.x = dest.x; p.y = dest.y;
+            p.teleCooldown = 0.9;
+            burst(p.x, p.y, currentLevel().palette.accent, 20, 320);
+            sfx("teleport");
+          }
+        }
+      }
+
+      // tide drowning
+      if (level.tide && p.y > world.tideLevel + 10) {
+        p.vy -= levelGravity() * dt * 0.7; // buoyancy
+        p.vx *= 0.94;
+        hurtRaw(p, 16 * dt, null);
+        if (Math.random() < dt * 10) puffOne(p.x + rand(-12, 12), p.y - 20, "#7fe8d0");
+      }
+
+      // world bounds & hazards
       if (p.x < -80 || p.x > world.width + 80 || p.y > world.height + 120) hurt(p, 999, null, 0, -1);
       if (settings.hazards) {
-        for (const h of map.hazards) {
+        for (const h of level.hazards) {
           if (circleRect(p, h)) hurt(p, 999, null, 0, -1);
         }
       }
     }
   }
 
-  function tryMythic(p) {
-    if (!p.stats.mythic || p.mythicCooldown > 0) return false;
-    p.mythicCooldown = p.stats.mythicCooldown || mythicCooldown(p.stats.mythic);
-    p.mythicTimer = p.stats.mythicDuration || 0.45;
-    pulse(p, 0.75, 170);
-    sfx("win");
-    burst(p.x, p.y, "#85fff2", 36, 520);
-
-    const aim = Math.atan2(p.aimY, p.aimX);
-    if (p.stats.mythic === "hollowViolet") {
-      fields.push({ type: "beam", owner: p, x: p.x + p.aimX * 360, y: p.y + p.aimY * 360, r: 210, life: 0.24, force: 1600 });
-      damageCone(p, aim, 0.18, 920, 96, 1900);
-    } else if (p.stats.mythic === "greenGiant") {
-      p.hp = Math.min(p.stats.maxHp * 1.6, p.hp + 95);
-      p.vx += p.aimX * 760;
-      p.vy -= 520;
-      fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 260, life: 0.25, force: 1600 });
-      p.mythicTimer = 4;
-    } else if (p.stats.mythic === "pocketDomain") {
-      fields.push({ type: "domain", owner: p, x: p.x, y: p.y, r: 360, life: 3.2, force: -780 });
-    } else if (p.stats.mythic === "starSword") {
-      spawnMythicBullet(p, aim, 1500, 32, 78, 1.2, 0, 0, 2, "#f8f4e8");
-    } else if (p.stats.mythic === "webSwing") {
-      p.vx += p.aimX * 1250;
-      p.vy += p.aimY * 900 - 180;
-      damageCone(p, aim, 0.45, 520, 34, 900);
-    } else if (p.stats.mythic === "speedForce") {
-      p.x = clamp(p.x + p.aimX * 360, 70, world.width - 70);
-      p.y = clamp(p.y + p.aimY * 240, 80, world.height - 120);
-      fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 190, life: 0.18, force: 980 });
-    } else if (p.stats.mythic === "wizardPortal") {
-      for (let i = -2; i <= 2; i += 1) spawnMythicBullet(p, aim + i * 0.18, 980, 10, 32, 1.4, 700, 0.2, 1, "#ffcf75");
-    } else if (p.stats.mythic === "iceQueen") {
-      fields.push({ type: "ice", owner: p, x: p.x, y: p.y, r: 320, life: 2.4, force: 260 });
-    } else if (p.stats.mythic === "shadowClone") {
-      for (let i = -3; i <= 3; i += 1) spawnMythicBullet(p, aim + i * 0.12, 1050, 7, 22, 1.1, 0, 0.3, 0, p.color);
-    } else if (p.stats.mythic === "kaijuRoar") {
-      fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 520, life: 0.32, force: 2200 });
-      damageCone(p, aim, Math.PI, 520, 48, 1800);
-    } else if (p.stats.mythic === "dragonBreath") {
-      for (let i = -4; i <= 4; i += 1) spawnMythicBullet(p, aim + i * 0.1, 880, 9, 26, 0.95, 0, 1, 0, "#ff7a32");
-    } else if (p.stats.mythic === "laserGauntlet") {
-      damageCone(p, aim, 0.08, 1120, 74, 2200);
-      fields.push({ type: "beam", owner: p, x: p.x + p.aimX * 500, y: p.y + p.aimY * 500, r: 140, life: 0.16, force: 1200 });
-    } else if (p.stats.mythic === "moonKnight") {
-      for (let i = -2; i <= 2; i += 1) spawnMythicBullet(p, aim + i * 0.28, 1180, 14, 38, 1.9, 0, 0, 3, "#dce8ff");
-    } else if (p.stats.mythic === "timeLoop") {
-      p.hp = Math.min(p.stats.maxHp, p.hp + 80);
-      p.spawnGrace = Math.max(p.spawnGrace, 1.2);
-      p.x = clamp(p.x - p.aimX * 260, 80, world.width - 80);
-      p.y = clamp(p.y - p.aimY * 180, 80, world.height - 120);
-    } else if (p.stats.mythic === "mechaSuit") {
-      for (let i = -3; i <= 3; i += 1) spawnMythicBullet(p, -Math.PI / 2 + i * 0.16, 760, 16, 42, 1.5, 1.4, 0, 1, "#9ff0ff", p.x + i * 44, p.y - 120);
-    }
-    showToast(`${p.name} used ${mythicName(p.stats.mythic)}`);
-    return true;
-  }
-
-  function mythicName(id) {
-    const c = cardPool.find(card => card.stats.some(stat => stat.includes("G/LB")) && card.id === id);
-    return c ? c.name : "Mythic";
-  }
-
-  function spawnMythicBullet(p, angle, speed, radius, damage, life, explosive = 0, poison = 0, bounces = 0, color = p.color, x = null, y = null) {
-    const sx = x ?? p.x + Math.cos(angle) * 38;
-    const sy = y ?? p.y + Math.sin(angle) * 38;
-    bullets.push({
-      owner: p,
-      x: sx,
-      y: sy,
-      prevX: sx,
-      prevY: sy,
-      ox: p.x,
-      oy: p.y,
-      vx: Math.cos(angle) * speed + p.vx * 0.1,
-      vy: Math.sin(angle) * speed + p.vy * 0.06,
-      r: radius,
-      damage,
-      life,
-      gravity: p.stats.bulletGravity * 0.4,
-      drag: 0.998,
-      restitution: 0.78,
-      bounces,
-      explosive,
-      homing: 0,
-      poison,
-      grow: 0,
-      color
-    });
-  }
-
-  function damageCone(owner, angle, arc, range, damage, force) {
-    for (const p of players) {
-      if (!p.alive || p === owner || p.spawnGrace > 0) continue;
-      const dx = p.x - owner.x;
-      const dy = p.y - owner.y;
-      const distance = Math.hypot(dx, dy) || 1;
-      const diff = Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - angle), Math.cos(Math.atan2(dy, dx) - angle)));
-      if (distance <= range && diff <= arc) {
-        const t = 1 - distance / range;
-        hurt(p, damage * (0.55 + t * 0.45), owner, dx * force / distance, dy * force / distance);
-      }
-    }
-  }
-
-  function tryBlock(p) {
-    if (p.blockCooldown > 0) return;
-    p.blockTimer = p.stats.blockDuration;
-    p.blockCooldown = p.stats.blockCooldown;
-    pulse(p, 0.32, 95);
-    sfx("block");
-    burst(p.x, p.y, p.color, 18, 260);
-    if (p.stats.blockDash) {
-      p.vx += p.aimX * 720;
-      p.vy += p.aimY * 520;
-    }
-    if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 180, life: 0.18, force: 980 });
-    if (p.stats.echoBlock) {
-      setTimeout(() => {
-        if (p.alive && world.state === "playing") {
-          p.blockTimer = Math.max(p.blockTimer, p.stats.blockDuration * 0.8);
-          if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 200, life: 0.18, force: 820 });
-          burst(p.x, p.y, p.color, 16, 220);
-        }
-      }, 190);
-    }
-  }
-
-  function tryShoot(p) {
-    if (p.fireTimer > 0 || p.reloadTimer > 0 || p.ammo <= 0) return;
-    p.fireTimer = p.stats.fireDelay;
-    p.ammo -= 1;
-    sfx("shoot");
-    const baseAngle = Math.atan2(p.aimY, p.aimX);
-    const pellets = p.stats.pellets;
-    for (let i = 0; i < pellets; i += 1) {
-      const spread = (i - (pellets - 1) / 2) * p.stats.spread + rand(-0.018, 0.018);
-      const a = baseAngle + spread;
-      const speed = p.stats.bulletSpeed * rand(0.94, 1.05);
-      bullets.push({
-        owner: p,
-        x: p.x + Math.cos(a) * 32,
-        y: p.y + Math.sin(a) * 32,
-        prevX: p.x + Math.cos(a) * 32,
-        prevY: p.y + Math.sin(a) * 32,
-        ox: p.x,
-        oy: p.y,
-        vx: Math.cos(a) * speed + p.vx * 0.18,
-        vy: Math.sin(a) * speed + p.vy * 0.08,
-        r: 7 + Math.min(10, p.stats.damage / 18),
-        damage: p.stats.damage,
-        life: 2.7,
-        gravity: p.stats.bulletGravity,
-        drag: p.stats.bulletDrag,
-        restitution: p.stats.bulletRestitution,
-        bounces: p.stats.bounces,
-        explosive: p.stats.explosive,
-        homing: p.stats.homing,
-        poison: p.stats.poison,
-        grow: p.stats.grow,
-        color: p.color
-      });
-    }
-    p.vx -= Math.cos(baseAngle) * 70;
-    p.vy -= Math.sin(baseAngle) * 20;
-    pulse(p, 0.18, 45);
-    if (p.ammo <= 0) {
-      if (p.stats.emptyBlock) tryBlock(p);
-      p.reloadTimer = p.stats.reload;
-    }
-  }
-
-  function updateBullets(dt) {
-    const map = maps[world.mapIndex];
-    for (const b of bullets) {
-      if (b.homing) {
-        const target = nearestEnemy(b);
-        if (target) {
-          const dx = target.x - b.x;
-          const dy = target.y - b.y;
-          const mag = Math.hypot(dx, dy) || 1;
-          b.vx += (dx / mag) * b.homing * 520 * dt;
-          b.vy += (dy / mag) * b.homing * 520 * dt;
-        }
-      }
-      b.prevX = b.x;
-      b.prevY = b.y;
-      b.vy += b.gravity * dt;
-      const drag = Math.pow(b.drag, dt * 60);
-      b.vx *= drag;
-      b.vy *= drag;
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-      b.life -= dt;
-      particles.push({ x: b.x, y: b.y, vx: rand(-18, 18), vy: rand(-18, 18), life: 0.18, maxLife: 0.18, r: 2, color: b.color });
-
-      for (const platform of map.platforms) {
-        if (circleRect(b, platform)) {
-          if (b.bounces > 0) {
-            bounceBullet(b, platform);
-            b.bounces -= 1;
-            sfx("block");
-            pulse(b.owner, 0.08, 25);
-          } else {
-            b.life = -1;
-            explodeBullet(b);
-          }
-        }
-      }
-
-      for (const p of players) {
-        if (!p.alive || p === b.owner || p.spawnGrace > 0) continue;
-        const d = Math.hypot(p.x - b.x, p.y - b.y);
-        if (d < p.stats.radius + b.r) {
-          if (p.blockTimer > 0) {
-            const mag = Math.hypot(b.vx, b.vy) || 1;
-            b.owner = p;
-            b.vx = -(b.vx / mag) * p.stats.bulletSpeed * 1.05;
-            b.vy = -(b.vy / mag) * p.stats.bulletSpeed * 1.05;
-            b.color = p.color;
-            b.x += b.vx * dt * 2;
-            b.y += b.vy * dt * 2;
-            pulse(p, 0.22, 70);
-          } else {
-            const travel = Math.hypot(b.x - b.ox, b.y - b.oy);
-            const growBonus = b.grow ? 1 + Math.min(1.3, travel / 900) : 1;
-            const damage = b.damage * growBonus;
-            hurt(p, damage, b.owner, b.vx, b.vy);
-            if (b.owner && b.owner.alive && b.owner.stats.lifesteal) {
-              b.owner.hp = Math.min(b.owner.stats.maxHp, b.owner.hp + damage * b.owner.stats.lifesteal);
-            }
-            if (b.poison) {
-              p.poisonTimer = Math.max(p.poisonTimer, 2.6);
-              p.poisonDps = Math.max(p.poisonDps, 11 + b.damage * 0.12);
-            }
-            b.life = -1;
-            explodeBullet(b);
-          }
-        }
-      }
-    }
-    bullets = bullets.filter(b => b.life > 0 && b.x > -120 && b.x < world.width + 120 && b.y > -120 && b.y < world.height + 120);
-  }
-
-  function updateFields(dt) {
-    for (const f of fields) {
-      f.life -= dt;
-      for (const p of players) {
-        if (!p.alive || p === f.owner) continue;
-        const dx = p.x - f.x;
-        const dy = p.y - f.y;
-        const d = Math.hypot(dx, dy) || 1;
-        if (d < f.r) {
-          const t = 1 - d / f.r;
-          if (f.type === "domain") {
-            p.vx -= (dx / d) * Math.abs(f.force) * t * dt;
-            p.vy -= (dy / d) * Math.abs(f.force) * t * dt;
-            hurt(p, 18 * t * dt, f.owner, -dx, -dy);
-          } else if (f.type === "ice") {
-            p.vx *= Math.pow(0.86, dt * 60);
-            p.vy += 80 * t * dt;
-            hurt(p, 7 * t * dt, f.owner, dx, dy);
-          } else {
-            p.vx += (dx / d) * f.force * t * dt;
-            p.vy += (dy / d) * f.force * t * dt;
-            hurt(p, 12 * t * dt, f.owner, dx, dy);
-          }
-        }
-      }
-    }
-    fields = fields.filter(f => f.life > 0);
-  }
-
-  function hurt(p, amount, attacker, kx, ky) {
-    if (!p.alive || p.blockTimer > 0 || p.spawnGrace > 0) return;
-    p.hp -= amount;
-    const mag = Math.hypot(kx, ky) || 1;
-    p.vx += (kx / mag) * Math.min(620, amount * 16);
-    p.vy += (ky / mag) * Math.min(320, amount * 8) - Math.min(220, amount * 2);
-    if (amount > 4) {
-      sfx("hit");
-      pulse(p, Math.min(0.55, amount / 90), Math.min(190, 50 + amount));
-      world.shake = Math.max(world.shake, Math.min(18, amount / 7));
-      burst(p.x, p.y, p.color, Math.min(34, 6 + amount / 3), 340);
-    }
-    if (p.hp <= 0) {
-      if (p.roundRevives > 0) {
-        p.roundRevives -= 1;
-        p.hp = p.stats.maxHp * 0.55;
-        p.spawnGrace = 0.75;
-        p.vy = -760;
-        showToast(`${p.name} pops back in`);
-        burst(p.x, p.y, p.color, 48, 620);
-      } else {
-        p.alive = false;
-        p.hp = 0;
-        burst(p.x, p.y, p.color, 70, 760);
-        if (attacker) pulse(attacker, 0.35, 130);
-      }
-    }
-  }
-
-  function collidePlayerWithMap(p, map) {
+  function collidePlayer(p, plats) {
     const r = p.stats.radius;
-    if (p.x < r) {
-      p.x = r;
-      p.vx = Math.abs(p.vx) * 0.46;
-      if (p.blockTimer > 0) p.vx += 720;
-    }
-    if (p.x > world.width - r) {
-      p.x = world.width - r;
-      p.vx = -Math.abs(p.vx) * 0.46;
-      if (p.blockTimer > 0) p.vx -= 720;
-    }
-    if (p.y < r) {
-      p.y = r;
-      p.vy = Math.abs(p.vy) * 0.42;
-    }
-
-    for (const platform of map.platforms) {
+    if (p.x < r) { p.x = r; p.vx = Math.abs(p.vx) * 0.46; }
+    if (p.x > world.width - r) { p.x = world.width - r; p.vx = -Math.abs(p.vx) * 0.46; }
+    if (p.y < r) { p.y = r; p.vy = Math.abs(p.vy) * 0.42; }
+    for (const platform of plats) {
       const overlap = playerPlatformOverlap(p, platform);
       if (!overlap) continue;
       if (overlap.side === "top") {
         p.y -= overlap.amount;
         p.vy = Math.min(0, p.vy);
         p.grounded = true;
-        p.jumpReady = true;
+        p.groundPlatform = platform;
         p.jumpsLeft = 1 + p.stats.extraJumps;
       } else if (overlap.side === "bottom") {
         p.y += overlap.amount;
@@ -2281,10 +1009,281 @@
     ].filter(o => o.amount > 0);
     overlaps.sort((a, b) => a.amount - b.amount);
     const vertical = overlaps.filter(o => o.side === "top" || o.side === "bottom")[0];
-    const horizontal = overlaps.filter(o => o.side === "left" || o.side === "right")[0];
     if (p.vy >= 0 && vertical && vertical.side === "top" && vertical.amount < r * 1.4) return vertical;
     if (p.vy < 0 && vertical && vertical.side === "bottom" && vertical.amount < r * 1.1) return vertical;
-    return overlaps[0] || horizontal || vertical;
+    return overlaps[0] || vertical;
+  }
+
+  // ----------------------------------------------------------------- combat
+  function tryBlock(p) {
+    if (p.blockCooldown > 0) return;
+    p.blockTimer = p.stats.blockDuration;
+    p.blockCooldown = p.stats.blockCooldown;
+    pulse(p, 0.32, 95);
+    sfx("block");
+    burst(p.x, p.y, "#ffffff", 14, 240);
+    if (p.stats.warpBlock) {
+      burst(p.x, p.y, p.color, 18, 300);
+      p.x = clamp(p.x + p.aimX * 260, p.stats.radius, world.width - p.stats.radius);
+      p.y = clamp(p.y + p.aimY * 200, p.stats.radius, world.height - 60);
+      burst(p.x, p.y, p.color, 18, 300);
+      sfx("teleport");
+    }
+    if (p.stats.blockDash) {
+      p.vx += p.aimX * 720;
+      p.vy += p.aimY * 520;
+    }
+    if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 190, life: 0.18, force: 1000 });
+    if (p.stats.stormBlock) {
+      for (const q of players) {
+        if (!q.alive || q === p || q.spawnGrace > 0) continue;
+        const d = Math.hypot(q.x - p.x, q.y - p.y);
+        if (d < 260) {
+          boltVisual(p.x, p.y, q.x, q.y, "#ffe95e", 0.25);
+          hurt(q, 30, p, q.x - p.x, q.y - p.y - 120);
+        }
+      }
+      world.shake = Math.max(world.shake, 8);
+      sfx("chain");
+    }
+    if (p.stats.echoBlock) {
+      setTimeout(() => {
+        if (p.alive && world.state === "playing") {
+          p.blockTimer = Math.max(p.blockTimer, p.stats.blockDuration * 0.8);
+          if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 200, life: 0.18, force: 840 });
+          burst(p.x, p.y, "#ffffff", 12, 200);
+        }
+      }, 190);
+    }
+  }
+
+  function tryActive(p) {
+    if (!p.stats.active || p.activeCooldown > 0) return false;
+    p.activeCooldown = p.stats.activeCooldown;
+    pulse(p, 0.75, 170);
+    sfx("mythic");
+    burst(p.x, p.y, "#ff4d8f", 30, 480);
+    const aim = Math.atan2(p.aimY, p.aimX);
+    if (p.stats.active === "starfall") {
+      const tx = clamp(p.x + p.aimX * 420, 120, world.width - 120);
+      for (let i = 0; i < 5; i += 1) {
+        const sx = tx + (i - 2) * 80 + rand(-25, 25);
+        bullets.push({
+          owner: p, x: sx, y: -40 - i * 60, prevX: sx, prevY: -40, ox: sx, oy: -40,
+          vx: rand(-40, 40), vy: 900 + rand(0, 250),
+          r: 15, damage: 34, life: 3, gravity: 500, drag: 1, restitution: 0.5,
+          bounces: 0, explosive: 1.2, homing: 0, pierce: 0, poison: 0, burn: 1,
+          chain: 0, shards: 0, grow: 0, golden: false, isShard: true,
+          color: "#ff9e3d", meteor: true, hitIds: new Set()
+        });
+      }
+      showToast(`${p.name} calls STARFALL PROTOCOL`);
+    } else if (p.stats.active === "eventHorizon") {
+      fields.push({
+        type: "blackhole", owner: p,
+        x: clamp(p.x + p.aimX * 320, 150, world.width - 150),
+        y: clamp(p.y + p.aimY * 260, 150, world.height - 150),
+        r: 300, life: 3, force: -950, dps: 16
+      });
+      showToast(`${p.name} opens the EVENT HORIZON`);
+    } else if (p.stats.active === "chronoshift") {
+      const past = p.trail[0];
+      if (past) {
+        burst(p.x, p.y, "#8fd8ff", 24, 380);
+        p.x = past.x; p.y = past.y;
+        p.vx = 0; p.vy = 0;
+        p.hp = Math.min(p.stats.maxHp, p.hp + 35);
+        p.spawnGrace = Math.max(p.spawnGrace, 0.4);
+        burst(p.x, p.y, "#8fd8ff", 24, 380);
+        sfx("teleport");
+      }
+      showToast(`${p.name} rewinds with CHRONOSHIFT`);
+    }
+    return true;
+  }
+
+  function tryShoot(p) {
+    if (p.fireTimer > 0 || p.reloadTimer > 0 || p.ammo <= 0) return;
+    p.fireTimer = p.stats.fireDelay;
+    const golden = p.stats.goldenShot && p.ammo === p.stats.maxAmmo;
+    p.ammo -= 1;
+    sfx(golden ? "golden" : "shoot");
+    const rageMul = p.stats.rage > 0 ? 1 + p.stats.rage * (1 - clamp(p.hp / p.stats.maxHp, 0, 1)) : 1;
+    const baseAngle = Math.atan2(p.aimY, p.aimX);
+    const pellets = p.stats.pellets;
+    for (let i = 0; i < pellets; i += 1) {
+      const spread = (i - (pellets - 1) / 2) * p.stats.spread + rand(-0.018, 0.018);
+      const a = baseAngle + spread;
+      const speed = p.stats.bulletSpeed * rand(0.94, 1.05);
+      bullets.push({
+        owner: p,
+        x: p.x + Math.cos(a) * 34, y: p.y + Math.sin(a) * 34,
+        prevX: p.x, prevY: p.y, ox: p.x, oy: p.y,
+        vx: Math.cos(a) * speed + p.vx * 0.18,
+        vy: Math.sin(a) * speed + p.vy * 0.08,
+        r: (6 + Math.min(9, p.stats.damage / 20)) * p.stats.bulletSize,
+        damage: p.stats.damage * rageMul * (golden ? 3 : 1),
+        life: 2.7,
+        gravity: p.stats.bulletGravity,
+        drag: p.stats.bulletDrag,
+        restitution: p.stats.bulletRestitution,
+        bounces: p.stats.bounces + (currentLevel().bulletBounceBonus || 0),
+        explosive: p.stats.explosive,
+        homing: p.stats.homing,
+        pierce: p.stats.pierce,
+        poison: p.stats.poison,
+        burn: p.stats.burn,
+        chill: p.stats.chill,
+        chain: p.stats.chain,
+        shards: p.stats.shards,
+        grow: p.stats.grow,
+        golden,
+        isShard: false,
+        hitIds: new Set(),
+        color: golden ? "#ffd700" : p.color
+      });
+    }
+    p.vx -= Math.cos(baseAngle) * 70;
+    p.vy -= Math.sin(baseAngle) * 20;
+    pulse(p, 0.18, 45);
+    if (p.ammo <= 0) p.reloadTimer = p.stats.reload;
+  }
+
+  function updateBullets(dt) {
+    const level = currentLevel();
+    const plats = activePlatforms(level, world.time);
+    const wind = windForce();
+    for (const b of bullets) {
+      if (b.homing) {
+        const target = nearestEnemy(b);
+        if (target) {
+          const dx = target.x - b.x, dy = target.y - b.y;
+          const mag = Math.hypot(dx, dy) || 1;
+          b.vx += (dx / mag) * b.homing * 520 * dt;
+          b.vy += (dy / mag) * b.homing * 520 * dt;
+        }
+      }
+      b.prevX = b.x; b.prevY = b.y;
+      b.vy += b.gravity * dt;
+      if (wind) b.vx += wind * 0.9 * dt;
+      const drag = Math.pow(b.drag, dt * 60);
+      b.vx *= drag; b.vy *= drag;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.life -= dt;
+      particles.push({
+        x: b.x, y: b.y, vx: rand(-16, 16), vy: rand(-16, 16),
+        life: 0.16, maxLife: 0.16, r: b.golden ? 3 : 2,
+        color: b.burn ? "#ff9e3d" : b.color
+      });
+
+      for (const platform of plats) {
+        if (circleRect(b, platform)) {
+          if (b.bounces > 0) {
+            bounceBullet(b, platform);
+            b.bounces -= 1;
+            sfx("block");
+          } else {
+            b.life = -1;
+            explodeBullet(b);
+          }
+        }
+      }
+
+      for (const p of players) {
+        if (!p.alive || p === b.owner || p.spawnGrace > 0 || b.hitIds.has(p.id)) continue;
+        const d = Math.hypot(p.x - b.x, p.y - b.y);
+        if (d < p.stats.radius + b.r) {
+          if (p.blockTimer > 0) {
+            // parry: reflect the bullet back
+            const mag = Math.hypot(b.vx, b.vy) || 1;
+            b.owner = p;
+            b.hitIds = new Set();
+            b.vx = -(b.vx / mag) * p.stats.bulletSpeed * 1.05;
+            b.vy = -(b.vy / mag) * p.stats.bulletSpeed * 1.05;
+            b.color = p.color;
+            b.x += b.vx * dt * 2;
+            b.y += b.vy * dt * 2;
+            pulse(p, 0.22, 70);
+            sfx("parry");
+          } else {
+            const travel = Math.hypot(b.x - b.ox, b.y - b.oy);
+            const growBonus = b.grow ? 1 + Math.min(1, travel / 900) : 1;
+            const damage = b.damage * growBonus;
+            hurt(p, damage, b.owner, b.vx, b.vy);
+            if (b.owner && b.owner.alive && b.owner.stats.lifesteal) {
+              b.owner.hp = Math.min(b.owner.stats.maxHp, b.owner.hp + damage * b.owner.stats.lifesteal);
+            }
+            if (b.poison) {
+              p.poisonTimer = Math.max(p.poisonTimer, 3);
+              p.poisonDps = Math.max(p.poisonDps, (9 + b.damage * 0.1) * b.poison);
+              p.poisonAttacker = b.owner;
+            }
+            if (b.burn) {
+              p.burnTimer = Math.max(p.burnTimer, 2.5);
+              p.burnDps = Math.max(p.burnDps, (8 + b.damage * 0.1) * b.burn);
+              p.burnAttacker = b.owner;
+            }
+            if (b.chill) {
+              p.chillTimer = Math.max(p.chillTimer, 2);
+              burst(p.x, p.y, "#8fd8ff", 10, 200);
+            }
+            if (b.chain) chainLightning(b, p, damage);
+            b.hitIds.add(p.id);
+            if (b.pierce > 0) {
+              b.pierce -= 1;
+            } else {
+              b.life = -1;
+              explodeBullet(b);
+            }
+          }
+        }
+      }
+    }
+    bullets = bullets.filter(b => b.life > 0 && b.x > -120 && b.x < world.width + 120 && b.y > -160 && b.y < world.height + 120);
+  }
+
+  function chainLightning(b, victim, damage) {
+    let best = null, bestD = Infinity;
+    for (const q of players) {
+      if (!q.alive || q === victim || q === b.owner || q.spawnGrace > 0) continue;
+      const d = Math.hypot(q.x - victim.x, q.y - victim.y);
+      if (d < bestD && d < 520) { bestD = d; best = q; }
+    }
+    if (best) {
+      boltVisual(victim.x, victim.y, best.x, best.y, "#ffe95e", 0.22);
+      hurt(best, damage * 0.55 * b.chain, b.owner, best.x - victim.x, best.y - victim.y);
+      sfx("chain");
+    }
+  }
+
+  function explodeBullet(b) {
+    if (b.explosive) {
+      fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: 95 + b.explosive * 20, life: 0.14, force: 760 });
+      for (const p of players) {
+        if (!p.alive || p === b.owner) continue;
+        const radius = 105 + b.explosive * 12;
+        const d = Math.hypot(p.x - b.x, p.y - b.y);
+        if (d < radius) hurt(p, (1 - d / radius) * (26 + b.explosive * 9), b.owner, p.x - b.x, p.y - b.y);
+      }
+      world.shake = Math.max(world.shake, 9);
+      sfx("boom");
+    }
+    if (b.shards && !b.isShard) {
+      for (let i = 0; i < b.shards; i += 1) {
+        const a = -Math.PI / 2 + (i - (b.shards - 1) / 2) * 0.55 + rand(-0.1, 0.1);
+        bullets.push({
+          owner: b.owner, x: b.x, y: b.y - 4, prevX: b.x, prevY: b.y, ox: b.x, oy: b.y,
+          vx: Math.cos(a) * 520 + rand(-60, 60), vy: Math.sin(a) * 520,
+          r: Math.max(4, b.r * 0.55), damage: b.damage * 0.4, life: 0.9,
+          gravity: 1500, drag: 0.997, restitution: 0.6,
+          bounces: 0, explosive: 0, homing: 0, pierce: 0,
+          poison: b.poison, burn: b.burn, chill: 0, chain: 0, shards: 0, grow: 0,
+          golden: false, isShard: true, hitIds: new Set(), color: b.color
+        });
+      }
+    }
+    burst(b.x, b.y, b.color, b.explosive ? 30 : 10, b.explosive ? 520 : 180);
   }
 
   function bounceBullet(b, platform) {
@@ -2294,7 +1293,6 @@
     const cameFromTop = b.prevY + r <= platform.y;
     const cameFromBottom = b.prevY - r >= platform.y + platform.h;
     const restitution = b.restitution || 0.78;
-
     if (cameFromLeft || cameFromRight) {
       b.x = cameFromLeft ? platform.x - r - 1 : platform.x + platform.w + r + 1;
       b.vx = -b.vx * restitution;
@@ -2306,9 +1304,7 @@
     } else {
       const cx = clamp(b.x, platform.x, platform.x + platform.w);
       const cy = clamp(b.y, platform.y, platform.y + platform.h);
-      const dx = b.x - cx;
-      const dy = b.y - cy;
-      if (Math.abs(dx) > Math.abs(dy)) {
+      if (Math.abs(b.x - cx) > Math.abs(b.y - cy)) {
         b.vx = -b.vx * restitution;
         b.x += Math.sign(b.vx) * (r + 2);
       } else {
@@ -2316,42 +1312,115 @@
         b.y += Math.sign(b.vy) * (r + 2);
       }
     }
+    b.hitIds = new Set(); // a fresh bounce can hit the same target again
     b.vx += rand(-18, 18);
     b.vy += rand(-18, 18);
   }
 
-  function explodeBullet(b) {
-    if (b.explosive) {
-      fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: 95 + b.explosive * 18, life: 0.14, force: 720 });
+  function updateFields(dt) {
+    for (const f of fields) {
+      f.life -= dt;
+      if (f.type === "lightning-warn") continue;
       for (const p of players) {
-        if (!p.alive || p === b.owner) continue;
-        const d = Math.hypot(p.x - b.x, p.y - b.y);
-        if (d < 105) hurt(p, (1 - d / 105) * 34, b.owner, p.x - b.x, p.y - b.y);
+        if (!p.alive || p === f.owner) continue;
+        const dx = p.x - f.x, dy = p.y - f.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < f.r) {
+          const t = 1 - d / f.r;
+          if (f.type === "blackhole") {
+            p.vx += (dx / d) * f.force * t * dt;
+            p.vy += (dy / d) * f.force * t * dt;
+            hurtRaw(p, f.dps * t * dt, f.owner);
+            if (Math.random() < dt * 20) puffOne(p.x + rand(-10, 10), p.y + rand(-10, 10), "#b45cff");
+          } else {
+            p.vx += (dx / d) * f.force * t * dt;
+            p.vy += (dy / d) * f.force * t * dt;
+            hurtRaw(p, 12 * t * dt, f.owner);
+          }
+        }
       }
-      world.shake = Math.max(world.shake, 9);
     }
-    burst(b.x, b.y, b.color, b.explosive ? 30 : 10, b.explosive ? 520 : 180);
+    fields = fields.filter(f => f.life > 0);
+  }
+
+  // hurt with knockback, blockable
+  function hurt(p, amount, attacker, kx, ky) {
+    if (!p.alive || p.blockTimer > 0 || p.spawnGrace > 0) return;
+    const mag = Math.hypot(kx, ky) || 1;
+    p.vx += (kx / mag) * Math.min(620, amount * 16);
+    p.vy += (ky / mag) * Math.min(320, amount * 8) - Math.min(220, amount * 2);
+    if (amount > 4) {
+      sfx("hit");
+      pulse(p, Math.min(0.55, amount / 90), Math.min(190, 50 + amount));
+      world.shake = Math.max(world.shake, Math.min(18, amount / 7));
+      burst(p.x, p.y, p.color, Math.min(34, 6 + amount / 3), 340);
+    }
+    if (attacker && p.stats.thorns > 0 && attacker.alive && amount < 500) {
+      hurtRaw(attacker, amount * p.stats.thorns, null);
+      boltVisual(p.x, p.y, attacker.x, attacker.y, "#ff5f8f", 0.15);
+    }
+    applyDamage(p, amount, attacker);
+  }
+
+  // direct damage: no knockback, no thorns (used by DoTs, fields, thorns itself)
+  function hurtRaw(p, amount, attacker) {
+    if (!p.alive || p.spawnGrace > 0) return;
+    applyDamage(p, amount, attacker);
+  }
+
+  function applyDamage(p, amount, attacker) {
+    const lethal = p.hp - amount <= 0;
+    if (lethal && p.guardianCharges > 0 && amount < 500) {
+      p.guardianCharges -= 1;
+      p.hp = 1;
+      p.spawnGrace = Math.max(p.spawnGrace, 0.5);
+      burst(p.x, p.y, "#ffd700", 36, 480);
+      showToast(`${p.name}'s Guardian Halo saves them!`);
+      sfx("mythic");
+      return;
+    }
+    p.hp -= amount;
+    if (p.hp <= 0) {
+      if (p.roundRevives > 0) {
+        p.roundRevives -= 1;
+        p.hp = p.stats.maxHp * 0.5;
+        p.spawnGrace = 0.75;
+        p.vy = -760;
+        showToast(`${p.name} rises from the ashes!`);
+        burst(p.x, p.y, "#ff9e3d", 48, 620);
+        sfx("mythic");
+      } else {
+        p.alive = false;
+        p.hp = 0;
+        burst(p.x, p.y, p.color, 70, 760);
+        world.shake = Math.max(world.shake, 12);
+        if (attacker) {
+          pulse(attacker, 0.35, 130);
+          if (attacker.stats.killHeal && attacker.alive) {
+            attacker.hp = attacker.stats.maxHp;
+            burst(attacker.x, attacker.y, "#74f08b", 24, 380);
+          }
+        }
+      }
+    }
   }
 
   function checkRoundEnd() {
+    if (world.state !== "playing") return;
     const alive = players.filter(p => p.alive);
     if (alive.length === 1) endRound(alive[0]);
     else if (alive.length === 0) {
-      showToast("Nobody survived");
+      showToast("Nobody survived. Rerolling the arena…");
       resetRound();
     }
   }
 
   function nearestEnemy(b) {
-    let best = null;
-    let bestD = Infinity;
+    let best = null, bestD = Infinity;
     for (const p of players) {
-      if (!p.alive || p === b.owner) continue;
+      if (!p.alive || p === b.owner || b.hitIds.has(p.id)) continue;
       const d = Math.hypot(p.x - b.x, p.y - b.y);
-      if (d < bestD && d < 650) {
-        bestD = d;
-        best = p;
-      }
+      if (d < bestD && d < 650) { bestD = d; best = p; }
     }
     return best;
   }
@@ -2359,83 +1428,32 @@
   function circleRect(c, r) {
     const cx = clamp(c.x, r.x, r.x + r.w);
     const cy = clamp(c.y, r.y, r.y + r.h);
-    return Math.hypot(c.x - cx, c.y - cy) <= (c.r || c.stats.radius);
+    return Math.hypot(c.x - cx, c.y - cy) <= (c.r || (c.stats && c.stats.radius) || 0);
   }
 
-  function assignGamepads(pads = getPads()) {
-    for (const pad of pads) {
-      const anyPressed = pad.buttons.some((_, i) => buttonEdge(pad, i));
-      if (!anyPressed || gamepadSlots.has(pad.index)) continue;
-      const player = players.find(p => p.gamepadIndex === null);
-      if (player) {
-        claimPad(player, pad);
-      }
-    }
-  }
-
-  function updateLobbyJoins(pads) {
-    for (const pad of pads) {
-      const anyPressed = pad.buttons.some((_, i) => buttonEdge(pad, i));
-      if (!anyPressed || lobbySlots.some(slot => slot.gamepadIndex === pad.index)) continue;
-      if (lobbySlots.length + settings.botCount >= settings.playerCount) {
-        showToast("Lobby is full");
-        world.joinedThisFrame = true;
-        return;
-      }
-      lobbySlots.push({
-        type: "pad",
-        gamepadIndex: pad.index,
-        label: pad.id.split("(")[0].trim() || `Controller ${pad.index + 1}`
-      });
-      ensureAudio();
-      sfx("card");
-      world.joinedThisFrame = true;
-      showToast(`P${lobbySlots.length} joined`);
-      renderLobbySlots();
-    }
-  }
-
-  function rebuildGamepadSlots() {
-    gamepadSlots.clear();
-    for (const p of players) {
-      if (p.gamepadIndex !== null) gamepadSlots.set(p.gamepadIndex, p.id);
-    }
-  }
-
-  function claimPad(player, pad, announce = true) {
-    player.gamepadIndex = pad.index;
-    gamepadSlots.set(pad.index, player.id);
-    if (announce) {
-      showToast(`${pad.id.split("(")[0].trim() || "Controller"} joined ${player.name}`);
-      pulse(player, 0.28, 100);
-    }
-  }
-
+  // ------------------------------------------------------------------- menus
   function updateMenuControls(pads) {
     const controls = visibleControls();
     if (!controls.length) return;
     world.menuIndex = clamp(world.menuIndex, 0, controls.length - 1);
     const move = menuMove(pads);
     if (move) setMenuIndex(world.menuIndex + move, controls);
-
     const focused = controls[world.menuIndex];
     const adjust = menuAdjust(pads);
-    if (focused && focused.matches("input") && adjust) {
-      adjustMenuInput(focused, adjust);
+    if (focused && (focused.matches("input") || focused.matches("select")) && adjust) {
+      adjustMenuControl(focused, adjust);
     }
-
     if (menuConfirm(pads)) {
       const target = controls[world.menuIndex];
       if (target) {
         if (target.matches("input[type='checkbox']")) {
           target.checked = !target.checked;
           target.dispatchEvent(new Event("change"));
-        } else {
+        } else if (!target.matches("select")) {
           target.click();
         }
       }
     }
-
     if (menuBack(pads)) {
       if (world.state === "settings") showMainMenu(settingsPanel);
       if (world.state === "how") showMainMenu(howPanel);
@@ -2445,7 +1463,7 @@
 
   function visibleControls() {
     const panel = world.state === "settings" ? settingsPanel : world.state === "how" ? howPanel : world.state === "paused" ? pausePanel : menu;
-    return [...panel.querySelectorAll("button, input")].filter(el => !el.disabled && el.offsetParent !== null);
+    return [...panel.querySelectorAll("button, input, select")].filter(el => !el.disabled && el.offsetParent !== null);
   }
 
   function setMenuIndex(index, controls = visibleControls()) {
@@ -2455,11 +1473,12 @@
     const target = controls[world.menuIndex];
     target.classList.add("controller-focus");
     target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "nearest" });
   }
 
   function menuMove(pads) {
     if (pressed.has("ArrowDown") || pressed.has("KeyS")) return 1;
-    if (pressed.has("ArrowUp") || pressed.has("KeyW")) return -1;
+    if (pressed.has("ArrowUp")) return -1;
     for (const pad of pads) {
       if (buttonEdge(pad, 13) || axisEdge(pad, 1, 1)) return 1;
       if (buttonEdge(pad, 12) || axisEdge(pad, 1, -1)) return -1;
@@ -2468,6 +1487,7 @@
   }
 
   function menuAdjust(pads) {
+    if (world.state === "menu") return 0; // left/right reserved for character select
     if (pressed.has("ArrowRight") || pressed.has("KeyD")) return 1;
     if (pressed.has("ArrowLeft") || pressed.has("KeyA")) return -1;
     for (const pad of pads) {
@@ -2478,24 +1498,26 @@
   }
 
   function menuConfirm(pads) {
-    if (world.pausedThisFrame) return false;
-    if (world.joinedThisFrame) return false;
-    if (pressed.has("Enter") || pressed.has("Space")) return true;
-    return pads.some(pad => buttonEdge(pad, 0) || buttonEdge(pad, 7) || buttonEdge(pad, 9));
+    if (world.pausedThisFrame || world.joinedThisFrame) return false;
+    if (pressed.has("Enter") || pressed.has("Space") || pressed.has("NumpadEnter")) return true;
+    return pads.some(pad => buttonEdge(pad, 9));
   }
 
   function menuBack(pads) {
     if (pressed.has("Escape") || pressed.has("Backspace")) return true;
-    return pads.some(pad => buttonEdge(pad, 1) || buttonEdge(pad, 8));
+    return pads.some(pad => buttonEdge(pad, 8));
   }
 
-  function adjustMenuInput(input, direction) {
-    if (input.type === "range") {
-      input.value = String(clamp(Number(input.value) + direction, Number(input.min), Number(input.max)));
-      input.dispatchEvent(new Event("input"));
-    } else if (input.type === "checkbox") {
-      input.checked = direction > 0;
-      input.dispatchEvent(new Event("change"));
+  function adjustMenuControl(el, dir) {
+    if (el.matches("select")) {
+      el.selectedIndex = clamp(el.selectedIndex + dir, 0, el.options.length - 1);
+      el.dispatchEvent(new Event("change"));
+    } else if (el.type === "range") {
+      el.value = String(clamp(Number(el.value) + dir * Number(el.step || 1), Number(el.min), Number(el.max)));
+      el.dispatchEvent(new Event("input"));
+    } else if (el.type === "checkbox") {
+      el.checked = dir > 0;
+      el.dispatchEvent(new Event("change"));
     }
   }
 
@@ -2505,6 +1527,7 @@
     world.state = "menu";
     pausePanel.classList.add("hidden");
     battleSplash.classList.add("hidden");
+    renderLobby();
     setMenuIndex(0);
   }
 
@@ -2515,283 +1538,806 @@
       world.pausedThisFrame = true;
       pausePanel.classList.remove("hidden");
       setMenuIndex(0);
-      showToast("Paused");
     } else if (!shouldPause && world.state === "paused") {
       world.state = "playing";
       pausePanel.classList.add("hidden");
-      showToast("Resumed");
     }
   }
 
   function returnToMainMenu() {
-    leaveOnlineGame();
     players = [];
     bullets = [];
     fields = [];
+    hud.innerHTML = "";
+    hudRefs = [];
     stopAudio();
     world.state = "menu";
     world.winner = null;
-    pausePanel.classList.add("hidden");
-    battleSplash.classList.add("hidden");
-    draftPanel.classList.add("hidden");
+    hideAllPanels();
     menu.classList.remove("hidden");
+    renderLobby();
     setMenuIndex(0);
   }
 
-  function pulse(target, strength, duration) {
-    if (!settings.haptics || !target || target.gamepadIndex === null) return;
-    const pad = navigator.getGamepads && navigator.getGamepads()[target.gamepadIndex];
-    const actuator = pad && (pad.vibrationActuator || (pad.hapticActuators && pad.hapticActuators[0]));
-    if (!actuator) return;
-    if (actuator.playEffect) {
-      actuator.playEffect("dual-rumble", {
-        duration,
-        strongMagnitude: clamp(strength, 0, 1),
-        weakMagnitude: clamp(strength * 0.55, 0, 1)
-      }).catch(() => {});
-    } else if (actuator.pulse) {
-      actuator.pulse(clamp(strength, 0, 1), duration).catch(() => {});
+  // -------------------------------------------------------------------- HUD
+  function buildHud() {
+    hud.innerHTML = "";
+    hudRefs = [];
+    for (const p of players) {
+      const el = document.createElement("article");
+      el.className = "hud-card";
+      el.style.setProperty("--pcol", p.color);
+      el.innerHTML = `
+        <div class="hud-portrait"><canvas width="64" height="64"></canvas></div>
+        <div class="hud-body">
+          <div class="hud-top"><span class="hud-name">${escapeHtml(p.name)}</span><span class="hud-score"></span></div>
+          <div class="bar"><i></i><b></b></div>
+          <div class="hud-ammo"></div>
+          <div class="hud-cards"></div>
+        </div>`;
+      const pc = el.querySelector("canvas").getContext("2d");
+      pc.translate(32, 36);
+      drawCharacter(pc, p.character, 19, { t: 0, aimX: 1 });
+      hud.appendChild(el);
+      hudRefs.push({
+        p, el,
+        score: el.querySelector(".hud-score"),
+        bar: el.querySelector(".bar i"),
+        barGhost: el.querySelector(".bar b"),
+        ammo: el.querySelector(".hud-ammo"),
+        cards: el.querySelector(".hud-cards"),
+        lastCards: -1, lastAmmo: -1, lastReload: false
+      });
+    }
+    updateHud(true);
+  }
+
+  function updateHud(force = false) {
+    for (const ref of hudRefs) {
+      const p = ref.p;
+      ref.el.classList.toggle("dead", !p.alive);
+      const hpPct = clamp(p.hp / p.stats.maxHp, 0, 1) * 100;
+      ref.bar.style.width = `${hpPct}%`;
+      ref.score.textContent = `★ ${p.score}/${settings.scoreLimit}`;
+      const reloading = p.reloadTimer > 0;
+      if (force || p.ammo !== ref.lastAmmo || reloading !== ref.lastReload) {
+        ref.lastAmmo = p.ammo; ref.lastReload = reloading;
+        ref.ammo.innerHTML = reloading
+          ? `<span class="reloading">reloading…</span>`
+          : Array.from({ length: p.stats.maxAmmo }, (_, i) => `<i class="${i < p.ammo ? "full" : ""}"></i>`).join("");
+      }
+      if (force || p.cards.length !== ref.lastCards) {
+        ref.lastCards = p.cards.length;
+        const shown = p.cards.slice(-3);
+        ref.cards.innerHTML = shown.map(c =>
+          `<span style="--rcol:${RARITIES[c.rarity].color}">${c.name}</span>`).join("") +
+          (p.cards.length > 3 ? `<span class="more">+${p.cards.length - 3}</span>` : "") ||
+          `<span class="none">no cards yet</span>`;
+      }
+      const activeReady = p.stats.active && p.activeCooldown <= 0;
+      ref.el.classList.toggle("active-ready", Boolean(activeReady));
     }
   }
 
+  // ------------------------------------------------------------------ render
   function render() {
     resize();
     const scale = Math.min(canvas.width / world.width, canvas.height / world.height);
     const ox = (canvas.width - world.width * scale) / 2;
     const oy = (canvas.height - world.height * scale) / 2;
     ctx.save();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#111418";
+    ctx.fillStyle = "#0a0a12";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     const shake = settings.shake ? world.shake : 0;
     ctx.translate(ox + rand(-shake, shake), oy + rand(-shake, shake));
     ctx.scale(scale, scale);
     world.shake *= 0.86;
+    ctx.beginPath();
+    ctx.rect(0, 0, world.width, world.height);
+    ctx.clip();
+
     if (world.state === "menu" || world.state === "settings" || world.state === "how") {
-      drawTitleBackground();
+      drawMenuBackground();
+      drawParticles();
     } else {
-      drawBackground();
-      drawMap();
+      const level = currentLevel();
+      drawArenaBackground(level);
+      drawWeatherParticles();
+      drawArenaFeatures(level);
+      drawPlatforms(level);
       drawFields();
       drawBullets();
-      drawPlayers();
+      drawPlayersAll();
+      drawTide(level);
       drawParticles();
+      drawBoltsAll();
+      if (world.lightningFlash > 0) {
+        ctx.fillStyle = `rgba(255,244,200,${world.lightningFlash * 1.4})`;
+        ctx.fillRect(0, 0, world.width, world.height);
+      }
       if (world.roundFreeze > 0 && world.state === "playing") drawCountdown();
       if (world.state === "ended") drawWinner();
+      // vignette
+      const vg = ctx.createRadialGradient(world.width / 2, world.height / 2, world.height * 0.45, world.width / 2, world.height / 2, world.height * 0.95);
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(0,0,0,0.32)");
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, world.width, world.height);
     }
     ctx.restore();
-    renderHud();
-    if (world.state === "menu") renderLobbySlots();
     updateToast();
   }
 
-  function drawTitleBackground() {
-    const t = performance.now() / 1000;
-    const g = ctx.createLinearGradient(0, 0, world.width, world.height);
-    g.addColorStop(0, "#11171d");
-    g.addColorStop(0.55, "#151013");
-    g.addColorStop(1, "#07090c");
+  // -------- backdrop
+  const seedCache = new Map();
+  function seeded(id, n) {
+    const key = `${id}:${n}`;
+    if (!seedCache.has(key)) {
+      let h = 2166136261;
+      for (const c of key) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+      seedCache.set(key, ((h >>> 0) % 1000) / 1000);
+    }
+    return seedCache.get(key);
+  }
+
+  function skyGradient(pal) {
+    const g = ctx.createLinearGradient(0, 0, 0, world.height);
+    g.addColorStop(0, pal.skyTop);
+    g.addColorStop(0.55, pal.skyMid);
+    g.addColorStop(1, pal.skyBottom);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, world.width, world.height);
+  }
 
-    for (let i = 0; i < 22; i += 1) {
-      const x = (i * 197 + t * 42) % (world.width + 220) - 110;
-      const y = 115 + ((i * 89) % 680);
-      ctx.globalAlpha = 0.08 + (i % 4) * 0.025;
-      ctx.fillStyle = colors[i % colors.length];
-      ctx.beginPath();
-      ctx.arc(x, y + Math.sin(t + i) * 22, 28 + (i % 3) * 9, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.13)";
-      ctx.lineWidth = 5;
-      ctx.stroke();
+  function drawArenaBackground(level) {
+    const img = arenaImage.get(level.id);
+    if (img) {
+      ctx.drawImage(img, 0, 0, world.width, world.height);
+      return;
+    }
+    const pal = level.palette;
+    skyGradient(pal);
+    drawBackdropSilhouettes(level);
+  }
+
+  function drawBackdropSilhouettes(level) {
+    const pal = level.palette;
+    const id = level.id;
+    ctx.save();
+    // far layer
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = shade(pal.skyTop, 24);
+    drawSilhouetteLayer(level, 0, 560, 0.6);
+    // near layer
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = shade(pal.skyTop, 12);
+    drawSilhouetteLayer(level, 1, 640, 1);
+    ctx.restore();
+    // theme extras
+    ctx.save();
+    switch (level.backdrop) {
+      case "space": case "void": case "grid": drawStarsBg(id); break;
+      case "aurora": drawAuroraBg(); drawStarsBg(id); break;
+      case "storm": drawStarsBg(id); break;
+      case "heaven": drawSunburst(pal.accent); break;
+      case "festival": drawLanternsBg(id); break;
+      case "crystal": drawCrystalBeams(pal.accent); break;
+    }
+    if (level.backdrop === "grid") drawGridFloor(pal.accent);
+    ctx.restore();
+  }
+
+  function drawSilhouetteLayer(level, layer, horizon, scaleF) {
+    const id = level.id;
+    const style = level.backdrop;
+    const step = 130 * scaleF;
+    ctx.beginPath();
+    ctx.moveTo(0, world.height);
+    for (let x = -60; x < world.width + 120; x += step) {
+      const s1 = seeded(id, Math.floor(x / step) * 2 + layer * 100);
+      const s2 = seeded(id, Math.floor(x / step) * 2 + 1 + layer * 100);
+      let h;
+      if (["city", "grid", "junkyard", "library", "gears"].includes(style)) {
+        // blocky skyline
+        h = horizon + s1 * 220;
+        ctx.lineTo(x, world.height);
+        ctx.lineTo(x, world.height - (world.height - h));
+        ctx.lineTo(x + step * (0.55 + s2 * 0.4), world.height - (world.height - h));
+        ctx.lineTo(x + step * (0.55 + s2 * 0.4), world.height);
+      } else if (["mountains", "canyon", "colosseum", "wreck", "temple", "aurora"].includes(style)) {
+        // jagged peaks
+        h = horizon - 60 + s1 * 260;
+        ctx.lineTo(x + step / 2, h);
+        ctx.lineTo(x + step, world.height - (world.height - horizon - 120) * s2 * 0.3 - 100);
+      } else {
+        // rolling bumps (forest, cave, candy, jungle, etc.)
+        h = horizon + s1 * 160;
+        ctx.quadraticCurveTo(x + step / 2, h - 130 * s2, x + step, h);
+      }
+    }
+    ctx.lineTo(world.width + 120, world.height);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawStarsBg(id) {
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    for (let i = 0; i < 70; i += 1) {
+      const x = seeded(id, i * 3) * world.width;
+      const y = seeded(id, i * 3 + 1) * world.height * 0.7;
+      const tw = 0.4 + 0.6 * Math.abs(Math.sin(world.time * (0.5 + seeded(id, i * 3 + 2)) + i));
+      ctx.globalAlpha = tw * 0.8;
+      ctx.fillRect(x, y, 2.5, 2.5);
     }
     ctx.globalAlpha = 1;
+  }
 
-    ctx.strokeStyle = "rgba(255,255,255,0.06)";
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 9; i += 1) {
-      const y = 140 + i * 84 + Math.sin(t * 0.7 + i) * 10;
+  function drawAuroraBg() {
+    for (let band = 0; band < 3; band += 1) {
       ctx.beginPath();
-      ctx.moveTo(180, y);
-      ctx.quadraticCurveTo(world.width / 2, y - 40, world.width - 180, y);
+      const baseY = 120 + band * 70;
+      ctx.moveTo(0, baseY);
+      for (let x = 0; x <= world.width; x += 80) {
+        ctx.lineTo(x, baseY + Math.sin(x / 210 + world.time * 0.5 + band * 2) * 46);
+      }
+      ctx.strokeStyle = band === 1 ? "rgba(94,255,195,0.16)" : "rgba(180,92,255,0.13)";
+      ctx.lineWidth = 46 - band * 8;
+      ctx.lineCap = "round";
       ctx.stroke();
     }
   }
 
-  function drawBackground() {
-    const g = ctx.createLinearGradient(0, 0, 0, world.height);
-    g.addColorStop(0, "#182026");
-    g.addColorStop(0.5, "#11161b");
-    g.addColorStop(1, "#090b0e");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, world.width, world.height);
-    ctx.strokeStyle = "rgba(255,255,255,0.035)";
-    ctx.lineWidth = 1.5;
-    for (let x = 0; x < world.width; x += 80) {
+  function drawSunburst(color) {
+    ctx.save();
+    ctx.translate(world.width / 2, 150);
+    ctx.rotate(world.time * 0.05);
+    ctx.fillStyle = hexAlpha(color, 0.08);
+    for (let i = 0; i < 12; i += 1) {
+      ctx.rotate(Math.PI / 6);
       ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-90, 1500);
+      ctx.lineTo(90, 1500);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawLanternsBg(id) {
+    for (let i = 0; i < 16; i += 1) {
+      const x = seeded(id, i * 7) * world.width;
+      const y = (seeded(id, i * 7 + 1) * 700 - world.time * 12 - i * 40) % 760;
+      const yy = y < 0 ? y + 760 : y;
+      ctx.fillStyle = "rgba(255,207,94,0.5)";
+      ctx.beginPath();
+      ctx.ellipse(x, yy, 9, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,150,60,0.25)";
+      ctx.beginPath();
+      ctx.arc(x, yy, 22, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawCrystalBeams(color) {
+    ctx.save();
+    ctx.globalAlpha = 0.1;
+    for (let i = 0; i < 5; i += 1) {
+      ctx.fillStyle = i % 2 ? color : "#ff5fa8";
+      ctx.beginPath();
+      const x = 200 + i * 300 + Math.sin(world.time * 0.3 + i) * 40;
       ctx.moveTo(x, 0);
-      ctx.lineTo(x, world.height);
-      ctx.stroke();
+      ctx.lineTo(x + 130, 0);
+      ctx.lineTo(x + 320, world.height);
+      ctx.lineTo(x + 190, world.height);
+      ctx.closePath();
+      ctx.fill();
     }
-    for (let y = 30; y < world.height; y += 80) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(world.width, y);
-      ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawGridFloor(color) {
+    ctx.strokeStyle = hexAlpha(color, 0.14);
+    ctx.lineWidth = 1.5;
+    for (let x = 0; x <= world.width; x += 100) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, world.height); ctx.stroke();
     }
-    ctx.fillStyle = "rgba(255,255,255,0.035)";
-    for (let i = 0; i < 42; i += 1) {
-      const x = (i * 137 + performance.now() * 0.012) % world.width;
-      const y = (i * 83) % world.height;
-      ctx.fillRect(x, y, 3, 3);
+    for (let y = 0; y <= world.height; y += 100) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(world.width, y); ctx.stroke();
     }
   }
 
-  function drawMap() {
-    const map = maps[world.mapIndex];
-    for (const p of map.platforms) {
-      roundRect(p.x, p.y, p.w, p.h, 8, "#eef0e4", "#171a1d");
-      ctx.fillStyle = "#a7adb0";
-      ctx.fillRect(p.x + 8, p.y + p.h - 8, p.w - 16, 4);
-      ctx.fillStyle = "rgba(255,255,255,0.38)";
-      ctx.fillRect(p.x + 10, p.y + 5, p.w - 20, 2);
-    }
-    if (settings.hazards) {
-      for (const h of map.hazards) {
-        roundRect(h.x, h.y, h.w, h.h, 6, "#ff4268", "#651323");
-        ctx.fillStyle = "rgba(255,255,255,0.24)";
-        for (let x = h.x + 8; x < h.x + h.w - 8; x += 18) {
+  // -------- arena features
+  function drawArenaFeatures(level) {
+    const pal = level.palette;
+    // teleporters
+    for (const t of level.teleporters || []) {
+      for (const [x, y] of [[t.ax, t.ay], [t.bx, t.by]]) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(world.time * 2.4);
+        for (let i = 0; i < 3; i += 1) {
+          ctx.strokeStyle = hexAlpha(pal.accent, 0.7 - i * 0.2);
+          ctx.lineWidth = 5 - i;
           ctx.beginPath();
-          ctx.moveTo(x, h.y + h.h);
-          ctx.lineTo(x + 8, h.y + 2);
-          ctx.lineTo(x + 16, h.y + h.h);
-          ctx.fill();
+          ctx.arc(0, 0, 16 + i * 9, i, i + Math.PI * 1.4);
+          ctx.stroke();
         }
+        ctx.restore();
+      }
+    }
+    // bounce pads
+    for (const pad of level.bouncePads || []) {
+      const squish = 1 + Math.sin(world.time * 6 + pad.x) * 0.08;
+      ctx.fillStyle = pal.accent;
+      ctx.strokeStyle = shade(pal.accent, -60);
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(pad.x + pad.w / 2, pad.y + 10, pad.w / 2, 14 * squish, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath();
+      ctx.moveTo(pad.x + pad.w / 2 - 10, pad.y + 2);
+      ctx.lineTo(pad.x + pad.w / 2, pad.y - 8 - squish * 3);
+      ctx.lineTo(pad.x + pad.w / 2 + 10, pad.y + 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // zones (syrup)
+    for (const z of level.zones || []) {
+      ctx.fillStyle = "rgba(140,60,20,0.4)";
+      ctx.beginPath();
+      ctx.roundRect(z.x, z.y, z.w, z.h, 10);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,200,120,0.25)";
+      for (let i = 0; i < 4; i += 1) {
+        const bx = z.x + ((seeded(level.id, i * 13) * z.w + world.time * 18) % z.w);
+        ctx.beginPath();
+        ctx.arc(bx, z.y + 8 + (i % 2) * 12, 4, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
   }
 
-  function drawPlayers() {
+  function drawPlatforms(level) {
+    const pal = level.palette;
+    const t = world.time;
+    for (const p of level.platforms) {
+      const alpha = phaseAlpha(p, t);
+      drawPlatform(p, pal, alpha, p.ice, p.conveyor);
+    }
+    for (const m of level.movers || []) {
+      const ph = (m.phase || 0) * Math.PI * 2;
+      const s = (Math.sin((t / m.period) * Math.PI * 2 + ph) + 1) / 2;
+      drawPlatform({ ...m, x: m.x + m.dx * s, y: m.y + m.dy * s }, pal, 1, m.ice, m.conveyor, true);
+    }
+    if (settings.hazards) {
+      for (const h of level.hazards) drawHazard(h, pal);
+    }
+    // lightning warns
+    for (const f of fields) {
+      if (f.type === "lightning-warn") {
+        ctx.fillStyle = `rgba(255,233,94,${0.1 + 0.12 * Math.abs(Math.sin(world.time * 16))})`;
+        ctx.fillRect(f.x - 55, 0, 110, world.height);
+      }
+    }
+  }
+
+  function drawPlatform(p, pal, alpha, ice, conveyor, isMover = false) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = pal.plat;
+    ctx.strokeStyle = pal.platEdge;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(p.x, p.y, p.w, p.h, 8);
+    ctx.fill();
+    ctx.stroke();
+    // top accent glow line
+    ctx.fillStyle = ice ? "rgba(255,255,255,0.75)" : hexAlpha(pal.accent, 0.8);
+    ctx.beginPath();
+    ctx.roundRect(p.x + 6, p.y + 3, p.w - 12, 4, 2);
+    ctx.fill();
+    if (ice) {
+      ctx.fillStyle = "rgba(200,240,255,0.25)";
+      ctx.beginPath();
+      ctx.roundRect(p.x, p.y, p.w, p.h, 8);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      for (let x = p.x + 18; x < p.x + p.w - 18; x += 46) {
+        ctx.fillRect(x, p.y + p.h / 2 - 1, 18, 2);
+      }
+    }
+    if (conveyor) {
+      const dir = Math.sign(conveyor);
+      const off = (world.time * Math.abs(conveyor) * 0.6) % 30;
+      ctx.fillStyle = hexAlpha(pal.accent, 0.65);
+      for (let x = p.x + 8 + (dir > 0 ? off : 30 - off); x < p.x + p.w - 14; x += 30) {
+        ctx.beginPath();
+        ctx.moveTo(x, p.y + p.h / 2 + 4);
+        ctx.lineTo(x + 8 * dir, p.y + p.h / 2);
+        ctx.lineTo(x, p.y + p.h / 2 - 4);
+        ctx.fill();
+      }
+    }
+    if (isMover) {
+      ctx.strokeStyle = hexAlpha(pal.accent, 0.35);
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 7]);
+      ctx.strokeRect(p.x - 4, p.y - 4, p.w + 8, p.h + 8);
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
+
+  function drawHazard(h, pal) {
+    ctx.fillStyle = pal.hazard;
+    ctx.strokeStyle = shade(pal.hazard, -60);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(h.x, h.y, h.w, h.h, 6);
+    ctx.fill();
+    ctx.stroke();
+    // bubbling / spikes
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    for (let x = h.x + 8; x < h.x + h.w - 8; x += 20) {
+      const bob = Math.sin(world.time * 5 + x * 0.2) * 3;
+      ctx.beginPath();
+      ctx.moveTo(x, h.y + h.h);
+      ctx.lineTo(x + 8, h.y + 2 + bob);
+      ctx.lineTo(x + 16, h.y + h.h);
+      ctx.fill();
+    }
+  }
+
+  function drawTide(level) {
+    if (!level.tide) return;
+    const y = world.tideLevel;
+    const g = ctx.createLinearGradient(0, y, 0, world.height);
+    g.addColorStop(0, hexAlpha(level.palette.hazard, 0.55));
+    g.addColorStop(1, hexAlpha(level.palette.hazard, 0.8));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, y + 8);
+    for (let x = 0; x <= world.width; x += 60) {
+      ctx.lineTo(x, y + Math.sin(x / 90 + world.time * 2.2) * 7);
+    }
+    ctx.lineTo(world.width, world.height);
+    ctx.lineTo(0, world.height);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let x = 0; x <= world.width; x += 60) {
+      const yy = y + Math.sin(x / 90 + world.time * 2.2) * 7;
+      if (x === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+
+  // -------- entities
+  function drawPlayersAll() {
     for (const p of players) {
       if (!p.alive) continue;
-      const r = p.stats.radius * (p.stats.mythic === "greenGiant" && p.mythicTimer > 0 ? 1.38 : 1);
-      const wobble = Math.sin(performance.now() / 115 + p.id) * 3;
-      const drawX = Number.isFinite(p.renderX) ? p.renderX : Number.isFinite(p.x) ? p.x : spawnPoints[p.id].x;
-      const drawY = Number.isFinite(p.renderY) ? p.renderY : Number.isFinite(p.y) ? p.y : spawnPoints[p.id].y;
       ctx.save();
-      ctx.translate(drawX, drawY);
-      ctx.rotate(clamp(p.vx / 1200, -0.45, 0.45));
+      ctx.translate(p.x, p.y);
+      const r = p.stats.radius;
+      // shadow
       ctx.fillStyle = "rgba(0,0,0,0.28)";
       ctx.beginPath();
-      ctx.ellipse(0, r + 9, r * 0.95, 9, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, r + 9, r * 0.95, 8, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = p.color;
-      ctx.strokeStyle = "#171717";
-      ctx.lineWidth = 5;
+      ctx.rotate(clamp(p.vx / 1400, -0.4, 0.4));
+      // player color ring
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.9;
       ctx.beginPath();
-      ctx.ellipse(0, wobble, r * 0.95, r * 1.08, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(0, 0, r + 7, 0, Math.PI * 2);
       ctx.stroke();
-
-      drawArm(-r * 0.72, -4, -p.aimY * 15 - 10, p.aimX * 18, p.color);
-      drawArm(r * 0.72, -2, p.aimY * 15 + 10, p.aimX * 18, p.color);
-      drawGun(p, r);
-
-      ctx.fillStyle = "#111";
-      const blink = p.faceBlink % 4 > 3.75 ? 1 : 6;
-      ctx.fillRect(-9 + p.aimX * 4, -10 + p.aimY * 4, 6, blink);
-      ctx.fillRect(9 + p.aimX * 4, -10 + p.aimY * 4, 6, blink);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "#111";
-      ctx.beginPath();
-      ctx.arc(p.aimX * 4, 6, 9, 0.1, Math.PI - 0.1);
-      ctx.stroke();
-
+      ctx.globalAlpha = 1;
+      drawCharacter(ctx, p.character, r, {
+        t: world.time + p.botSeed,
+        aimX: p.aimX, aimY: p.aimY,
+        blink: p.blinkClock % 4 > 3.8
+      });
+      // status tints
+      if (p.chillTimer > 0) {
+        ctx.fillStyle = "rgba(140,220,255,0.3)";
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      }
+      if (p.burnTimer > 0) {
+        ctx.fillStyle = "rgba(255,120,40,0.22)";
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      }
       if (p.blockTimer > 0 || p.spawnGrace > 0) {
         ctx.strokeStyle = p.blockTimer > 0 ? "#ffffff" : "rgba(255,255,255,0.45)";
         ctx.lineWidth = p.blockTimer > 0 ? 7 : 3;
         ctx.beginPath();
-        ctx.arc(0, 0, r + 12 + Math.sin(performance.now() / 45) * 3, 0, Math.PI * 2);
+        ctx.arc(0, 0, r + 13 + Math.sin(performance.now() / 45) * 3, 0, Math.PI * 2);
         ctx.stroke();
       }
+      // active ready ring
+      if (p.stats.active && p.activeCooldown <= 0) {
+        ctx.strokeStyle = "rgba(255,77,143,0.8)";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 8]);
+        ctx.lineDashOffset = -world.time * 40;
+        ctx.beginPath();
+        ctx.arc(0, 0, r + 18, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       ctx.restore();
+      // name tag
+      ctx.fillStyle = hexAlpha(p.color, 0.9);
+      ctx.font = "700 15px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(p.name, p.x, p.y - p.stats.radius - 22);
     }
-  }
-
-  function drawArm(x, y, bend, reach, color) {
-    ctx.strokeStyle = "#161616";
-    ctx.lineWidth = 12;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.quadraticCurveTo(x + reach * 0.25, y + bend, x + reach, y + bend * 0.35);
-    ctx.stroke();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 7;
-    ctx.stroke();
-  }
-
-  function drawGun(p, r) {
-    const angle = Math.atan2(p.aimY, p.aimX);
-    const side = p.aimX >= 0 ? 1 : -1;
-    ctx.save();
-    ctx.rotate(angle);
-    ctx.translate(r * 0.58, 1);
-    ctx.fillStyle = "#121417";
-    ctx.strokeStyle = "#f8f4e8";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(-4, -7, 42, 14, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#f8f4e8";
-    ctx.fillRect(28, -4, 16, 8);
-    ctx.fillStyle = p.color;
-    ctx.fillRect(8, -4, 10, 8);
-    ctx.fillStyle = "#151515";
-    ctx.save();
-    ctx.translate(5, 7);
-    ctx.rotate(0.45 * side);
-    ctx.fillRect(-3, -1, 7, 16);
-    ctx.restore();
-    ctx.restore();
   }
 
   function drawBullets() {
     for (const b of bullets) {
+      ctx.save();
+      if (b.golden) {
+        ctx.shadowColor = "#ffd700";
+        ctx.shadowBlur = 16;
+      }
+      if (b.meteor) {
+        ctx.shadowColor = "#ff9e3d";
+        ctx.shadowBlur = 20;
+      }
       ctx.fillStyle = b.color;
-      ctx.strokeStyle = "#121212";
+      ctx.strokeStyle = "#15121c";
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       if (b.homing) {
-        ctx.strokeStyle = "rgba(255,255,255,0.28)";
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
         ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r + 6, 0, Math.PI * 2);
+        ctx.arc(b.x, b.y, b.r + 5, 0, Math.PI * 2);
         ctx.stroke();
       }
+      ctx.restore();
     }
   }
 
   function drawFields() {
     for (const f of fields) {
-      const alpha = clamp(f.life / 0.18, 0, 1);
-      const longAlpha = clamp(f.life / 3.2, 0, 1);
-      ctx.strokeStyle = f.type === "domain"
-        ? `rgba(133,255,242,${0.32 * longAlpha})`
-        : f.type === "ice"
-          ? `rgba(180,235,255,${0.34 * clamp(f.life / 2.4, 0, 1)})`
-          : f.type === "beam"
-            ? `rgba(215,92,255,${0.5 * alpha})`
-            : `rgba(255,255,255,${0.28 * alpha})`;
-      ctx.lineWidth = f.type === "beam" ? 18 : 8;
+      if (f.type === "lightning-warn") continue;
+      if (f.type === "blackhole") {
+        const a = clamp(f.life / 3, 0, 1);
+        ctx.save();
+        ctx.translate(f.x, f.y);
+        ctx.rotate(world.time * 3);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, f.r * 0.6);
+        g.addColorStop(0, "rgba(10,5,20,0.95)");
+        g.addColorStop(0.5, `rgba(120,40,200,${0.5 * a})`);
+        g.addColorStop(1, "rgba(120,40,200,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, f.r * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(180,92,255,${0.6 * a})`;
+        ctx.lineWidth = 4;
+        for (let i = 0; i < 3; i += 1) {
+          ctx.beginPath();
+          ctx.arc(0, 0, 24 + i * 26, i * 2, i * 2 + Math.PI * 1.3);
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else {
+        const alpha = clamp(f.life / 0.18, 0, 1);
+        ctx.strokeStyle = `rgba(255,255,255,${0.3 * alpha})`;
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.r * (1 - alpha * 0.45), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function boltVisual(x1, y1, x2, y2, color, life) {
+    const points = [];
+    const segs = 8;
+    for (let i = 0; i <= segs; i += 1) {
+      const t = i / segs;
+      points.push({
+        x: x1 + (x2 - x1) * t + (i > 0 && i < segs ? rand(-26, 26) : 0),
+        y: y1 + (y2 - y1) * t + (i > 0 && i < segs ? rand(-26, 26) : 0)
+      });
+    }
+    bolts.push({ points, life, maxLife: life, color });
+  }
+
+  function updateBolts(dt) {
+    for (const b of bolts) b.life -= dt;
+    bolts = bolts.filter(b => b.life > 0);
+  }
+
+  function drawBoltsAll() {
+    for (const b of bolts) {
+      const a = clamp(b.life / b.maxLife, 0, 1);
+      ctx.strokeStyle = hexAlpha(b.color, a);
+      ctx.lineWidth = 4 * a + 1;
+      ctx.lineJoin = "round";
       ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * (1 - alpha * 0.45), 0, Math.PI * 2);
+      b.points.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
       ctx.stroke();
     }
+  }
+
+  function drawCountdown() {
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.fillRect(0, 0, world.width, world.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 78px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(world.roundFreeze > 0.35 ? "READY" : "FIGHT!", world.width / 2, 180);
+  }
+
+  function drawWinner() {
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(0, 0, world.width, world.height);
+    if (!world.winner) return;
+    ctx.save();
+    ctx.translate(world.width / 2, 330);
+    const bob = Math.sin(world.time * 3) * 8;
+    ctx.save();
+    ctx.translate(0, -90 + bob);
+    drawCharacter(ctx, world.winner.character, 60, { t: world.time, aimX: 1 });
+    ctx.restore();
+    ctx.fillStyle = world.winner.color;
+    ctx.font = "900 84px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`${world.winner.name.toUpperCase()} WINS`, 0, 120);
+    ctx.fillStyle = "#f5f2ff";
+    ctx.font = "700 28px system-ui, sans-serif";
+    ctx.fillText("Champion of the arena — Enter / Start for a rematch", 0, 170);
+    ctx.restore();
+  }
+
+  function drawMenuBackground() {
+    const t = world.time;
+    const g = ctx.createLinearGradient(0, 0, world.width, world.height);
+    const hue1 = (t * 6) % 360;
+    g.addColorStop(0, `hsl(${hue1}, 45%, 12%)`);
+    g.addColorStop(0.5, `hsl(${(hue1 + 60) % 360}, 42%, 16%)`);
+    g.addColorStop(1, `hsl(${(hue1 + 120) % 360}, 45%, 9%)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, world.width, world.height);
+    // drifting round fighters
+    for (let i = 0; i < 16; i += 1) {
+      const ch = CHARACTERS[i % CHARACTERS.length];
+      const x = (i * 233 + t * 34) % (world.width + 260) - 130;
+      const y = 130 + ((i * 131) % 640) + Math.sin(t + i) * 26;
+      ctx.save();
+      ctx.globalAlpha = 0.16;
+      ctx.translate(x, y);
+      drawCharacter(ctx, ch, 30 + (i % 3) * 10, { t: t + i, aimX: Math.sin(t * 0.4 + i) > 0 ? 1 : -1, useImage: false });
+      ctx.restore();
+    }
+  }
+
+  // -------- weather
+  function spawnWeatherParticle(type) {
+    const W = world.width;
+    switch (type) {
+      case "rain": return { x: rand(0, W), y: -10, vx: -140, vy: 900, r: 1.6, kind: "line", color: "rgba(160,200,255,0.5)", life: 1.4 };
+      case "snow": return { x: rand(0, W), y: -10, vx: rand(-30, 30), vy: rand(60, 130), r: rand(1.5, 3.5), kind: "dot", color: "rgba(255,255,255,0.8)", sway: rand(1, 2.4), life: 12 };
+      case "embers": return { x: rand(0, W), y: world.height + 10, vx: rand(-30, 30), vy: rand(-160, -70), r: rand(1.5, 3.2), kind: "dot", color: "rgba(255,158,61,0.8)", sway: rand(1, 3), life: 8 };
+      case "leaves": return { x: rand(0, W), y: -10, vx: rand(-60, -20), vy: rand(60, 120), r: rand(2.5, 4.5), kind: "leaf", color: "rgba(155,226,79,0.7)", sway: rand(1.5, 3), life: 12 };
+      case "stars": return { x: rand(0, W), y: rand(0, world.height * 0.8), vx: 0, vy: 0, r: rand(1, 2.2), kind: "twinkle", color: "rgba(255,255,255,0.8)", life: rand(1, 3) };
+      case "petals": return { x: rand(0, W), y: -10, vx: rand(-50, -15), vy: rand(50, 110), r: rand(2.5, 4), kind: "leaf", color: "rgba(255,183,213,0.8)", sway: rand(1.5, 3), life: 12 };
+      case "confetti": return { x: rand(0, W), y: -10, vx: rand(-40, 40), vy: rand(90, 170), r: rand(2, 3.6), kind: "rect", color: `hsl(${Math.floor(rand(0, 360))}, 90%, 65%)`, sway: rand(2, 4), life: 9 };
+      case "sparks": return { x: rand(0, W), y: rand(300, world.height - 100), vx: rand(-90, 90), vy: rand(-220, -60), r: rand(1, 2.2), kind: "dot", color: "rgba(255,179,92,0.9)", life: 0.8 };
+      case "wisps": return { x: rand(0, W), y: rand(200, world.height - 60), vx: rand(-25, 25), vy: rand(-40, -10), r: rand(2, 4.5), kind: "glow", color: "rgba(141,255,110,0.5)", sway: rand(1, 2), life: 6 };
+      case "dust": return { x: -10, y: rand(200, world.height - 60), vx: rand(120, 260), vy: rand(-20, 20), r: rand(1, 2.6), kind: "dot", color: "rgba(255,210,150,0.4)", life: 7 };
+      case "spores": return { x: rand(0, W), y: rand(100, world.height - 60), vx: rand(-15, 15), vy: rand(-30, -8), r: rand(1.5, 3), kind: "glow", color: "rgba(255,122,200,0.5)", sway: rand(0.5, 1.5), life: 7 };
+      case "sparkle": return { x: rand(0, W), y: rand(0, world.height), vx: 0, vy: 0, r: rand(1.2, 2.6), kind: "twinkle", color: "rgba(127,252,255,0.8)", life: rand(0.5, 1.6) };
+      case "lanterns": return { x: rand(0, W), y: world.height + 14, vx: rand(-12, 12), vy: rand(-55, -30), r: rand(4, 7), kind: "lantern", color: "rgba(255,207,94,0.8)", sway: rand(0.5, 1.5), life: 22 };
+      case "feathers": return { x: rand(0, W), y: -10, vx: rand(-30, 0), vy: rand(35, 70), r: rand(2.5, 4), kind: "leaf", color: "rgba(255,255,255,0.75)", sway: rand(2, 4), life: 16 };
+      default: return null;
+    }
+  }
+
+  const weatherRates = {
+    rain: 26, snow: 9, embers: 7, leaves: 4, stars: 2, petals: 4, confetti: 5,
+    sparks: 5, wisps: 2.5, dust: 6, spores: 3, sparkle: 6, lanterns: 0.8, feathers: 2.5
+  };
+
+  let weatherCarry = 0;
+  function updateWeather(dt) {
+    const type = currentLevel().weather;
+    if (!type) return;
+    weatherCarry += (weatherRates[type] || 4) * dt;
+    while (weatherCarry >= 1) {
+      weatherCarry -= 1;
+      const w = spawnWeatherParticle(type);
+      if (w) world.weather.push(w);
+    }
+    for (const w of world.weather) {
+      w.life -= dt;
+      w.x += (w.vx + (w.sway ? Math.sin(world.time * w.sway + w.y * 0.01) * 40 : 0)) * dt;
+      w.y += w.vy * dt;
+      if (w.y > world.height + 20) w.life = -1;
+    }
+    world.weather = world.weather.filter(w => w.life > 0);
+  }
+
+  function updateWeatherMenu(dt) { /* menu uses its own drifting characters */ }
+
+  function drawWeatherParticles() {
+    for (const w of world.weather) {
+      ctx.globalAlpha = clamp(w.life, 0, 1);
+      ctx.fillStyle = w.color;
+      if (w.kind === "line") {
+        ctx.strokeStyle = w.color;
+        ctx.lineWidth = w.r;
+        ctx.beginPath();
+        ctx.moveTo(w.x, w.y);
+        ctx.lineTo(w.x - w.vx * 0.02, w.y - w.vy * 0.02);
+        ctx.stroke();
+      } else if (w.kind === "rect") {
+        ctx.save();
+        ctx.translate(w.x, w.y);
+        ctx.rotate(world.time * w.sway);
+        ctx.fillRect(-w.r, -w.r * 0.6, w.r * 2, w.r * 1.2);
+        ctx.restore();
+      } else if (w.kind === "leaf") {
+        ctx.save();
+        ctx.translate(w.x, w.y);
+        ctx.rotate(Math.sin(world.time * w.sway) * 0.8);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w.r * 1.4, w.r * 0.7, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (w.kind === "twinkle") {
+        ctx.globalAlpha = clamp(w.life, 0, 1) * Math.abs(Math.sin(world.time * 4 + w.x));
+        ctx.beginPath();
+        ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (w.kind === "glow") {
+        ctx.beginPath();
+        ctx.arc(w.x, w.y, w.r * 2.2, 0, Math.PI * 2);
+        ctx.globalAlpha *= 0.3;
+        ctx.fill();
+        ctx.globalAlpha = clamp(w.life, 0, 1);
+        ctx.beginPath();
+        ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (w.kind === "lantern") {
+        ctx.beginPath();
+        ctx.ellipse(w.x, w.y, w.r * 0.8, w.r, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha *= 0.3;
+        ctx.beginPath();
+        ctx.arc(w.x, w.y, w.r * 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // -------- particles
+  function updateParticles(dt) {
+    for (const p of particles) {
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 360 * dt;
+    }
+    particles = particles.filter(p => p.life > 0);
   }
 
   function drawParticles() {
@@ -2806,118 +2352,6 @@
     ctx.globalAlpha = 1;
   }
 
-  function drawCountdown() {
-    ctx.fillStyle = "rgba(0,0,0,0.24)";
-    ctx.fillRect(0, 0, world.width, world.height);
-    ctx.fillStyle = "#f8f4e8";
-    ctx.font = "800 74px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(world.roundFreeze > 0.35 ? "READY" : "GO", world.width / 2, 180);
-  }
-
-  function drawWinner() {
-    ctx.fillStyle = "rgba(0,0,0,0.48)";
-    ctx.fillRect(0, 0, world.width, world.height);
-    ctx.fillStyle = world.winner ? world.winner.color : "#fff";
-    ctx.font = "900 84px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(`${world.winner.name} WINS`, world.width / 2, 390);
-    ctx.fillStyle = "#f8f4e8";
-    ctx.font = "700 28px system-ui, sans-serif";
-    ctx.fillText("Press Enter or Start for rematch", world.width / 2, 440);
-  }
-
-  function renderHud() {
-    if (world.state === "menu" || world.state === "settings" || world.state === "how") {
-      hud.innerHTML = "";
-      return;
-    }
-    hud.innerHTML = players.map(p => {
-      const hp = clamp(p.hp / p.stats.maxHp, 0, 1) * 100;
-      const cards = p.cards.map(c => c.name).slice(-3).join(" / ") || "No cards";
-      const mythic = p.stats.mythic ? ` - Mythic ${p.mythicCooldown > 0 ? Math.ceil(p.mythicCooldown) : "Ready"}` : "";
-      return `
-        <article class="hud-card ${p.alive ? "" : "dead"}" style="color:${p.color}">
-          <div class="hud-top"><span>${p.name}</span><span>${p.score}/${settings.scoreLimit}</span></div>
-          <div class="bar"><i style="width:${hp}%"></i></div>
-          <div class="mini">Ammo ${p.ammo}/${p.stats.maxAmmo}${mythic} - ${cards}</div>
-        </article>
-      `;
-    }).join("");
-  }
-
-  function renderLobbySlots() {
-    const displaySlots = [...lobbySlots];
-    if (!displaySlots.length && settings.botCount > 0) {
-      displaySlots.push({ type: "keyboard", label: "Keyboard P1" });
-    }
-    joinSlots.innerHTML = Array.from({ length: settings.playerCount }, (_, i) => {
-      const slot = displaySlots[i];
-      const botIndex = i - displaySlots.length;
-      const bot = !slot && botIndex >= 0 && botIndex < settings.botCount;
-      const color = colors[i % colors.length];
-      return `
-        <article class="join-slot ${slot || bot ? "joined" : ""}" style="color:${color}">
-          <strong>${slot || bot ? `P${i + 1}` : `P${i + 1} Open`}</strong>
-          <span>${slot ? slot.label : bot ? `Bot ${botIndex + 1}` : "Press controller button"}</span>
-        </article>
-      `;
-    }).join("");
-  }
-
-  function renderOnlineGames() {
-    if (!onlineGames) return;
-    const joinable = online.games.filter(game => game.status === "open" && game.hostId !== online.localId).slice(0, 4);
-    const ownWaiting = online.gameId && online.role === "host" && !online.active;
-    const rows = [];
-    if (ownWaiting) {
-      rows.push(`
-        <article class="online-row">
-          <div><strong>Your online game is open</strong><span>Waiting for a friend to join</span></div>
-          <button type="button" data-online-cancel="1">Cancel</button>
-        </article>
-      `);
-    }
-    for (const game of joinable) {
-      rows.push(`
-        <article class="online-row">
-          <div><strong>${escapeHtml(game.name || "Online Game")}</strong><span>Ready to join</span></div>
-          <button type="button" data-online-join="${game.id}">Join</button>
-        </article>
-      `);
-    }
-    onlineGames.innerHTML = rows.join("");
-    for (const button of onlineGames.querySelectorAll("[data-online-join]")) {
-      button.addEventListener("click", () => joinOnlineGame(button.dataset.onlineJoin));
-    }
-    const cancel = onlineGames.querySelector("[data-online-cancel]");
-    if (cancel) cancel.addEventListener("click", () => {
-      leaveOnlineGame();
-      renderOnlineGames();
-      showToast("Online game closed");
-    });
-  }
-
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, char => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      "\"": "&quot;",
-      "'": "&#39;"
-    })[char]);
-  }
-
-  function updateParticles(dt) {
-    for (const p of particles) {
-      p.life -= dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.vy += 360 * dt;
-    }
-    particles = particles.filter(p => p.life > 0);
-  }
-
   function burst(x, y, color, count, speed) {
     for (let i = 0; i < count; i += 1) {
       const a = Math.random() * Math.PI * 2;
@@ -2925,9 +2359,28 @@
       particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.25, 0.72), maxLife: 0.72, r: rand(2, 7), color });
     }
   }
+  function puff(x, y, color, count) { burst(x, y, color, count, 160); }
+  function puffOne(x, y, color) {
+    particles.push({ x, y, vx: rand(-30, 30), vy: rand(-80, -20), life: 0.5, maxLife: 0.5, r: rand(2, 4), color });
+  }
 
-  function puff(x, y, color, count) {
-    burst(x, y, color, count, 160);
+  // -------- misc helpers
+  function shade(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = clamp(((n >> 16) & 255) + amt, 0, 255);
+    const g = clamp(((n >> 8) & 255) + amt, 0, 255);
+    const b = clamp((n & 255) + amt, 0, 255);
+    return `rgb(${r},${g},${b})`;
+  }
+  function hexAlpha(hex, a) {
+    if (hex.startsWith("rgb")) return hex;
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function rand(min, max) { return min + Math.random() * (max - min); }
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[ch]);
   }
 
   function showToast(text) {
@@ -2935,15 +2388,34 @@
     toast.classList.remove("hidden");
     toastTimer = 2.2;
   }
+  function updateToast() {
+    if (toastTimer > 0) {
+      toastTimer -= 1 / 60;
+      if (toastTimer <= 0) toast.classList.add("hidden");
+    }
+  }
 
+  function pulse(target, strength, duration) {
+    if (!settings.haptics || !target || target.gamepadIndex === null || target.gamepadIndex === undefined) return;
+    const pad = navigator.getGamepads && navigator.getGamepads()[target.gamepadIndex];
+    const actuator = pad && (pad.vibrationActuator || (pad.hapticActuators && pad.hapticActuators[0]));
+    if (!actuator) return;
+    if (actuator.playEffect) {
+      actuator.playEffect("dual-rumble", { duration, strongMagnitude: clamp(strength, 0, 1), weakMagnitude: clamp(strength * 0.55, 0, 1) }).catch(() => {});
+    } else if (actuator.pulse) {
+      actuator.pulse(clamp(strength, 0, 1), duration).catch(() => {});
+    }
+  }
+
+  // ------------------------------------------------------------------- audio
   function ensureAudio() {
     if (audioCtx) {
       if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
       return;
     }
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    audioCtx = new AudioContext();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = new AC();
     masterGain = audioCtx.createGain();
     masterGain.gain.value = 0.28;
     masterGain.connect(audioCtx.destination);
@@ -2952,10 +2424,8 @@
   function startMusic() {
     if (!settings.music) return;
     if (!musicAudio) makeMusicAudio();
-    musicAudio.currentTime = musicAudio.currentTime || 0;
-    musicAudio.play().catch(() => showToast("Click once to enable music"));
+    musicAudio.play().catch(() => {});
   }
-
   function makeMusicAudio() {
     musicAudio = new Audio(soundtrack[currentTrack % soundtrack.length]);
     musicAudio.loop = false;
@@ -2967,44 +2437,26 @@
       startMusic();
     });
   }
-
   function stopMusic() {
-    if (musicAudio) {
-      musicAudio.pause();
-      musicAudio.currentTime = 0;
-    }
+    if (musicAudio) { musicAudio.pause(); musicAudio.currentTime = 0; }
   }
-
   function stopAudio() {
     stopMusic();
-    if (audioCtx) {
-      audioCtx.close().catch(() => {});
-      audioCtx = null;
-      masterGain = null;
-    }
+    if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; masterGain = null; }
   }
-
   function toggleMusic() {
     settings.music = !settings.music;
-    if (settings.music) {
-      ensureAudio();
-      startMusic();
-      showToast("Music on");
-    } else {
-      stopAudio();
-      showToast("Music off");
-    }
+    if (settings.music) { ensureAudio(); startMusic(); showToast("Music on"); }
+    else { stopMusic(); showToast("Music off"); }
     syncMusicButtons();
   }
-
   function syncMusicButtons() {
     const label = `Music: ${settings.music ? "On" : "Off"}`;
-    const menuButton = document.getElementById("musicBtn");
-    const pauseButton = document.getElementById("pauseMusicBtn");
-    if (menuButton) menuButton.textContent = label;
-    if (pauseButton) pauseButton.textContent = label;
+    for (const id of ["musicBtn", "pauseMusicBtn"]) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = label;
+    }
   }
-
   function setMusicVolume(value) {
     settings.musicVolume = clamp(Number(value) / 100, 0, 1);
     if (musicAudio) musicAudio.volume = settings.musicVolume;
@@ -3048,84 +2500,29 @@
     src.stop(start + duration);
   }
 
-  function kick(when = null) {
-    const start = when ?? (audioCtx ? audioCtx.currentTime : 0);
-    tone(95, 0.16, "sine", 0.11, start, 42);
-  }
-
   function sfx(name) {
     ensureAudio();
     if (!audioCtx) return;
     const now = audioCtx.currentTime;
-    if (name === "shoot") {
-      tone(220, 0.07, "square", 0.08, now, 95);
-      noise(0.045, 0.05, 1800, now);
-    } else if (name === "jump") {
-      tone(220, 0.09, "triangle", 0.07, now, 440);
-    } else if (name === "block") {
-      tone(180, 0.13, "sawtooth", 0.07, now, 260);
-      noise(0.08, 0.035, 900, now);
-    } else if (name === "hit") {
-      tone(120, 0.11, "sawtooth", 0.08, now, 75);
-      noise(0.08, 0.07, 700, now);
-    } else if (name === "card") {
-      tone(440, 0.08, "triangle", 0.06, now);
-      tone(660, 0.12, "triangle", 0.05, now + 0.07);
-    } else if (name === "win") {
-      tone(330, 0.13, "triangle", 0.08, now);
-      tone(440, 0.13, "triangle", 0.08, now + 0.12);
-      tone(660, 0.2, "triangle", 0.08, now + 0.24);
-    }
+    if (name === "shoot") { tone(220, 0.07, "square", 0.08, now, 95); noise(0.045, 0.05, 1800, now); }
+    else if (name === "golden") { tone(660, 0.1, "square", 0.09, now, 220); tone(990, 0.14, "triangle", 0.06, now + 0.03); }
+    else if (name === "jump") { tone(220, 0.09, "triangle", 0.06, now, 440); }
+    else if (name === "block") { tone(180, 0.13, "sawtooth", 0.06, now, 260); noise(0.08, 0.03, 900, now); }
+    else if (name === "parry") { tone(520, 0.1, "square", 0.07, now, 880); }
+    else if (name === "hit") { tone(120, 0.11, "sawtooth", 0.08, now, 75); noise(0.08, 0.07, 700, now); }
+    else if (name === "boom") { tone(70, 0.3, "sine", 0.12, now, 36); noise(0.22, 0.09, 500, now); }
+    else if (name === "card") { tone(440, 0.08, "triangle", 0.06, now); tone(660, 0.12, "triangle", 0.05, now + 0.07); }
+    else if (name === "chain") { tone(880, 0.05, "sawtooth", 0.05, now, 1400); noise(0.05, 0.04, 3200, now); }
+    else if (name === "bounce") { tone(240, 0.12, "sine", 0.09, now, 620); }
+    else if (name === "teleport") { tone(500, 0.14, "sine", 0.07, now, 1200); tone(1200, 0.12, "sine", 0.05, now + 0.08, 500); }
+    else if (name === "mythic") { tone(330, 0.12, "sawtooth", 0.07, now, 660); tone(660, 0.18, "triangle", 0.07, now + 0.1, 990); }
+    else if (name === "win") { tone(330, 0.13, "triangle", 0.08, now); tone(440, 0.13, "triangle", 0.08, now + 0.12); tone(660, 0.2, "triangle", 0.08, now + 0.24); }
   }
 
-  function updateToast() {
-    if (toastTimer > 0) {
-      toastTimer -= 1 / 60;
-      if (toastTimer <= 0) toast.classList.add("hidden");
-    }
-  }
-
-  function roundRect(x, y, w, h, r, fill, stroke) {
-    ctx.fillStyle = fill;
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, r);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  function resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = Math.floor(innerWidth * dpr);
-    const h = Math.floor(innerHeight * dpr);
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-    }
-  }
-
-  function clamp(v, min, max) {
-    return Math.max(min, Math.min(max, v));
-  }
-
-  function rand(min, max) {
-    return min + Math.random() * (max - min);
-  }
-
-  function tick(now) {
-    const dt = Math.min(0.033, (now - last) / 1000);
-    last = now;
-    update(dt);
-    rememberGamepads();
-    render();
-    pressed.clear();
-    requestAnimationFrame(tick);
-  }
-
+  // --------------------------------------------------------------------- UI
   function bindUi() {
     document.getElementById("startBtn").addEventListener("click", startMatch);
-    document.getElementById("createOnlineBtn").addEventListener("click", createOnlineGame);
+    document.getElementById("addBotBtn").addEventListener("click", addBot);
     document.getElementById("fullscreenBtn").addEventListener("click", toggleFullscreen);
     document.getElementById("musicBtn").addEventListener("click", toggleMusic);
     document.getElementById("resumeBtn").addEventListener("click", () => togglePause(false));
@@ -3144,41 +2541,43 @@
       world.state = "how";
       setMenuIndex(0);
     });
-    document.getElementById("settingsBack").addEventListener("click", () => {
-      showMainMenu(settingsPanel);
+    document.getElementById("settingsBack").addEventListener("click", () => showMainMenu(settingsPanel));
+    document.getElementById("howBack").addEventListener("click", () => showMainMenu(howPanel));
+
+    // arena picker
+    const levelSelect = document.getElementById("levelSelect");
+    const rnd = document.createElement("option");
+    rnd.value = "-1";
+    rnd.textContent = "🎲 Random every round";
+    levelSelect.appendChild(rnd);
+    LEVELS.forEach((lv, i) => {
+      const o = document.createElement("option");
+      o.value = String(i);
+      o.textContent = lv.name;
+      levelSelect.appendChild(o);
     });
-    document.getElementById("howBack").addEventListener("click", () => {
-      showMainMenu(howPanel);
+    levelSelect.addEventListener("change", () => {
+      settings.levelChoice = Number(levelSelect.value);
+      const label = document.getElementById("levelSelectValue");
+      if (label) label.textContent = settings.levelChoice < 0 ? "Random" : LEVELS[settings.levelChoice].name;
     });
+
     bindSetting("playerCount", "playerCountValue", v => {
       settings.playerCount = Number(v);
       while (lobbySlots.length > settings.playerCount) lobbySlots.pop();
-      settings.botCount = Math.min(settings.botCount, Math.max(0, settings.playerCount - lobbySlots.length));
-      const botInput = document.getElementById("botCount");
-      const botValue = document.getElementById("botCountValue");
-      botInput.value = String(settings.botCount);
-      botValue.textContent = botInput.value;
-      renderLobbySlots();
-    });
-    bindSetting("botCount", "botCountValue", v => {
-      settings.botCount = Math.min(Number(v), Math.max(0, settings.playerCount - lobbySlots.length));
-      document.getElementById("botCount").value = String(settings.botCount);
-      document.getElementById("botCountValue").textContent = String(settings.botCount);
-      renderLobbySlots();
+      renderLobby();
     });
     bindSetting("botDifficulty", "botDifficultyValue", v => {
       settings.botDifficulty = Number(v);
       document.getElementById("botDifficultyValue").textContent = botDifficultyLabel(settings.botDifficulty);
     });
+    document.getElementById("botDifficultyValue").textContent = botDifficultyLabel(settings.botDifficulty);
     bindSetting("scoreLimit", "scoreLimitValue", v => settings.scoreLimit = Number(v));
     bindSetting("draftCount", "draftCountValue", v => settings.draftCount = Number(v));
     bindSetting("musicVolume", "musicVolumeValue", setMusicVolume);
-    bindRarityWeight("commonWeight", "commonWeightValue", "common");
-    bindRarityWeight("uncommonWeight", "uncommonWeightValue", "uncommon");
-    bindRarityWeight("rareWeight", "rareWeightValue", "rare");
-    bindRarityWeight("epicWeight", "epicWeightValue", "epic");
-    bindRarityWeight("legendaryWeight", "legendaryWeightValue", "legendary");
-    bindRarityWeight("mythicalWeight", "mythicalWeightValue", "mythical");
+    for (const rarity of window.ROUNDERS.RARITY_ORDER) {
+      bindSetting(`${rarity}Weight`, `${rarity}WeightValue`, v => settings.rarityWeights[rarity] = Number(v));
+    }
     document.getElementById("hazards").addEventListener("change", e => settings.hazards = e.target.checked);
     document.getElementById("haptics").addEventListener("change", e => settings.haptics = e.target.checked);
     document.getElementById("shake").addEventListener("change", e => settings.shake = e.target.checked);
@@ -3187,30 +2586,40 @@
   function bindSetting(inputId, valueId, setter) {
     const input = document.getElementById(inputId);
     const value = document.getElementById(valueId);
+    if (!input) return;
     input.addEventListener("input", () => {
-      value.textContent = input.value;
+      if (value) value.textContent = input.value;
       setter(input.value);
-    });
-  }
-
-  function bindRarityWeight(inputId, valueId, rarity) {
-    bindSetting(inputId, valueId, value => {
-      settings.rarityWeights[rarity] = Number(value);
     });
   }
 
   async function toggleFullscreen() {
     try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-        showToast("Fullscreen on");
-      } else {
-        await document.exitFullscreen();
-        showToast("Fullscreen off");
-      }
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      else await document.exitFullscreen();
     } catch {
       showToast("Fullscreen is blocked by this browser");
     }
+  }
+
+  function resize() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.floor(innerWidth * dpr);
+    const h = Math.floor(innerHeight * dpr);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+  }
+
+  function tick(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    update(dt);
+    rememberGamepads();
+    render();
+    pressed.clear();
+    requestAnimationFrame(tick);
   }
 
   addEventListener("keydown", e => {
@@ -3218,22 +2627,19 @@
     if (!keys.has(e.code)) pressed.add(e.code);
     keys.add(e.code);
     if (e.code === "KeyM") toggleMusic();
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter", "NumpadEnter"].includes(e.code)) e.preventDefault();
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter", "NumpadEnter", "Slash"].includes(e.code)) e.preventDefault();
   });
+  addEventListener("keyup", e => keys.delete(e.code));
   addEventListener("pointerdown", ensureAudio);
   addEventListener("pagehide", stopAudio);
   addEventListener("beforeunload", stopAudio);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) stopAudio();
-  });
-  addEventListener("keyup", e => keys.delete(e.code));
-  addEventListener("gamepadconnected", e => showToast(`${e.gamepad.id.split("(")[0].trim() || "Controller"} detected`));
+  document.addEventListener("visibilitychange", () => { if (document.hidden) stopMusic(); else if (world.state !== "menu") startMusic(); });
+  addEventListener("gamepadconnected", e => showToast(`${e.gamepad.id.split("(")[0].trim() || "Controller"} detected — press a button to join`));
   addEventListener("gamepaddisconnected", e => {
-    gamepadSlots.delete(e.gamepad.index);
     const slotIndex = lobbySlots.findIndex(slot => slot.gamepadIndex === e.gamepad.index);
     if (slotIndex >= 0) lobbySlots.splice(slotIndex, 1);
     for (const p of players) if (p.gamepadIndex === e.gamepad.index) p.gamepadIndex = null;
-    renderLobbySlots();
+    renderLobby();
     showToast("Controller disconnected");
   });
 
@@ -3250,13 +2656,8 @@
   }
 
   bindUi();
-  renderLobbySlots();
-  renderOnlineGames();
-  ensureInstant().catch(() => {});
+  renderLobby();
   syncMusicButtons();
   setMenuIndex(0);
-  for (let i = 0; i < 80; i += 1) {
-    particles.push({ x: rand(0, world.width), y: rand(0, world.height), vx: rand(-20, 20), vy: rand(-10, 10), life: rand(1, 4), maxLife: 4, r: rand(1, 3), color: "rgba(255,255,255,0.25)" });
-  }
   requestAnimationFrame(tick);
 })();

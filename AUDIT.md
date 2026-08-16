@@ -146,6 +146,18 @@ step, a bounce pad, or an elevator.
 | Static Circus | High-wire poles with tiny top plates; **two single-chain trapezes**; prop crates. |
 | Voidfall | Obelisks with cap perches on both islands; shard platform hung over the void (cut it and the void keeps it); breakable rune plates. |
 
+### Follow-up pass: scale, ballistics, lob arenas
+
+A second comparison round against ROUNDS, focused on proportions rather than
+terrain vocabulary.
+
+| # | Finding | Resolution |
+|---|---|---|
+| L6 | ROUNDS varies map scale — tight pillar boxes up to wide fields where the ball reads small (roughly 30–45 character-diameters of width). Every one of our arenas was exactly 1600×900 (~30 diameters at radius 27): the small end of the range, with zero variety. | ✅ Per-level playfield size (`size:{w,h}`, whole level always framed). Two tight arenas at 1460×820 (Glimmer Hollow, Sugar Rush — fighters ~10% bigger), fifteen standard, and eight grand from 1760×990 to 2000×1000 (fighters up to ~20% smaller): Neon Skyline, Orbital Drift, Sirocco Canyon, Thunderhead Perch, Bonepit Arena, Aurora Summit, Rustyard, Tidal Wreck. |
+| L7 | **CRITICAL** — Lobbing didn't exist as a tactic. Default bullets (speed 980, gravity 1300) have a *maximum* ballistic range of v²/g ≈ 740px — under half an arena — so every duel collapsed to close range; bullet life (2.7s vs drag) also capped travel below a grand arena's width. ROUNDS defaults are faster with flatter drop, and arcing over cover is core play. | ✅ Speed 980→1180, gravity 1300→1050 (max arc ≈ 1330px — clears mid-map cover and reaches across, while flat shots still drop visibly), life 2.7→3.2s, bullet radius trimmed (7.8→7.1 at base damage). Bot lead and parry speed follow the stat automatically. |
+| L8 | No arena offered ROUNDS' "open top" duel: empty sky above low cover, where the fight is arcs lobbed over the middle while both sides shuffle behind something. Most tops were capped by a high platform. | ✅ Seven explicit **lob arenas**, marked in `js/levels.js`: Sirocco Canyon (mesa tops + crates, wind), Thunderhead Perch (islands under a storm that punishes the one high perch), Bonepit Arena (floor duel over the hanging cage), Aurora Summit (peak rains arcs down onto the crated lowland), Orbital Drift (slow-motion low-g artillery), Tidal Wreck (shore-to-shore over the mast), Rustyard (over the crane); plus Koi Temple's sky opened above the gate beam. Their upper tiers were removed on purpose — the file says not to fill the sky back in. |
+| L9 | Ammo pips arced perpendicular around the body, away from where the eye tracks the shot. | ✅ Pips now sit in a straight row just above the weapon barrel, on the screen-up side, running along the aim. |
+
 ### Verified
 
 - Static validator over all 25 arenas: spawns above ground and outside solids,

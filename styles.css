@@ -663,6 +663,65 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 
 @keyframes toast-in { from { transform: translate(-50%, -14px); opacity: 0; } }
 
+/* ----------------------------------------------------------- now playing */
+.now-playing {
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 20px;
+  background: rgba(14, 11, 24, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  z-index: 22;
+  opacity: 0.72;
+  transition: opacity 0.18s ease;
+  user-select: none;
+}
+
+.now-playing:hover { opacity: 1; }
+.now-playing.muted .np-name { opacity: 0.45; text-decoration: line-through; }
+
+.np-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--lemon);
+  padding: 0 4px;
+  max-width: 190px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--paper);
+  font-size: 10px;
+  line-height: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.np-btn:hover { background: rgba(255, 255, 255, 0.2); }
+.np-btn:active { transform: scale(0.92); }
+.np-btn:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
+
+@media (max-width: 760px) {
+  .np-name { max-width: 110px; }
+}
+
 /* small screens */
 @media (max-width: 760px) {
   .panel { padding: 22px 20px; }

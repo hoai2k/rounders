@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname);
@@ -33,9 +34,48 @@ createServer(async (request, response) => {
       response.end("Forbidden");
       return;
     }
+    const type = types[extname(file)] || "application/octet-stream";
+    const media = type.startsWith("audio/") || type.startsWith("video/");
+
+    // Media is streamed with byte-range support so a multi-megabyte track
+    // starts playing immediately instead of being buffered whole.
+    if (media) {
+      const { size } = await stat(file);
+      const headers = {
+        "content-type": type,
+        "accept-ranges": "bytes",
+        "cache-control": "public, max-age=86400"
+      };
+      const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range || "");
+      let start = 0;
+      let end = size - 1;
+      if (range) {
+        if (range[1] === "" && range[2] === "") { start = 0; }
+        else if (range[1] === "") { start = Math.max(0, size - Number(range[2])); }
+        else {
+          start = Number(range[1]);
+          if (range[2] !== "") end = Math.min(end, Number(range[2]));
+        }
+        if (start > end || start >= size) {
+          response.writeHead(416, { "content-range": `bytes */${size}` });
+          response.end();
+          return;
+        }
+        headers["content-range"] = `bytes ${start}-${end}/${size}`;
+      }
+      headers["content-length"] = String(end - start + 1);
+      response.writeHead(range ? 206 : 200, headers);
+      if (request.method === "HEAD") { response.end(); return; }
+      const stream = createReadStream(file, { start, end });
+      stream.on("error", () => response.destroy());
+      response.on("close", () => stream.destroy());
+      stream.pipe(response);
+      return;
+    }
+
     const body = await readFile(file);
     response.writeHead(200, {
-      "content-type": types[extname(file)] || "application/octet-stream",
+      "content-type": type,
       "cache-control": "no-store"
     });
     response.end(body);

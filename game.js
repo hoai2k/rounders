@@ -94,10 +94,15 @@
   let audioCtx = null;
   let masterGain = null;
   let musicAudio = null;
-  let currentTrack = 0;
   let hudRefs = [];
 
-  const soundtrack = ["assets/audio/Apex_Pursuit.mp3", "assets/audio/The_Last_Overpass.mp3"];
+  const MUSIC = window.ROUNDERS.MUSIC;
+  const musicState = {
+    index: MUSIC.titleIndex,
+    context: "menu", // "menu" (title/lobby/settings) or "battle"
+    preload: null,   // { index, el } streamed ahead so a skip starts instantly
+    started: false
+  };
 
   // ------------------------------------------------------------------ stats
   function defaultStats() {
@@ -360,11 +365,12 @@
   // ------------------------------------------------------------------ match
   function startMatch() {
     ensureAudio();
-    startMusic();
     if (lobbySlots.length < 2) {
+      startMusic();
       showToast("Need at least 2 fighters — join up or add a bot");
       return;
     }
+    setMusicContext("battle");
     players = lobbySlots.map((slot, i) => {
       const p = makePlayer(i, slot);
       if (slot.type === "bot") p.name = `${p.character.name} (Bot)`;
@@ -392,7 +398,7 @@
     titleScreen.classList.add("hidden");
     menu.classList.remove("hidden");
     ensureAudio();
-    startMusic();
+    setMusicContext("menu");
     sfx("card");
     renderLobby();
     setMenuIndex(0);
@@ -1686,7 +1692,8 @@
   }
 
   function applyMusicVolume() {
-    if (musicAudio) musicAudio.volume = settings.musicVolume * (world.musicDucked ? 0.22 : 1);
+    if (musicAudio) musicAudio.volume = musicGain();
+    if (musicState.preload) musicState.preload.el.volume = musicGain();
   }
 
   function returnToMainMenu() {
@@ -1697,6 +1704,7 @@
     hud.innerHTML = "";
     hudRefs = [];
     duckMusic(false);
+    setMusicContext("menu");
     world.state = "menu";
     world.panelReturn = "menu";
     world.winner = null;
@@ -2573,34 +2581,139 @@
     masterGain.connect(audioCtx.destination);
   }
 
+  // Tracks are streamed: the element gets a src and starts as soon as enough
+  // has buffered, so a multi-megabyte file never blocks the game loop. The
+  // next track in list order is warmed in the background for instant skips.
+  function makeTrackAudio(index) {
+    const el = new Audio();
+    el.preload = "auto";
+    el.loop = false;
+    el.volume = musicGain();
+    el.src = MUSIC.tracks[index].url;
+    el.load();
+    return el;
+  }
+
+  function musicGain() {
+    return settings.musicVolume * (world.musicDucked ? 0.22 : 1);
+  }
+
+  function wrapTrack(index) {
+    const n = MUSIC.tracks.length;
+    return ((index % n) + n) % n;
+  }
+
+  function takeAudioFor(index) {
+    if (musicState.preload && musicState.preload.index === index) {
+      const el = musicState.preload.el;
+      musicState.preload = null;
+      el.volume = musicGain();
+      return el;
+    }
+    return makeTrackAudio(index);
+  }
+
+  function warmNextTrack(index) {
+    const next = wrapTrack(index + 1);
+    if (musicState.preload && musicState.preload.index === next) return;
+    releasePreload();
+    musicState.preload = { index: next, el: makeTrackAudio(next) };
+    musicState.preload.el.pause();
+  }
+
+  function releasePreload() {
+    if (!musicState.preload) return;
+    const el = musicState.preload.el;
+    el.pause();
+    el.removeAttribute("src");
+    el.load();
+    musicState.preload = null;
+  }
+
+  function onTrackEnded() {
+    if (musicState.context === "battle") playTrack(randomBattleTrack());
+    else playTrack(musicState.index, true);
+  }
+
+  // Any track except the title theme, and never the one just played.
+  function randomBattleTrack() {
+    const pool = [];
+    for (let i = 0; i < MUSIC.tracks.length; i++) {
+      if (i === MUSIC.titleIndex) continue;
+      if (i === musicState.index) continue;
+      pool.push(i);
+    }
+    if (!pool.length) return wrapTrack(MUSIC.titleIndex + 1);
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function playTrack(index, restart = false) {
+    index = wrapTrack(index);
+    const same = musicAudio && musicState.index === index && !restart;
+    if (!same) {
+      if (musicAudio) {
+        musicAudio.pause();
+        musicAudio.removeEventListener("ended", onTrackEnded);
+        musicAudio.removeAttribute("src");
+        musicAudio.load();
+      }
+      musicAudio = takeAudioFor(index);
+      musicAudio.addEventListener("ended", onTrackEnded);
+      musicState.index = index;
+    } else if (restart) {
+      musicAudio.currentTime = 0;
+    }
+    musicState.started = true;
+    applyMusicVolume();
+    renderNowPlaying();
+    if (settings.music) musicAudio.play().catch(() => {});
+    warmNextTrack(index);
+  }
+
+  // "menu" keeps the title theme; "battle" rolls a fresh non-title track.
+  function setMusicContext(context) {
+    const changed = musicState.context !== context;
+    musicState.context = context;
+    if (context === "battle") { playTrack(randomBattleTrack()); return; }
+    if (changed || !musicState.started) playTrack(MUSIC.titleIndex);
+    else startMusic();
+  }
+
+  function skipTrack(step) {
+    ensureAudio();
+    playTrack(musicState.index + step, true);
+    if (!settings.music) showToast("Music is off — press M to turn it on");
+  }
+
   function startMusic() {
     if (!settings.music) return;
-    if (!musicAudio) makeMusicAudio();
-    musicAudio.play().catch(() => {});
+    if (!musicAudio) playTrack(musicState.index);
+    else musicAudio.play().catch(() => {});
   }
-  function makeMusicAudio() {
-    musicAudio = new Audio(soundtrack[currentTrack % soundtrack.length]);
-    musicAudio.loop = false;
-    musicAudio.volume = settings.musicVolume * (world.musicDucked ? 0.22 : 1);
-    musicAudio.preload = "auto";
-    musicAudio.addEventListener("ended", () => {
-      currentTrack = (currentTrack + 1) % soundtrack.length;
-      musicAudio = null;
-      startMusic();
-    });
+  function pauseMusic() {
+    if (musicAudio) musicAudio.pause();
   }
   function stopMusic() {
     if (musicAudio) { musicAudio.pause(); musicAudio.currentTime = 0; }
   }
   function stopAudio() {
-    stopMusic();
+    pauseMusic();
+    releasePreload();
     if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; masterGain = null; }
   }
   function toggleMusic() {
     settings.music = !settings.music;
     if (settings.music) { ensureAudio(); startMusic(); showToast("Music on"); }
-    else { stopMusic(); showToast("Music off"); }
+    else { pauseMusic(); showToast("Music off"); }
     syncMusicButtons();
+    renderNowPlaying();
+  }
+  function renderNowPlaying() {
+    const label = document.getElementById("nowPlayingName");
+    if (!label) return;
+    label.textContent = MUSIC.tracks[musicState.index].name;
+    const bar = document.getElementById("nowPlaying");
+    if (bar) bar.classList.toggle("muted", !settings.music);
   }
   function syncMusicButtons() {
     const label = `Music: ${settings.music ? "On" : "Off"}`;
@@ -2689,6 +2802,8 @@
     document.getElementById("resumeBtn").addEventListener("click", () => togglePause(false));
     document.getElementById("pauseFullscreenBtn").addEventListener("click", toggleFullscreen);
     document.getElementById("pauseMusicBtn").addEventListener("click", toggleMusic);
+    document.getElementById("musicPrev").addEventListener("click", () => skipTrack(-1));
+    document.getElementById("musicNext").addEventListener("click", () => skipTrack(1));
     document.getElementById("pauseMenuBtn").addEventListener("click", returnToMainMenu);
     document.getElementById("settingsBtn").addEventListener("click", () => openPanel(settingsPanel, "settings"));
     document.getElementById("howBtn").addEventListener("click", () => openPanel(howPanel, "how"));
@@ -2806,7 +2921,8 @@
   addEventListener("pagehide", stopAudio);
   addEventListener("beforeunload", stopAudio);
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) stopMusic();
+    // pause, don't stop — coming back mid-track should not restart the song
+    if (document.hidden) pauseMusic();
     else if (world.state !== "title") startMusic();
   });
   addEventListener("gamepadconnected", e => {
@@ -2841,5 +2957,6 @@
   bindUi();
   renderLobby();
   syncMusicButtons();
+  renderNowPlaying();
   requestAnimationFrame(tick);
 })();

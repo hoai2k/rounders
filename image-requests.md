@@ -183,5 +183,36 @@ background, no text.* Files go in `assets/images/cards/<id>.png`.
 
 ---
 
-**Total: 97 images** (2 branding + 6 frames + 12 characters + 25 arenas + 52 card icons).
+**Total: 109 images** (2 branding + 6 frames + 24 characters across two rounds + 25 arenas + 52 card icons).
 Priority order if generating in batches: characters → rarity frames → arenas → logo → card icons.
+
+---
+
+## 6. Round 2 — Characters (12 images, indie-badass roster)
+
+A second wave of fighters that leads the roster: sharper, moodier, more dangerous —
+neon-noir and wasteland grit in the spirit of indie brawlers, while keeping the
+exact same format as Round 1 (**round ball body, tiny nub arms, signature weapon
+protruding to the right, thick outline, transparent PNG 512×512, body sphere
+centered at ~80% of frame height, weapon extends into the right margin**).
+
+Round 2 base prompt: *Round ball-shaped cartoon fighter with an indie-badass
+attitude — moody, cool, battle-worn — big glossy body sphere, tiny nub arms,
+expressive eyes, signature weapon protruding to the right, thick outline, flat
+saturated colors with one neon accent, subtle scuffs and scratches, transparent
+background.*
+
+| File | Character | Prompt additions |
+|---|---|---|
+| `assets/images/characters/vex.png` | **Vex** — the neon reaper | Deep-magenta ball with a blazing neon-pink mohawk, one eye replaced by a pale X scar, deadpan stare, wicked scythe-gun with a curved glowing blade. |
+| `assets/images/characters/rook.png` | **Rook** — the wasteland warden | Gunmetal-grey ball with a riveted rust-orange armor plate bolted over its crown, black eyepatch over one eye, weary glare, brutal double-barrel sawn-off shotgun. |
+| `assets/images/characters/jinx.png` | **Jinx** — the glitch witch | Near-black navy ball flickering with cyan-and-magenta glitch shards at its edges, square pixelated cyan eyes, mischievous static grin, corrupted pixel-cannon leaking datamosh artifacts. |
+| `assets/images/characters/diesel.png` | **Diesel** — the road king | Oxblood-leather ball with a chrome spiked collar-band, scuffed aviator goggles pushed up, oil smudge on one cheek, roaring twin-exhaust flame-thrower with heat shimmer. |
+| `assets/images/characters/nyx.png` | **Nyx** — the void dancer | Dark-indigo ball wrapped in a star-speckled hood casting its face in shadow, two pale violet eye-slits glowing from the dark, sleek twin-dagger launcher with one blade mid-eject. |
+| `assets/images/characters/saber.png` | **Saber** — the last ronin | Deep-crimson ball with a tight black topknot and a pale scar across one stern eye, unshakable calm, elegant katana held blade-forward with a bone-white wrapped hilt. |
+| `assets/images/characters/havoc.png` | **Havoc** — the demolition artist | Khaki ball wrapped in black-and-yellow hazard tape with a lit fuse sprouting from the top, one wide manic eye and one squinting, too-happy grin, chunky drum grenade launcher. |
+| `assets/images/characters/wraith.png` | **Wraith** — the static ghost | Pale sage-grey semi-translucent ball with tattered wisps trailing off its crown, two hollow black eyes, faint spectral drip, long ethereal rifle glowing mint-green at the seams. |
+| `assets/images/characters/blitz.png` | **Blitz** — the arc runner | Electric-yellow ball with two swept-back blue lightning horns, fierce race-day eyes, speed-scuffed outline, humming coilgun with charged blue rings along the barrel. |
+| `assets/images/characters/fang.png` | **Fang** — the stray | Steel-blue ball with sharp battle-notched wolf ears, narrow feral red eyes, one visible fang, chain-blade launcher with a length of chain whipping behind it. |
+| `assets/images/characters/onyx.png` | **Onyx** — the magma golem | Obsidian-black stone ball cracked with glowing magma seams, jagged rock shards for a crown, slow-burning ember eyes, massive rock-knuckled gauntlet cannon. |
+| `assets/images/characters/riot.png` | **Riot** — the paint prophet | Dark-teal ball wearing a backwards cap and a paint-splattered bandana over its mouth, defiant eyes, neon-pink paint drips, rapid-fire spray-paint gatling with a rainbow mist. |

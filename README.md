@@ -66,6 +66,7 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 
 - `PROJECT-STATE.md` — workstream tracker for the redesign
 - `image-requests.md` — prompts + file paths for all optional generated art
+- `intake/README.md` — how to bring delivered art into the game
 - `AUDIT.md` — variety/balance audit findings
 - `CLAUDE.md` — repo policies
 
@@ -78,6 +79,8 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 | `js/levels.js` | The 25 arenas |
 | `js/characters.js` | The 24 characters + procedural renderer |
 | `js/rig.js` | Composed sprites: loads body/weapon/arm parts, detects anchors, draws the aimable rig |
-| `workbench/` | Sprite workbench — tune anchors and weapon/hand placement, export `rigs.json` |
+| `js/chroma.js` | Backdrop keying (magenta/green screen → transparent), shared by intake and runtime |
+| `tools/intake.mjs` | `npm run intake` — keys and files delivered art, keeps originals in `art-source/` |
+| `workbench/` | Sprite workbench (anchors + weapon/hand placement → `rigs.json`) and art intake page |
 | `index.html`, `styles.css` | UI |
 | `server.mjs` | Zero-dependency static server |

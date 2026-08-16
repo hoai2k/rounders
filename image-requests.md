@@ -12,6 +12,12 @@ so images can be generated and dropped in incrementally — any missing file is 
 ## File conventions
 
 - Drop files at the exact paths below (create folders as needed).
+- **Backgrounds:** transparent is preferred, but a flat backdrop is fine — drop
+  those files in `intake/` and run `npm run intake` (or use
+  `/workbench/intake.html`), which keys the backdrop out, writes a transparent
+  PNG to the right path, and keeps the delivered file in `art-source/`. Use a
+  backdrop color the art does not contain (magenta `#ff00ff` for cool art, green
+  `#00ff00` for warm art) and keep it perfectly flat — no gradient, no shadow.
 - **Characters:** transparent PNG, 512×512. The **body sphere** must be centered with its diameter ~80% of frame height; the weapon extends into the right margin (the game centers the frame on the body's physics center).
 - **Arena backdrops:** PNG or JPG, 1600×900, painterly background only (no platforms,
   no characters) — the game draws platforms/hazards on top, so keep the middle third
@@ -63,18 +69,18 @@ protruding to the right, thick outline, flat vibrant colors, transparent backgro
 
 | File | Character | Prompt additions |
 |---|---|---|
-| `assets/images/characters/pip.png` | **Pip** — the cheerful rookie | Tangerine-orange ball with a single green sprout-leaf antenna on top, wide optimistic eyes, holding a simple wooden pea-shooter with a cork in the barrel. |
-| `assets/images/characters/bolt.png` | **Bolt** — the livewire | Electric-blue ball with a yellow lightning-bolt fin on its head, one eye squinting with excitement, crackling tesla blaster with a glowing coil. |
-| `assets/images/characters/mochi.png` | **Mochi** — the soft menace | Pastel-pink squishy ball with cat ears and a tiny fang, sleepy smug eyes, bubble gun with a soap-bubble half-emerged from the barrel. |
-| `assets/images/characters/gruff.png` | **Gruff** — the old guard | Moss-green ball with curling ram horns and bushy grey eyebrows, unimpressed stare, antique brass blunderbuss with a flared bell muzzle. |
-| `assets/images/characters/nova.png` | **Nova** — the star child | Deep-violet ball speckled with constellation freckles, wearing a translucent star-shaped visor, serene glowing eyes, sleek chrome ray gun with rings. |
-| `assets/images/characters/fizz.png` | **Fizz** — the shaken soda | Lime-green translucent ball with rising bubbles inside and a bottle-cap hat, giddy cross-eyed grin, soda-spray cannon with a pump handle. |
-| `assets/images/characters/ember.png` | **Ember** — the hothead | Crimson ball with a living flame crest for hair, fierce eager eyes, snub flare pistol with a lit fuse and smoke wisp. |
-| `assets/images/characters/glacia.png` | **Glacia** — the cold shoulder | Ice-white ball with a jagged icicle crown and frosty blue cheeks, calm half-lidded eyes, crystalline frost rifle with icy vapor. |
-| `assets/images/characters/shade.png` | **Shade** — the silent bet | Slate-grey ball wearing a tattered dark ninja headband, two narrow glowing violet slit eyes, compact kunai launcher with a blade half-ejected. |
-| `assets/images/characters/duke.png` | **Duke** — the aristocrat | Cream-and-gold ball with a monocle, thin mustache and tiny top hat, haughty raised brow, engraved ivory dueling long-rifle. |
-| `assets/images/characters/sprocket.png` | **Sprocket** — the wind-up wonder | Copper clockwork ball with visible gears through a porthole, a wind-up key on top, cheerful LED eyes, chunky riveted rivet-gun. |
-| `assets/images/characters/luna.png` | **Luna** — the moth queen | Teal ball with feathery antennae and small glowing moth wings, gentle luminous eyes, compact prism blaster with a diamond crystal muzzle refracting a rainbow glint. |
+| `assets/images/characters/canonical/pip.png` | **Pip** — the cheerful rookie | Tangerine-orange ball with a single green sprout-leaf antenna on top, wide optimistic eyes, holding a simple wooden pea-shooter with a cork in the barrel. |
+| `assets/images/characters/canonical/bolt.png` | **Bolt** — the livewire | Electric-blue ball with a yellow lightning-bolt fin on its head, one eye squinting with excitement, crackling tesla blaster with a glowing coil. |
+| `assets/images/characters/canonical/mochi.png` | **Mochi** — the soft menace | Pastel-pink squishy ball with cat ears and a tiny fang, sleepy smug eyes, bubble gun with a soap-bubble half-emerged from the barrel. |
+| `assets/images/characters/canonical/gruff.png` | **Gruff** — the old guard | Moss-green ball with curling ram horns and bushy grey eyebrows, unimpressed stare, antique brass blunderbuss with a flared bell muzzle. |
+| `assets/images/characters/canonical/nova.png` | **Nova** — the star child | Deep-violet ball speckled with constellation freckles, wearing a translucent star-shaped visor, serene glowing eyes, sleek chrome ray gun with rings. |
+| `assets/images/characters/canonical/fizz.png` | **Fizz** — the shaken soda | Lime-green translucent ball with rising bubbles inside and a bottle-cap hat, giddy cross-eyed grin, soda-spray cannon with a pump handle. |
+| `assets/images/characters/canonical/ember.png` | **Ember** — the hothead | Crimson ball with a living flame crest for hair, fierce eager eyes, snub flare pistol with a lit fuse and smoke wisp. |
+| `assets/images/characters/canonical/glacia.png` | **Glacia** — the cold shoulder | Ice-white ball with a jagged icicle crown and frosty blue cheeks, calm half-lidded eyes, crystalline frost rifle with icy vapor. |
+| `assets/images/characters/canonical/shade.png` | **Shade** — the silent bet | Slate-grey ball wearing a tattered dark ninja headband, two narrow glowing violet slit eyes, compact kunai launcher with a blade half-ejected. |
+| `assets/images/characters/canonical/duke.png` | **Duke** — the aristocrat | Cream-and-gold ball with a monocle, thin mustache and tiny top hat, haughty raised brow, engraved ivory dueling long-rifle. |
+| `assets/images/characters/canonical/sprocket.png` | **Sprocket** — the wind-up wonder | Copper clockwork ball with visible gears through a porthole, a wind-up key on top, cheerful LED eyes, chunky riveted rivet-gun. |
+| `assets/images/characters/canonical/luna.png` | **Luna** — the moth queen | Teal ball with feathery antennae and small glowing moth wings, gentle luminous eyes, compact prism blaster with a diamond crystal muzzle refracting a rainbow glint. |
 
 ## 4. Arena backdrops (25 images)
 
@@ -219,15 +225,15 @@ and `<id>_arm.png` on the identical canvas into
 
 | File | Character | Prompt additions |
 |---|---|---|
-| `assets/images/characters/vex.png` | **Vex** — the neon reaper | Deep-magenta ball with a blazing neon-pink mohawk, one eye replaced by a pale X scar, deadpan stare, wicked scythe-gun with a curved glowing blade. |
-| `assets/images/characters/rook.png` | **Rook** — the wasteland warden | Gunmetal-grey ball with a riveted rust-orange armor plate bolted over its crown, black eyepatch over one eye, weary glare, brutal double-barrel sawn-off shotgun. |
-| `assets/images/characters/jinx.png` | **Jinx** — the glitch witch | Near-black navy ball flickering with cyan-and-magenta glitch shards at its edges, square pixelated cyan eyes, mischievous static grin, corrupted pixel-cannon leaking datamosh artifacts. |
-| `assets/images/characters/diesel.png` | **Diesel** — the road king | Oxblood-leather ball with a chrome spiked collar-band, scuffed aviator goggles pushed up, oil smudge on one cheek, roaring twin-exhaust flame-thrower with heat shimmer. |
-| `assets/images/characters/nyx.png` | **Nyx** — the void dancer | Dark-indigo ball wrapped in a star-speckled hood casting its face in shadow, two pale violet eye-slits glowing from the dark, sleek twin-dagger launcher with one blade mid-eject. |
-| `assets/images/characters/saber.png` | **Saber** — the last ronin | Deep-crimson ball with a tight black topknot and a pale scar across one stern eye, unshakable calm, elegant katana held blade-forward with a bone-white wrapped hilt. |
-| `assets/images/characters/havoc.png` | **Havoc** — the demolition artist | Khaki ball wrapped in black-and-yellow hazard tape with a lit fuse sprouting from the top, one wide manic eye and one squinting, too-happy grin, chunky drum grenade launcher. |
-| `assets/images/characters/wraith.png` | **Wraith** — the static ghost | Pale sage-grey semi-translucent ball with tattered wisps trailing off its crown, two hollow black eyes, faint spectral drip, long ethereal rifle glowing mint-green at the seams. |
-| `assets/images/characters/blitz.png` | **Blitz** — the arc runner | Electric-yellow ball with two swept-back blue lightning horns, fierce race-day eyes, speed-scuffed outline, humming coilgun with charged blue rings along the barrel. |
-| `assets/images/characters/fang.png` | **Fang** — the stray | Steel-blue ball with sharp battle-notched wolf ears, narrow feral red eyes, one visible fang, chain-blade launcher with a length of chain whipping behind it. |
-| `assets/images/characters/onyx.png` | **Onyx** — the magma golem | Obsidian-black stone ball cracked with glowing magma seams, jagged rock shards for a crown, slow-burning ember eyes, massive rock-knuckled gauntlet cannon. |
-| `assets/images/characters/riot.png` | **Riot** — the paint prophet | Dark-teal ball wearing a backwards cap and a paint-splattered bandana over its mouth, defiant eyes, neon-pink paint drips, rapid-fire spray-paint gatling with a rainbow mist. |
+| `assets/images/characters/canonical/vex.png` | **Vex** — the neon reaper | Deep-magenta ball with a blazing neon-pink mohawk, one eye replaced by a pale X scar, deadpan stare, wicked scythe-gun with a curved glowing blade. |
+| `assets/images/characters/canonical/rook.png` | **Rook** — the wasteland warden | Gunmetal-grey ball with a riveted rust-orange armor plate bolted over its crown, black eyepatch over one eye, weary glare, brutal double-barrel sawn-off shotgun. |
+| `assets/images/characters/canonical/jinx.png` | **Jinx** — the glitch witch | Near-black navy ball flickering with cyan-and-magenta glitch shards at its edges, square pixelated cyan eyes, mischievous static grin, corrupted pixel-cannon leaking datamosh artifacts. |
+| `assets/images/characters/canonical/diesel.png` | **Diesel** — the road king | Oxblood-leather ball with a chrome spiked collar-band, scuffed aviator goggles pushed up, oil smudge on one cheek, roaring twin-exhaust flame-thrower with heat shimmer. |
+| `assets/images/characters/canonical/nyx.png` | **Nyx** — the void dancer | Dark-indigo ball wrapped in a star-speckled hood casting its face in shadow, two pale violet eye-slits glowing from the dark, sleek twin-dagger launcher with one blade mid-eject. |
+| `assets/images/characters/canonical/saber.png` | **Saber** — the last ronin | Deep-crimson ball with a tight black topknot and a pale scar across one stern eye, unshakable calm, elegant katana held blade-forward with a bone-white wrapped hilt. |
+| `assets/images/characters/canonical/havoc.png` | **Havoc** — the demolition artist | Khaki ball wrapped in black-and-yellow hazard tape with a lit fuse sprouting from the top, one wide manic eye and one squinting, too-happy grin, chunky drum grenade launcher. |
+| `assets/images/characters/canonical/wraith.png` | **Wraith** — the static ghost | Pale sage-grey semi-translucent ball with tattered wisps trailing off its crown, two hollow black eyes, faint spectral drip, long ethereal rifle glowing mint-green at the seams. |
+| `assets/images/characters/canonical/blitz.png` | **Blitz** — the arc runner | Electric-yellow ball with two swept-back blue lightning horns, fierce race-day eyes, speed-scuffed outline, humming coilgun with charged blue rings along the barrel. |
+| `assets/images/characters/canonical/fang.png` | **Fang** — the stray | Steel-blue ball with sharp battle-notched wolf ears, narrow feral red eyes, one visible fang, chain-blade launcher with a length of chain whipping behind it. |
+| `assets/images/characters/canonical/onyx.png` | **Onyx** — the magma golem | Obsidian-black stone ball cracked with glowing magma seams, jagged rock shards for a crown, slow-burning ember eyes, massive rock-knuckled gauntlet cannon. |
+| `assets/images/characters/canonical/riot.png` | **Riot** — the paint prophet | Dark-teal ball wearing a backwards cap and a paint-splattered bandana over its mouth, defiant eyes, neon-pink paint drips, rapid-fire spray-paint gatling with a rainbow mist. |

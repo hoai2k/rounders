@@ -38,7 +38,10 @@
       e.pending += 1;
       const img = new Image();
       img.onload = () => {
-        e[part] = img;
+        // Parts that arrived without going through intake may still carry a
+        // solid backdrop; key it before anything measures the alpha channel.
+        const chroma = window.ROUNDERS.chroma;
+        e[part] = (chroma && chroma.keyImage(img)) || img;
         settle(e);
       };
       img.onerror = () => settle(e);

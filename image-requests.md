@@ -12,7 +12,7 @@ so images can be generated and dropped in incrementally — any missing file is 
 ## File conventions
 
 - Drop files at the exact paths below (create folders as needed).
-- **Characters:** transparent PNG, 512×512, character centered, fills ~80% of frame.
+- **Characters:** transparent PNG, 512×512. The **body sphere** must be centered with its diameter ~80% of frame height; the weapon extends into the right margin (the game centers the frame on the body's physics center).
 - **Arena backdrops:** PNG or JPG, 1600×900, painterly background only (no platforms,
   no characters) — the game draws platforms/hazards on top, so keep the middle third
   relatively calm and keep contrast low enough that bright players read against it.
@@ -60,10 +60,10 @@ protruding to the right, thick outline, flat vibrant colors, transparent backgro
 | `assets/images/characters/fizz.png` | **Fizz** — the shaken soda | Lime-green translucent ball with rising bubbles inside and a bottle-cap hat, giddy cross-eyed grin, soda-spray cannon with a pump handle. |
 | `assets/images/characters/ember.png` | **Ember** — the hothead | Crimson ball with a living flame crest for hair, fierce eager eyes, snub flare pistol with a lit fuse and smoke wisp. |
 | `assets/images/characters/glacia.png` | **Glacia** — the cold shoulder | Ice-white ball with a jagged icicle crown and frosty blue cheeks, calm half-lidded eyes, crystalline frost rifle with icy vapor. |
-| `assets/images/characters/shade.png` | **Shade** — the silent bet | Charcoal-black ball wearing a tattered indigo ninja headband, one glowing slit eye, compact kunai launcher with a blade half-ejected. |
+| `assets/images/characters/shade.png` | **Shade** — the silent bet | Slate-grey ball wearing a tattered dark ninja headband, two narrow glowing violet slit eyes, compact kunai launcher with a blade half-ejected. |
 | `assets/images/characters/duke.png` | **Duke** — the aristocrat | Cream-and-gold ball with a monocle, thin mustache and tiny top hat, haughty raised brow, engraved ivory dueling long-rifle. |
 | `assets/images/characters/sprocket.png` | **Sprocket** — the wind-up wonder | Copper clockwork ball with visible gears through a porthole, a wind-up key on top, cheerful LED eyes, chunky riveted rivet-gun. |
-| `assets/images/characters/luna.png` | **Luna** — the moth queen | Teal ball with feathery antennae and small glowing moth wings, gentle luminous eyes, elegant prism bow-caster refracting a rainbow beam. |
+| `assets/images/characters/luna.png` | **Luna** — the moth queen | Teal ball with feathery antennae and small glowing moth wings, gentle luminous eyes, compact prism blaster with a diamond crystal muzzle refracting a rainbow glint. |
 
 ## 4. Arena backdrops (25 images)
 
@@ -94,7 +94,7 @@ central area, no platforms, no characters, no text.*
 | `assets/images/arenas/hexwood-glade.png` | **Hexwood Glade** | Crooked witch-forest clearing, gnarled trees with lantern eyes, drifting will-o-wisps, a cauldron's green glow, deep plum and toxic green. |
 | `assets/images/arenas/tidal-wreck.png` | **Tidal Wreck** | Broken galleon on a reef, tide pools, treasure spilling from a cracked hull, storm light breaking through clouds, teal and driftwood grey. |
 | `assets/images/arenas/lantern-festival.png` | **Lantern Festival** | Night festival over a river, hundreds of floating paper lanterns rising, fireworks blooming far away, warm crimson and gold on indigo. |
-| `assets/images/arenas/magma-lift.png` | **Magma Lift** | Vertical mineshaft with industrial elevator rails, lava glow rising from below, warning stripes, steam vents, black rock and hazard yellow. |
+| `assets/images/arenas/magma-lift.png` | **Ion Lift** | Vertical obsidian mineshaft with industrial elevator rails, cold blue plasma glow rising from below, crackling ion arcs, warning stripes, steam vents, black rock and electric cyan. |
 | `assets/images/arenas/cloud-nine.png` | **Cloud Nine** | Heavenly daytime skyscape of fluffy cumulus terraces, marble column fragments, doves, rainbows, white and sky-blue with gold trim. |
 | `assets/images/arenas/static-circus.png` | **Static Circus** | Inside a big-top circus tent at night, striped canvas, trapeze and rings, spotlight beams crossing, popcorn confetti, red and cream palette. |
 | `assets/images/arenas/voidfall.png` | **Voidfall** | Shattered islands of obsidian drifting in a star-swallowing violet void, a distant black hole with an accretion ring, unreal purples and cyans. |

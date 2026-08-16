@@ -14,7 +14,7 @@
     { id: "mochi", name: "Mochi", title: "the soft menace", blurb: "Looks like dessert. Fights like a landlord.",
       color: "#ffa8c8", dark: "#d76a95", accent: "#fff0f6", crest: "ears", eyes: "smug", weapon: "bubble" },
     { id: "gruff", name: "Gruff", title: "the old guard", blurb: "Has seen every trick. Invented several of them.",
-      color: "#7ba05b", dark: "#4d6b38", accent: "#c9a86a", crest: "horns", eyes: "stern", weapon: "blunderbuss" },
+      color: "#647d3f", dark: "#3d4d26", accent: "#c9a86a", crest: "horns", eyes: "stern", weapon: "blunderbuss" },
     { id: "nova", name: "Nova", title: "the star child", blurb: "Speaks softly and carries a small supernova.",
       color: "#8a5cf5", dark: "#5a35b8", accent: "#ffd9fb", crest: "visor", eyes: "calm", weapon: "raygun" },
     { id: "fizz", name: "Fizz", title: "the shaken soda", blurb: "Do not shake. Too late. Way too late.",
@@ -25,11 +25,11 @@
       color: "#bfe7ff", dark: "#6fa8cc", accent: "#eaf9ff", crest: "icicles", eyes: "halflid", weapon: "frost" },
     { id: "shade", name: "Shade", title: "the silent bet", blurb: "You won't hear the shot. You'll hear the scoreboard.",
       color: "#4a4a5e", dark: "#26262f", accent: "#8f7bff", crest: "band", eyes: "slit", weapon: "kunai" },
-    { id: "duke", name: "Duke", title: "the aristocrat", blurb: "Duels at dawn, brunch at nine.",
+    { id: "duke", name: "Duke", title: "the dueling dandy", blurb: "Duels at dawn, brunch at nine.",
       color: "#f2e2b8", dark: "#c0a35e", accent: "#caa43c", crest: "tophat", eyes: "monocle", weapon: "longrifle" },
     { id: "sprocket", name: "Sprocket", title: "the wind-up wonder", blurb: "Fully wound and warranty-void.",
-      color: "#d08a4e", dark: "#8f5526", accent: "#ffd98f", crest: "key", eyes: "led", weapon: "rivet" },
-    { id: "luna", name: "Luna", title: "the moth queen", blurb: "Drawn to victory like a lamp.",
+      color: "#b5642c", dark: "#6e3a14", accent: "#ffd98f", crest: "key", eyes: "led", weapon: "rivet" },
+    { id: "luna", name: "Luna", title: "the moth queen", blurb: "Drawn to victory like it's the last lit lamp.",
       color: "#3fc9b0", dark: "#238a77", accent: "#d7c2ff", crest: "antennae", eyes: "glow", weapon: "prism" }
   ];
 
@@ -63,8 +63,7 @@
       return;
     }
 
-    // --- weapon (behind or in front depending on aim) drawn after body below
-    // --- body
+    // --- body (weapon and face drawn on top)
     ctx.save();
     ctx.fillStyle = body;
     ctx.strokeStyle = "#1c1a24";
@@ -198,11 +197,11 @@
         break;
       }
       case "band": {
-        ctx.fillStyle = ch.accent;
+        ctx.fillStyle = ch.dark;
         ctx.fillRect(-r * 0.95, -r * 0.55, r * 1.9, r * 0.26);
         ctx.strokeRect(-r * 0.95, -r * 0.55, r * 1.9, r * 0.26);
         // tails
-        ctx.fillStyle = ch.accent;
+        ctx.fillStyle = ch.dark;
         ctx.beginPath();
         ctx.moveTo(-r * 0.9, -r * 0.45);
         ctx.quadraticCurveTo(-r * 1.5, -r * 0.2 + Math.sin(t * 4) * r * 0.1, -r * 1.35, r * 0.15);
@@ -397,6 +396,7 @@
     const angle = Math.atan2(aimY, aimX);
     ctx.save();
     ctx.rotate(angle);
+    if (aimX < 0) ctx.scale(1, -1); // keep asymmetric weapons upright when aiming left
     ctx.translate(r * 0.55, 0);
     ctx.lineWidth = Math.max(2, r * 0.08);
     ctx.strokeStyle = "#1c1a24";
@@ -468,11 +468,15 @@
       }
       case "frost": {
         ctx.fillStyle = "#9fd4ef";
-        rr(ctx, 0, -r * 0.12, L * 0.7, r * 0.24, r * 0.06); ctx.fill(); ctx.stroke();
+        rr(ctx, 0, -r * 0.12, L * 0.62, r * 0.24, r * 0.06); ctx.fill(); ctx.stroke();
         ctx.fillStyle = "#eaf9ff";
-        ctx.beginPath();
-        ctx.moveTo(L * 0.7, -r * 0.18); ctx.lineTo(L * 1.0, 0); ctx.lineTo(L * 0.7, r * 0.18);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
+        for (const [dy, len] of [[-0.16, 0.22], [0, 0.36], [0.16, 0.22]]) {
+          ctx.beginPath();
+          ctx.moveTo(L * 0.6, dy * r - r * 0.07);
+          ctx.lineTo(L * (0.62 + len), dy * r);
+          ctx.lineTo(L * 0.6, dy * r + r * 0.07);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
         break;
       }
       case "kunai": {
@@ -492,7 +496,7 @@
         break;
       }
       case "rivet": {
-        ctx.fillStyle = "#8f5526";
+        ctx.fillStyle = "#7a7a85";
         rr(ctx, 0, -r * 0.2, L * 0.6, r * 0.4, r * 0.08); ctx.fill(); ctx.stroke();
         ctx.fillStyle = "#ffd98f";
         for (const fy of [-0.12, 0.12]) {
@@ -504,11 +508,16 @@
       }
       case "prism": {
         ctx.fillStyle = "#8a63d2";
-        rr(ctx, 0, -r * 0.1, L * 0.55, r * 0.2, r * 0.06); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "rgba(215,194,255,0.85)";
+        rr(ctx, 0, -r * 0.1, L * 0.5, r * 0.2, r * 0.06); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "rgba(215,194,255,0.9)";
         ctx.beginPath();
-        ctx.moveTo(L * 0.55, -r * 0.26); ctx.lineTo(L * 0.9, 0); ctx.lineTo(L * 0.55, r * 0.26);
+        ctx.moveTo(L * 0.5, 0); ctx.lineTo(L * 0.72, -r * 0.3); ctx.lineTo(L * 0.94, 0); ctx.lineTo(L * 0.72, r * 0.3);
         ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "rgba(255,255,255,0.8)";
+        ctx.lineWidth = Math.max(1.5, r * 0.04);
+        ctx.beginPath();
+        ctx.moveTo(L * 0.72, -r * 0.3); ctx.lineTo(L * 0.72, r * 0.3);
+        ctx.stroke();
         break;
       }
     }

@@ -37,62 +37,62 @@ Pillars:
 - [x] This state document
 
 ### 2. Card system — 52 cards, designed from scratch
-- [ ] New card schema: id, name, rarity, tagline (flavor), description (plain-English
+- [x] New card schema: id, name, rarity, tagline (flavor), description (plain-English
       explanation), effect list, tags, apply()
-- [ ] 14 Common / 12 Uncommon / 10 Rare / 8 Epic / 5 Legendary / 3 Mythic = **52 cards**
-- [ ] New combat mechanics to support them: burn DoT, chill (slow), pierce, chain
+- [x] 14 Common / 12 Uncommon / 10 Rare / 8 Epic / 5 Legendary / 3 Mythic = **52 cards**
+- [x] New combat mechanics to support them: burn DoT, chill (slow), pierce, chain
       lightning, shrapnel split, thorns, regen, rage (low-HP damage), adrenaline
       (low-HP speed), guardian save, golden first shot, kill-heal, storm block,
       warp block, 3 active Mythic abilities (Starfall Protocol, Event Horizon, Chronoshift)
-- [ ] File: `js/cards.js`
+- [x] File: `js/cards.js`
 
 ### 3. Arena system — 25 levels with themes & personality
-- [ ] Level schema: name, theme blurb, full palette (sky gradient, platform colors,
+- [x] Level schema: name, theme blurb, full palette (sky gradient, platform colors,
       accent), platforms, hazards, movers, features, weather particles
-- [ ] Engine features: moving platforms (carry riders), bounce pads, conveyors, ice
+- [x] Engine features: moving platforms (carry riders), bounce pads, conveyors, ice
       (slippery), wind/gusts, low gravity, teleporters, timed lightning strikes,
       rising/falling tide, syrup slow-zones, phase (crumbling) platforms,
       arena bullet-bounce modifier
-- [ ] **25 arenas**, each with a distinct theme + 1–2 signature mechanics
-- [ ] File: `js/levels.js`
+- [x] **25 arenas**, each with a distinct theme + 1–2 signature mechanics
+- [x] File: `js/levels.js`
 
 ### 4. Characters — 12 pilots, procedural + generated art
-- [ ] 12 characters, all roughly circular with a signature weapon sticking out
-- [ ] Procedural canvas renderer per character (crest, eyes, accessory, weapon shape,
+- [x] 12 characters, all roughly circular with a signature weapon sticking out
+- [x] Procedural canvas renderer per character (crest, eyes, accessory, weapon shape,
       palette) so the game is fully playable before art is generated
-- [ ] Image prompts for each character in `image-requests.md`; game auto-loads
+- [x] Image prompts for each character in `image-requests.md`; game auto-loads
       `assets/images/characters/<id>.png` when present, falls back to procedural
-- [ ] Character select in the lobby: each player joins, cycles characters, locks in
-- [ ] File: `js/characters.js`
+- [x] Character select in the lobby: each player joins, cycles characters, locks in
+- [x] File: `js/characters.js`
 
 ### 5. Game flow redesign
-- [ ] Random arena every round (no immediate repeats)
-- [ ] Settings: arena picker — Random or lock any of the 25
-- [ ] **Simultaneous drafting**: when multiple players lose a round, all of them
+- [x] Random arena every round (no immediate repeats)
+- [x] Settings: arena picker — Random or lock any of the 25
+- [x] **Simultaneous drafting**: when multiple players lose a round, all of them
       draft at the same time, each with their own hand and their own controls
-- [ ] Winner banner → draft → next arena loop with splash screens
-- [ ] Bots pick cards and characters automatically
+- [x] Winner banner → draft → next arena loop with splash screens
+- [x] Bots pick cards and characters automatically
 
 ### 6. UI / UX overhaul
-- [ ] Full visual redesign: animated gradient menu, glassmorphism panels, rarity-glow
+- [x] Full visual redesign: animated gradient menu, glassmorphism panels, rarity-glow
       cards, character-portrait HUD, arena intro banner with theme blurb
-- [ ] Restructured settings (grouped sections, arena picker, rarity rates)
-- [ ] Files: `index.html`, `styles.css`
+- [x] Restructured settings (grouped sections, arena picker, rarity rates)
+- [x] Files: `index.html`, `styles.css`
 
 ### 7. Audio & FX polish
-- [ ] Kept: 2-track soundtrack, synth SFX, rumble
-- [ ] New: per-mechanic SFX hooks (burn, chain, teleport, bounce pad), weather particles
+- [x] Kept: 2-track soundtrack, synth SFX, rumble
+- [x] New: per-mechanic SFX hooks (burn, chain, teleport, bounce pad), weather particles
 
 ### 8. Audit (agent pass)
-- [ ] Card balance & variety audit
-- [ ] Arena variety & uniqueness audit
-- [ ] Character personality audit
-- [ ] UI polish audit
-- [ ] Findings + applied fixes: `AUDIT.md`
+- [x] Card balance & variety audit
+- [x] Arena variety & uniqueness audit
+- [x] Character personality audit
+- [x] UI polish audit
+- [x] Findings + applied fixes: `AUDIT.md`
 
 ### 9. Ship
-- [ ] Commit and push feature branch
-- [ ] Merge to `main` and push
+- [x] Commit and push feature branch
+- [x] Merge to `main` and push
 
 ---
 

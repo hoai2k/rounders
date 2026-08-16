@@ -57,6 +57,10 @@
     joinedThisFrame: false,
     pausedThisFrame: false,
     windPhase: Math.random() * 10,
+    lastStep: 1 / 60,
+    dt: 1 / 60,
+    draftTimer: 30,
+    draftBaseTitle: "",
     lightningTimer: 0,
     lightningX: 0,
     lightningFlash: 0,
@@ -104,7 +108,7 @@
       poison: 0, burn: 0, chill: 0, chain: 0, shards: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
-      guardian: 0, revives: 0, extraJumps: 0,
+      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0,
       goldenShot: false, killHeal: false,
       active: null, activeCooldown: 10
     };
@@ -122,8 +126,8 @@
       hp: 100, score: 0, alive: true,
       grounded: false, groundPlatform: null, jumpsLeft: 1,
       ammo: 3, reloadTimer: 0, fireTimer: 0,
-      blockTimer: 0, blockCooldown: 0,
-      activeCooldown: 0,
+      blockTimer: 0, blockCooldown: 0, echoTimer: 0,
+      activeCooldown: 0, teleWasInside: false,
       poisonTimer: 0, poisonDps: 0,
       burnTimer: 0, burnDps: 0,
       chillTimer: 0,
@@ -171,7 +175,9 @@
   }
 
   // Live platform list for this frame: statics (phase-filtered) + movers with velocity.
+  let platCache = { t: -1, level: null, list: null };
   function activePlatforms(level, t) {
+    if (platCache.t === t && platCache.level === level) return platCache.list;
     const list = [];
     for (const p of level.platforms) {
       if (p.phase) {
@@ -185,10 +191,11 @@
     for (const m of level.movers || []) {
       const ph = (m.phase || 0) * Math.PI * 2;
       const s = (Math.sin((t / m.period) * Math.PI * 2 + ph) + 1) / 2;
-      const sPrev = (Math.sin(((t - 1 / 60) / m.period) * Math.PI * 2 + ph) + 1) / 2;
+      const sPrev = (Math.sin(((t - world.lastStep) / m.period) * Math.PI * 2 + ph) + 1) / 2;
       const x = m.x + m.dx * s, y = m.y + m.dy * s;
       list.push({ ...m, x, y, vxDelta: m.dx * (s - sPrev), vyDelta: m.dy * (s - sPrev), isMover: true });
     }
+    platCache = { t, level, list };
     return list;
   }
 
@@ -217,11 +224,9 @@
 
   function freeCharIndex() {
     const taken = new Set(lobbySlots.map(s => s.charIndex));
-    for (let i = 0; i < CHARACTERS.length; i += 1) {
-      const idx = Math.floor(Math.random() * CHARACTERS.length);
-      if (!taken.has(idx)) return idx;
-    }
-    return Math.floor(Math.random() * CHARACTERS.length);
+    const free = CHARACTERS.map((_, i) => i).filter(i => !taken.has(i));
+    if (!free.length) return Math.floor(Math.random() * CHARACTERS.length);
+    return free[Math.floor(Math.random() * free.length)];
   }
 
   function addSlot(slot) {
@@ -246,7 +251,13 @@
   }
 
   function cycleSlotChar(slot, dir) {
-    slot.charIndex = (slot.charIndex + dir + CHARACTERS.length) % CHARACTERS.length;
+    const taken = new Set(lobbySlots.filter(s => s !== slot).map(s => s.charIndex));
+    let next = slot.charIndex;
+    for (let i = 0; i < CHARACTERS.length; i += 1) {
+      next = (next + dir + CHARACTERS.length) % CHARACTERS.length;
+      if (!taken.has(next)) break;
+    }
+    slot.charIndex = next;
     sfx("jump");
     renderLobby();
   }
@@ -318,6 +329,7 @@
           <span class="slot-blurb">${ch.blurb}</span>
           <span class="slot-input">${slot.type === "bot" ? "Bot" : escapeHtml(slot.label)}</span>
           <span class="slot-state">${slot.locked ? "✓ Ready" : slot.type === "bot" ? "✓ Ready" : "◀ ▶ choose · shoot to lock"}</span>
+          ${slot.type === "bot" ? `<button type="button" class="bot-remove" data-remove-bot="${i}">✕ remove</button>` : ""}
         </article>`);
     }
     joinSlots.innerHTML = cells.join("");
@@ -326,8 +338,8 @@
       const c2 = cv.getContext("2d");
       c2.clearRect(0, 0, 96, 96);
       c2.save();
-      c2.translate(48, 52);
-      drawCharacter(c2, ch, 26, { t: world.time, aimX: 1, aimY: 0 });
+      c2.translate(40, 52);
+      drawCharacter(c2, ch, 24, { t: world.time, aimX: 1, aimY: 0 });
       c2.restore();
     }
   }
@@ -357,6 +369,11 @@
     hideAllPanels();
     buildHud();
     resetRound();
+    // prime inputs so a held Start/Enter doesn't edge-trigger pause on frame one
+    applyInputs(getPads());
+    for (const p of players) {
+      p.input.jumpPressed = p.input.shootPressed = p.input.blockPressed = p.input.pausePressed = false;
+    }
   }
 
   function hideAllPanels() {
@@ -386,8 +403,8 @@
       p.jumpsLeft = 1 + p.stats.extraJumps;
       p.ammo = p.stats.maxAmmo;
       p.reloadTimer = 0; p.fireTimer = 0;
-      p.blockTimer = 0; p.blockCooldown = 0;
-      p.activeCooldown = 0;
+      p.blockTimer = 0; p.blockCooldown = 0; p.echoTimer = 0;
+      p.activeCooldown = 0; p.teleWasInside = false;
       p.poisonTimer = 0; p.burnTimer = 0; p.chillTimer = 0;
       p.teleCooldown = 0;
       p.guardianCharges = p.stats.guardian;
@@ -459,7 +476,9 @@
       index: 0,
       picked: false
     }));
-    draftTitle.textContent = losers.length > 1 ? "Draft — everyone picks at once" : `${losers[0].name} drafts`;
+    world.draftBaseTitle = losers.length > 1 ? "Draft — everyone picks at once" : `${losers[0].name} drafts`;
+    world.draftTimer = 30;
+    draftTitle.textContent = world.draftBaseTitle;
     renderDraftPanel();
     draftPanel.classList.remove("hidden");
     for (const d of world.drafters) {
@@ -485,8 +504,8 @@
       head.className = "draft-row-head";
       head.innerHTML = `<canvas width="56" height="56"></canvas><div><strong>${escapeHtml(d.player.name)}</strong><span>${d.picked ? "Locked in!" : "◀ ▶ browse · shoot to pick"}</span></div>`;
       const pc = head.querySelector("canvas").getContext("2d");
-      pc.translate(28, 31);
-      drawCharacter(pc, d.player.character, 16, { t: 0, aimX: 1 });
+      pc.translate(23, 31);
+      drawCharacter(pc, d.player.character, 14, { t: 0, aimX: 1 });
       row.appendChild(head);
       const hand = document.createElement("div");
       hand.className = "draft-hand";
@@ -551,7 +570,18 @@
     }
   }
 
-  function updateDraftInput() {
+  function updateDraftInput(dt) {
+    world.draftTimer -= dt;
+    if (world.draftTimer <= 0) {
+      for (const d of world.drafters) {
+        if (!d.picked) {
+          d.index = Math.floor(Math.random() * d.options.length);
+          confirmPick(d);
+        }
+      }
+    } else if (world.draftTimer < 9.5) {
+      draftTitle.textContent = `${world.draftBaseTitle} — auto-pick in ${Math.ceil(world.draftTimer)}s`;
+    }
     for (const d of world.drafters) {
       const p = d.player;
       if (p.bot || d.picked) continue;
@@ -727,6 +757,7 @@
     world.joinedThisFrame = false;
     world.pausedThisFrame = false;
     world.time += dt;
+    world.dt = dt;
     if (world.state === "menu") updateLobby(pads);
     applyInputs(pads);
 
@@ -737,19 +768,26 @@
       return;
     }
 
-    if (players.some(p => p.input.pausePressed) && (world.state === "playing" || world.state === "paused")) togglePause();
+    const globalPauseKey = pressed.has("Escape") || pressed.has("KeyP");
+    if ((players.some(p => p.input.pausePressed) || globalPauseKey) && (world.state === "playing" || world.state === "paused")) togglePause();
     if (world.state === "paused") {
       updateMenuControls(pads);
       updateParticles(dt);
       return;
     }
-    if (players.some(p => p.input.menuPressed) && world.state === "ended") {
-      restoreLobbyFromPlayers();
-      startMatch();
-      return;
+    if (world.state === "ended") {
+      if (menuBack(pads)) {
+        returnToMainMenu();
+        return;
+      }
+      if (players.some(p => p.input.menuPressed)) {
+        rebuildLobbyFromPlayers();
+        startMatch();
+        return;
+      }
     }
     if (world.state === "round-won") { updateParticles(dt); return; }
-    if (world.state === "draft") { updateDraftInput(); updateParticles(dt); return; }
+    if (world.state === "draft") { updateDraftInput(dt); updateParticles(dt); return; }
     if (world.state !== "playing") { updateParticles(dt); return; }
 
     updateWeather(dt);
@@ -760,6 +798,7 @@
     }
 
     const step = Math.min(dt, 1 / 45);
+    world.lastStep = step;
     updateArena(step);
     updatePlayers(step);
     updateBullets(step);
@@ -770,12 +809,20 @@
     checkRoundEnd();
   }
 
-  function restoreLobbyFromPlayers() {
-    // keep same lineup for rematch, reset cards/scores
+  // If controller disconnects shrank the lobby, rebuild it from the match lineup
+  function rebuildLobbyFromPlayers() {
+    if (lobbySlots.length >= 2) return;
+    lobbySlots.length = 0;
     for (const p of players) {
-      p.cards = [];
-      p.stats = defaultStats();
-      p.score = 0;
+      if (!p.bot && !p.scheme && (p.gamepadIndex === null || p.gamepadIndex === undefined)) continue;
+      lobbySlots.push({
+        type: p.bot ? "bot" : p.scheme ? "keyboard" : "pad",
+        schemeIndex: p.scheme ? keyboardSchemes.indexOf(p.scheme) : undefined,
+        gamepadIndex: p.gamepadIndex,
+        label: p.bot ? "Bot" : p.scheme ? p.scheme.label : "Controller",
+        charIndex: Math.max(0, CHARACTERS.indexOf(p.character)),
+        locked: true
+      });
     }
   }
 
@@ -805,23 +852,23 @@
       ? targets[Math.floor(Math.random() * targets.length)].x + rand(-60, 60)
       : rand(120, world.width - 120);
     world.lightningX = clamp(tx, 80, world.width - 80);
-    // warn phase handled via timer offset: schedule actual strike after warn
-    const warn = level.lightning.warn;
-    fields.push({ type: "lightning-warn", x: world.lightningX, y: 0, r: 55, life: warn, owner: null });
-    setTimeout(() => {
-      if (world.state !== "playing") return;
-      world.lightningFlash = 0.22;
-      world.shake = Math.max(world.shake, 14);
-      sfx("hit");
-      boltVisual(world.lightningX, 0, world.lightningX + rand(-20, 20), world.height, "#ffe95e", 0.35);
-      for (const p of players) {
-        if (!p.alive) continue;
-        if (Math.abs(p.x - world.lightningX) < 70) {
-          hurt(p, 42, null, 0, -1);
-          p.vy -= 420;
-        }
+    // the warn field doubles as the strike timer: it resolves on game time in
+    // updateFields, so pauses hold it and resetRound (fields = []) cancels it
+    fields.push({ type: "lightning-warn", x: world.lightningX, y: 0, r: 55, life: level.lightning.warn, owner: null });
+  }
+
+  function resolveLightningStrike(x) {
+    world.lightningFlash = 0.22;
+    world.shake = Math.max(world.shake, 14);
+    sfx("hit");
+    boltVisual(x, 0, x + rand(-20, 20), world.height, "#ffe95e", 0.35);
+    for (const p of players) {
+      if (!p.alive || p.spawnGrace > 0) continue;
+      if (Math.abs(p.x - x) < 70) {
+        hurt(p, 42, null, 0, -1);
+        p.vy -= 420;
       }
-    }, warn * 1000);
+    }
   }
 
   // ----------------------------------------------------------------- players
@@ -838,6 +885,15 @@
       p.spawnGrace = Math.max(0, p.spawnGrace - dt);
       p.teleCooldown = Math.max(0, p.teleCooldown - dt);
       p.blinkClock += dt;
+
+      if (p.echoTimer > 0) {
+        p.echoTimer -= dt;
+        if (p.echoTimer <= 0) {
+          p.blockTimer = Math.max(p.blockTimer, p.stats.blockDuration * 0.8);
+          if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 200, life: 0.18, force: 840 });
+          burst(p.x, p.y, "#ffffff", 12, 200);
+        }
+      }
 
       // trail for chronoshift
       p.trail.push({ x: p.x, y: p.y });
@@ -906,7 +962,7 @@
 
       p.vy += levelGravity() * dt;
       if (wind) p.vx += wind * 0.55 * dt;
-      p.vx *= p.grounded && !onIce ? world.floorDrag : world.airDrag;
+      p.vx *= Math.pow(p.grounded && !onIce ? world.floorDrag : world.airDrag, dt * 60);
       // carry by mover
       if (p.grounded && p.groundPlatform && p.groundPlatform.isMover) {
         p.x += p.groundPlatform.vxDelta;
@@ -928,30 +984,33 @@
         if (p.vy > 0 &&
             p.x > pad.x - 10 && p.x < pad.x + pad.w + 10 &&
             p.y + p.stats.radius > pad.y && p.y + p.stats.radius < pad.y + 46) {
-          p.vy = -pad.power * (currentLevel().gravityScale ? Math.sqrt(currentLevel().gravityScale) : 1);
+          p.vy = -pad.power;
           p.grounded = false;
           sfx("bounce");
-          burst(p.x, pad.y, currentLevel().palette.accent, 16, 300);
+          burst(p.x, pad.y, level.palette.accent, 16, 300);
           pulse(p, 0.2, 60);
         }
       }
 
-      // teleporters
+      // teleporters (must leave a pad before it re-arms)
+      let onTele = false;
       for (const t of level.teleporters || []) {
-        if (p.teleCooldown <= 0) {
-          const near = (x, y) => Math.hypot(p.x - x, p.y - y) < 40;
-          let dest = null;
-          if (near(t.ax, t.ay)) dest = { x: t.bx, y: t.by };
-          else if (near(t.bx, t.by)) dest = { x: t.ax, y: t.ay };
-          if (dest) {
-            burst(p.x, p.y, currentLevel().palette.accent, 20, 320);
-            p.x = dest.x; p.y = dest.y;
-            p.teleCooldown = 0.9;
-            burst(p.x, p.y, currentLevel().palette.accent, 20, 320);
-            sfx("teleport");
-          }
+        const near = (x, y) => Math.hypot(p.x - x, p.y - y) < 40;
+        let dest = null;
+        if (near(t.ax, t.ay)) dest = { x: t.bx, y: t.by };
+        else if (near(t.bx, t.by)) dest = { x: t.ax, y: t.ay };
+        if (!dest) continue;
+        onTele = true;
+        if (!p.teleWasInside && p.teleCooldown <= 0) {
+          burst(p.x, p.y, level.palette.accent, 20, 320);
+          p.x = dest.x; p.y = dest.y;
+          p.teleCooldown = 0.4;
+          burst(p.x, p.y, level.palette.accent, 20, 320);
+          sfx("teleport");
+          break;
         }
       }
+      p.teleWasInside = onTele;
 
       // tide drowning
       if (level.tide && p.y > world.tideLevel + 10) {
@@ -1046,15 +1105,7 @@
       world.shake = Math.max(world.shake, 8);
       sfx("chain");
     }
-    if (p.stats.echoBlock) {
-      setTimeout(() => {
-        if (p.alive && world.state === "playing") {
-          p.blockTimer = Math.max(p.blockTimer, p.stats.blockDuration * 0.8);
-          if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 200, life: 0.18, force: 840 });
-          burst(p.x, p.y, "#ffffff", 12, 200);
-        }
-      }, 190);
-    }
+    if (p.stats.echoBlock) p.echoTimer = 0.19;
   }
 
   function tryActive(p) {
@@ -1122,7 +1173,7 @@
         vx: Math.cos(a) * speed + p.vx * 0.18,
         vy: Math.sin(a) * speed + p.vy * 0.08,
         r: (6 + Math.min(9, p.stats.damage / 20)) * p.stats.bulletSize,
-        damage: p.stats.damage * rageMul * (golden ? 3 : 1),
+        damage: p.stats.damage * rageMul * (golden ? (pellets > 1 ? 2 : 3) : 1),
         life: 2.7,
         gravity: p.stats.bulletGravity,
         drag: p.stats.bulletDrag,
@@ -1240,7 +1291,7 @@
         }
       }
     }
-    bullets = bullets.filter(b => b.life > 0 && b.x > -120 && b.x < world.width + 120 && b.y > -160 && b.y < world.height + 120);
+    bullets = bullets.filter(b => b.life > 0 && b.x > -120 && b.x < world.width + 120 && b.y > (b.meteor ? -420 : -160) && b.y < world.height + 120);
   }
 
   function chainLightning(b, victim, damage) {
@@ -1254,6 +1305,11 @@
       boltVisual(victim.x, victim.y, best.x, best.y, "#ffe95e", 0.22);
       hurt(best, damage * 0.55 * b.chain, b.owner, best.x - victim.x, best.y - victim.y);
       sfx("chain");
+    } else {
+      // duel fallback: the arc doubles back on the victim for a smaller zap
+      boltVisual(victim.x, victim.y - 80, victim.x, victim.y, "#ffe95e", 0.18);
+      hurtRaw(victim, damage * 0.25 * b.chain, b.owner);
+      sfx("chain");
     }
   }
 
@@ -1261,7 +1317,7 @@
     if (b.explosive) {
       fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: 95 + b.explosive * 20, life: 0.14, force: 760 });
       for (const p of players) {
-        if (!p.alive || p === b.owner) continue;
+        if (!p.alive || p === b.owner || b.hitIds.has(p.id)) continue;
         const radius = 105 + b.explosive * 12;
         const d = Math.hypot(p.x - b.x, p.y - b.y);
         if (d < radius) hurt(p, (1 - d / radius) * (26 + b.explosive * 9), b.owner, p.x - b.x, p.y - b.y);
@@ -1320,7 +1376,10 @@
   function updateFields(dt) {
     for (const f of fields) {
       f.life -= dt;
-      if (f.type === "lightning-warn") continue;
+      if (f.type === "lightning-warn") {
+        if (f.life <= 0) resolveLightningStrike(f.x);
+        continue;
+      }
       for (const p of players) {
         if (!p.alive || p === f.owner) continue;
         const dx = p.x - f.x, dy = p.y - f.y;
@@ -1347,8 +1406,9 @@
   function hurt(p, amount, attacker, kx, ky) {
     if (!p.alive || p.blockTimer > 0 || p.spawnGrace > 0) return;
     const mag = Math.hypot(kx, ky) || 1;
-    p.vx += (kx / mag) * Math.min(620, amount * 16);
-    p.vy += (ky / mag) * Math.min(320, amount * 8) - Math.min(220, amount * 2);
+    const kb = 1 - clamp(p.stats.kbResist, 0, 0.9);
+    p.vx += (kx / mag) * Math.min(620, amount * 16) * kb;
+    p.vy += ((ky / mag) * Math.min(320, amount * 8) - Math.min(220, amount * 2)) * kb;
     if (amount > 4) {
       sfx("hit");
       pulse(p, Math.min(0.55, amount / 90), Math.min(190, 50 + amount));
@@ -1372,7 +1432,7 @@
     const lethal = p.hp - amount <= 0;
     if (lethal && p.guardianCharges > 0 && amount < 500) {
       p.guardianCharges -= 1;
-      p.hp = 1;
+      p.hp = p.stats.maxHp * 0.25;
       p.spawnGrace = Math.max(p.spawnGrace, 0.5);
       burst(p.x, p.y, "#ffd700", 36, 480);
       showToast(`${p.name}'s Guardian Halo saves them!`);
@@ -1478,7 +1538,7 @@
 
   function menuMove(pads) {
     if (pressed.has("ArrowDown") || pressed.has("KeyS")) return 1;
-    if (pressed.has("ArrowUp")) return -1;
+    if (pressed.has("ArrowUp") || pressed.has("KeyW")) return -1;
     for (const pad of pads) {
       if (buttonEdge(pad, 13) || axisEdge(pad, 1, 1)) return 1;
       if (buttonEdge(pad, 12) || axisEdge(pad, 1, -1)) return -1;
@@ -1576,8 +1636,8 @@
           <div class="hud-cards"></div>
         </div>`;
       const pc = el.querySelector("canvas").getContext("2d");
-      pc.translate(32, 36);
-      drawCharacter(pc, p.character, 19, { t: 0, aimX: 1 });
+      pc.translate(26, 36);
+      drawCharacter(pc, p.character, 17, { t: 0, aimX: 1 });
       hud.appendChild(el);
       hudRefs.push({
         p, el,
@@ -1622,9 +1682,12 @@
   // ------------------------------------------------------------------ render
   function render() {
     resize();
-    const scale = Math.min(canvas.width / world.width, canvas.height / world.height);
+    const inGame = !(world.state === "menu" || world.state === "settings" || world.state === "how");
+    const dpr = canvas.height / innerHeight;
+    const hudReserve = inGame && hud.offsetHeight ? Math.min(150, hud.offsetHeight + 14) * dpr : 0;
+    const scale = Math.min(canvas.width / world.width, (canvas.height - hudReserve) / world.height);
     const ox = (canvas.width - world.width * scale) / 2;
-    const oy = (canvas.height - world.height * scale) / 2;
+    const oy = (canvas.height - hudReserve - world.height * scale) / 2;
     ctx.save();
     ctx.fillStyle = "#0a0a12";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2390,7 +2453,7 @@
   }
   function updateToast() {
     if (toastTimer > 0) {
-      toastTimer -= 1 / 60;
+      toastTimer -= world.dt;
       if (toastTimer <= 0) toast.classList.add("hidden");
     }
   }
@@ -2523,6 +2586,15 @@
   function bindUi() {
     document.getElementById("startBtn").addEventListener("click", startMatch);
     document.getElementById("addBotBtn").addEventListener("click", addBot);
+    joinSlots.addEventListener("click", e => {
+      const btn = e.target.closest("[data-remove-bot]");
+      if (!btn) return;
+      const idx = Number(btn.dataset.removeBot);
+      if (lobbySlots[idx] && lobbySlots[idx].type === "bot") {
+        lobbySlots.splice(idx, 1);
+        renderLobby();
+      }
+    });
     document.getElementById("fullscreenBtn").addEventListener("click", toggleFullscreen);
     document.getElementById("musicBtn").addEventListener("click", toggleMusic);
     document.getElementById("resumeBtn").addEventListener("click", () => togglePause(false));
@@ -2630,11 +2702,20 @@
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter", "NumpadEnter", "Slash"].includes(e.code)) e.preventDefault();
   });
   addEventListener("keyup", e => keys.delete(e.code));
+  addEventListener("blur", () => { keys.clear(); pressed.clear(); });
   addEventListener("pointerdown", ensureAudio);
   addEventListener("pagehide", stopAudio);
   addEventListener("beforeunload", stopAudio);
   document.addEventListener("visibilitychange", () => { if (document.hidden) stopMusic(); else if (world.state !== "menu") startMusic(); });
-  addEventListener("gamepadconnected", e => showToast(`${e.gamepad.id.split("(")[0].trim() || "Controller"} detected — press a button to join`));
+  addEventListener("gamepadconnected", e => {
+    const orphan = players.find(p => !p.bot && !p.scheme && (p.gamepadIndex === null || p.gamepadIndex === undefined));
+    if (orphan && world.state !== "menu") {
+      orphan.gamepadIndex = e.gamepad.index;
+      showToast(`Controller reconnected — welcome back, ${orphan.name}`);
+    } else {
+      showToast(`${e.gamepad.id.split("(")[0].trim() || "Controller"} detected — press a button to join`);
+    }
+  });
   addEventListener("gamepaddisconnected", e => {
     const slotIndex = lobbySlots.findIndex(slot => slot.gamepadIndex === e.gamepad.index);
     if (slotIndex >= 0) lobbySlots.splice(slotIndex, 1);

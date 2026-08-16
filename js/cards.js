@@ -30,26 +30,26 @@
     card("cannonball", "Cannonball", "common",
       "Subtlety is for other people.",
       "Your shots hit much harder, but they fly slower and reloading takes longer.",
-      ["+45% damage", "−10% bullet speed", "+0.22s reload"], ["damage"],
-      p => { p.stats.damage *= 1.45; p.stats.bulletSpeed *= 0.9; p.stats.reload += 0.22; }),
+      ["+30% damage", "−10% bullet speed", "+0.22s reload"], ["damage"],
+      p => { p.stats.damage *= 1.3; p.stats.bulletSpeed *= 0.9; p.stats.reload += 0.22; }),
 
     card("featherweight", "Featherweight", "common",
       "Float like a… you know.",
-      "Move and steer in the air much faster, at the cost of a thinner health bar.",
+      "Move faster everywhere and steer far better in the air, at the cost of a thinner health bar.",
       ["+16% speed", "+20% air control", "−12% health"], ["movement"],
       p => { p.stats.speed *= 1.16; p.stats.airAccel *= 1.2; p.stats.maxHp *= 0.88; }),
 
     card("stone-soup", "Stone Soup", "common",
-      "Hearty. Extremely hearty.",
+      "Mostly rocks. Somehow filling.",
       "A big helping of extra health with only a small hit to your ground speed.",
       ["+35% health", "−6% speed"], ["defense"],
       p => { p.stats.maxHp *= 1.35; p.stats.speed *= 0.94; }),
 
     card("hair-trigger", "Hair Trigger", "common",
       "Don't even breathe on it.",
-      "Shots come out much sooner after each other. Pure fire-rate, no strings.",
-      ["−22% fire delay"], ["firerate"],
-      p => { p.stats.fireDelay *= 0.78; }),
+      "Shots come out much sooner after each other, and you carry one extra round to enjoy it.",
+      ["−22% fire delay", "+1 ammo"], ["firerate"],
+      p => { p.stats.fireDelay *= 0.78; p.stats.maxAmmo += 1; }),
 
     card("speed-loader", "Speed Loader", "common",
       "Practice makes permanent.",
@@ -71,15 +71,15 @@
 
     card("brick-wall", "Brick Wall", "common",
       "You shall not pass. Probably.",
-      "A chunky slab of extra health. Reloads get slightly slower.",
-      ["+30% health", "+0.12s reload"], ["defense"],
-      p => { p.stats.maxHp *= 1.3; p.stats.reload += 0.12; }),
+      "Extra health, and you barely budge when shot — knockback against you drops by 40%.",
+      ["+15% health", "−40% knockback taken"], ["defense"],
+      p => { p.stats.maxHp *= 1.15; p.stats.kbResist += 0.4; }),
 
     card("buckshot-buttons", "Buckshot Buttons", "common",
       "Why fire one when you can fire three?",
       "Each trigger pull fires 2 extra pellets in a cone. Each pellet is weaker.",
-      ["+2 pellets", "−30% damage per pellet", "wider spread"], ["multishot"],
-      p => { p.stats.pellets += 2; p.stats.damage *= 0.7; p.stats.spread += 0.11; }),
+      ["+2 pellets", "−40% damage per pellet", "wide spread"], ["multishot"],
+      p => { p.stats.pellets += 2; p.stats.damage *= 0.6; p.stats.spread += 0.14; }),
 
     card("moon-shoes", "Moon Shoes", "common",
       "One small hop for a rounder…",
@@ -90,14 +90,14 @@
     card("sticky-soles", "Sticky Soles", "common",
       "Grip for days.",
       "Accelerate and stop much more sharply — you go exactly where you mean to.",
-      ["+30% acceleration", "+20% braking"], ["movement"],
-      p => { p.stats.accel *= 1.3; p.stats.brake *= 1.2; }),
+      ["+50% acceleration", "+35% braking"], ["movement"],
+      p => { p.stats.accel *= 1.5; p.stats.brake *= 1.35; }),
 
     card("tailwind", "Tailwind", "common",
       "The sky likes you today.",
       "Steer far better while airborne. Jumps feel weightless.",
-      ["+35% air control"], ["movement"],
-      p => { p.stats.airAccel *= 1.35; }),
+      ["+50% air control"], ["movement"],
+      p => { p.stats.airAccel *= 1.5; }),
 
     card("big-bore", "Big Bore", "common",
       "Comically large. Comically effective.",
@@ -114,9 +114,9 @@
 
     card("wasp-venom", "Wasp Venom", "uncommon",
       "The sting is just the beginning.",
-      "Hits inject venom that deals damage over 3 seconds. Direct damage drops a little.",
-      ["poison on hit (3s)", "−8% damage"], ["dot"],
-      p => { p.stats.poison += 1; p.stats.damage *= 0.92; }),
+      "Hits inject venom that deals damage over 3 seconds (strongest venom wins — it does not stack). Direct damage drops.",
+      ["poison on hit (3s)", "−15% damage"], ["dot"],
+      p => { p.stats.poison += 1; p.stats.damage *= 0.85; }),
 
     card("cinder-shot", "Cinder Shot", "uncommon",
       "Leave a little warmth behind.",
@@ -144,7 +144,7 @@
 
     card("leech-lunch", "Leech Lunch", "uncommon",
       "Eat what you hit.",
-      "Heal for 18% of every point of damage you deal.",
+      "Heal for 18% of every point of bullet damage you deal.",
       ["18% lifesteal"], ["sustain"],
       p => { p.stats.lifesteal += 0.18; }),
 
@@ -162,7 +162,7 @@
 
     card("echo-chamber", "Echo Chamber", "uncommon",
       "Say it again, louder.",
-      "A moment after you block, a second block pulse automatically repeats.",
+      "A moment after you block, your parry window automatically re-opens for a second pulse.",
       ["block repeats once", "+0.2s block cooldown"], ["block"],
       p => { p.stats.echoBlock += 1; p.stats.blockCooldown += 0.2; }),
 
@@ -185,15 +185,15 @@
       ["pierce 1 player", "−15% damage"], ["projectile"],
       p => { p.stats.pierce += 1; p.stats.damage *= 0.85; }),
 
-    card("chain-lightning", "Chain Lightning", "rare",
+    card("chain-lightning", "Chain Letter", "rare",
       "Sharing is shocking.",
-      "When you hit someone, lightning arcs to the nearest other opponent for 55% damage.",
-      ["hits arc to a 2nd enemy (55%)"], ["aoe"],
+      "When you hit someone, lightning arcs to the nearest other opponent for 55% damage. In a duel it re-strikes your victim for 25% instead.",
+      ["hits arc to a 2nd enemy (55%)", "duels: re-strike 25%"], ["aoe"],
       p => { p.stats.chain += 1; }),
 
     card("thorn-jacket", "Thorn Jacket", "rare",
       "Hug at your own risk.",
-      "Attackers take 35% of the damage they deal to you, reflected back instantly.",
+      "Attackers take 35% of the damage they deal to you, reflected back instantly. Thorns ignore blocks.",
       ["reflect 35% of damage taken", "+15% health"], ["defense"],
       p => { p.stats.thorns += 0.35; p.stats.maxHp *= 1.15; }),
 
@@ -235,12 +235,12 @@
 
     card("hummingbird", "Hummingbird", "rare",
       "Blink and you'll miss all of it.",
-      "A blur of light, fast shots: much higher fire rate and speed, lower damage.",
-      ["−40% fire delay", "+10% speed", "−20% damage"], ["firerate"],
-      p => { p.stats.fireDelay *= 0.6; p.stats.speed *= 1.1; p.stats.damage *= 0.8; }),
+      "A blur of light, fast shots: a bigger magazine, much higher fire rate and speed, lower damage.",
+      ["−40% fire delay", "+2 ammo", "+10% speed", "−20% damage"], ["firerate"],
+      p => { p.stats.fireDelay *= 0.6; p.stats.maxAmmo += 2; p.stats.speed *= 1.1; p.stats.damage *= 0.8; }),
 
     // -------------------------------------------------------------- EPIC (8)
-    card("cluster-bomb", "Cluster Bomb", "epic",
+    card("cluster-bomb", "Party Favor", "epic",
       "One explosion is never enough.",
       "Bullets explode on impact AND split into bomblets. Reloads take longer.",
       ["explosion on hit", "splits into 2 shards", "+0.2s reload"], ["aoe"],
@@ -258,7 +258,7 @@
       ["+110% health", "+14% size", "−14% speed"], ["defense"],
       p => { p.stats.maxHp *= 2.1; p.stats.radius *= 1.14; p.stats.speed *= 0.86; }),
 
-    card("warp-block", "Warp Block", "epic",
+    card("warp-block", "French Exit", "epic",
       "Be somewhere else.",
       "Blocking teleports you a short distance in your aim direction — through bullets, through walls.",
       ["block = teleport", "−10% block cooldown"], ["block", "movement"],
@@ -278,8 +278,8 @@
 
     card("guardian-halo", "Guardian Halo", "epic",
       "Someone up there owes you one.",
-      "Once per round, a hit that would kill you leaves you at 1 HP instead.",
-      ["survive 1 lethal hit per round", "+10% health"], ["clutch", "defense"],
+      "Once per round, a hit that would kill you leaves you at 25% health instead.",
+      ["survive 1 lethal hit per round (25% HP)", "+10% health"], ["clutch", "defense"],
       p => { p.stats.guardian += 1; p.stats.maxHp *= 1.1; }),
 
     card("bullet-ballet", "Bullet Ballet", "epic",
@@ -309,7 +309,7 @@
 
     card("grim-harvest", "Grim Harvest", "legendary",
       "Waste nothing.",
-      "Heal for 45% of all damage you deal, and knockouts restore you to full health.",
+      "Heal for 45% of the bullet damage you deal, and knockouts restore you to full health.",
       ["45% lifesteal", "kills fully heal you"], ["sustain"],
       p => { p.stats.lifesteal += 0.45; p.stats.killHeal = true; }),
 

@@ -289,6 +289,21 @@
       return ix >= 0 && iy >= 0 && ix < w && iy < h && mask[iy * w + ix];
     };
 
+    // How much of a candidate disc is actually body. The ball is solid, so a
+    // circle that bulges out past the silhouette — the usual mistake, where the
+    // outline of a hat, a mohawk or a hood looks like a bigger, rounder ball —
+    // fails this even when plenty of outline sits on it.
+    const CONTAINED = 0.9;
+    function containment(c) {
+      let inside = 0;
+      const n = 48;
+      for (let t = 0; t < n; t += 1) {
+        const th = (t / n) * Math.PI * 2;
+        if (insideMask(c.x + Math.cos(th) * c.r * 0.93, c.y + Math.sin(th) * c.r * 0.93)) inside += 1;
+      }
+      return inside / n;
+    }
+
     let best = null;
     const bins = new Uint8Array(72);
     for (let it = 0; it < 2400; it += 1) {
@@ -296,6 +311,7 @@
       const c = circleFrom3(pts[i], pts[i + 1], pts[j], pts[j + 1], pts[k], pts[k + 1]);
       if (!c || !(c.r > minR && c.r < maxR)) continue;
       if (!insideMask(c.x, c.y)) continue; // the ball's centre is in the body
+      if (containment(c) < CONTAINED) continue;
       bins.fill(0);
       let inl = 0;
       for (let q = 0; q < pts.length; q += 2) {
@@ -307,9 +323,10 @@
       }
       let arc = 0;
       for (const bb of bins) arc += bb;
-      // Count the inliers, but favour a circle the outline follows the whole
-      // way round over one that hugs a long flat stretch of a decoration.
-      const score = inl * (0.35 + 0.65 * (arc / bins.length));
+      // Among discs that are genuinely body, take the one the outline agrees
+      // with most. Wide agreement still counts for something, but only mildly:
+      // a ball wearing a hat only shows two thirds of its own circumference.
+      const score = inl * (0.7 + 0.3 * (arc / bins.length));
       if (!best || score > best.score) best = { ...c, inl, score };
     }
     if (!best) return null;
@@ -338,7 +355,9 @@
         if (Math.abs(Math.hypot(x - circle.x, y - circle.y) - circle.r) > tol) continue;
         rr += Math.hypot(x - cx, y - cy);
       }
-      circle = { x: cx, y: cy, r: rr / count };
+      const next = { x: cx, y: cy, r: rr / count };
+      if (containment(next) < CONTAINED) break; // don't let the refit inflate past the body
+      circle = next;
     }
 
     // Final polish: nudge centre and radius over a small grid to maximise how
@@ -352,6 +371,7 @@
         for (let dr = -2; dr <= 2; dr += 1) {
           const c = { x: circle.x + dx, y: circle.y + dy, r: circle.r + dr };
           if (c.r < minR || c.r > maxR) continue;
+          if (containment(c) < CONTAINED) continue;
           const sc = arcSupport(c, pts, fine);
           if (sc > bestFit.s) bestFit = { c, s: sc };
         }

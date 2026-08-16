@@ -33,7 +33,7 @@ art happened to do:
 
 | | |
 |---|---|
-| body | a circle is **fitted to the body's outline** (RANSAC, then least squares, then a hug-the-outline polish) and used as the collision circle. Every character is a ball with things stuck on it, so the horns, hat, flames and wings simply fall out as outliers while the round base decides the fit — the ball lands on the collision circle and the decorations stick out past it |
+| body | a circle is **fitted to the body's outline** (RANSAC, then least squares, then a hug-the-outline polish) and used as the collision circle. Every character is a ball with things stuck on it, so the horns, hat, flames and wings fall out as outliers while the round base decides the fit. Candidates must also be **solid body** — 90% of the disc inside the silhouette — which is what stops a mohawk or a hood from reading as a bigger, rounder ball than the head underneath it |
 | weapon | scaled so **grip → muzzle is 1.5 body radii**, with the grip riding **0.55 radii out along the aim** — the same numbers as the procedural weapon, so the muzzle sits 2.05 radii out and the whole barrel lies on the aim ray |
 | aim | the barrel's tilt in the source image is measured and cancelled, so the weapon points exactly where the stick does at every angle, not approximately |
 | hands | bare nub hands are sized to a fraction of the body radius and placed at the grip and fore-grip |

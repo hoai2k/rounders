@@ -20,8 +20,7 @@
     title: {
       eyebrow: "1–4 player arena brawler",
       tagline: "Round shooters. Power cards. Arenas with attitude.",
-      pressStart: "PRESS START",
-      fullscreenBlocked: "Fullscreen needs a key or click — use the fullscreen button"
+      pressStart: "PRESS START"
     },
 
     // ------------------------------------------------------- CHARACTER SELECT

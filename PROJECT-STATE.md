@@ -180,6 +180,10 @@ Pillars:
 - [x] Arena renders at full 16:9; health rings + ammo pips ride on the fighters
       (ROUNDS-style) and player cards sit in the letterbox margins
 - [x] Icon row stays bottom-right everywhere; song widget moved to bottom-left
+- [x] Title always attempts fullscreen, whatever pressed start
+- [x] How to Play is a full-width two-column layout that fits without scrolling
+- [x] Bots read hazards and ledges instead of walking into them
+- [x] Hazards damage + launch (~3 touches); the pit bounces you back twice
 - [x] **Arch logo art**: `assets/images/logo-arch.png` (keyed from
       `rounders_logo_arch_v3.png`) replaces the text logo on the title screen
       and main menu; UI palette shifted to match (gunmetal panels, steel-bevel

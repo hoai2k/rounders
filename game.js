@@ -180,7 +180,7 @@
       botStrafe: Math.random() < 0.5 ? -1 : 1,
       draftLock: false,
       spawnGrace: 0.9,
-      hazardGrace: 0,
+      hazardGrace: 0, pitBounces: 0,
       blinkClock: Math.random() * 4
     };
   }
@@ -485,7 +485,7 @@
     }
   }
 
-  function startFromTitle(canFullscreen) {
+  function startFromTitle() {
     if (world.state !== "title") return;
     world.state = "menu";
     world.panelReturn = "menu";
@@ -498,11 +498,10 @@
     setMenuIndex(0);
     // don't let the same press also activate the focused menu button
     pressed.clear();
-    if (canFullscreen) {
-      enterFullscreen();
-    } else if (!document.fullscreenElement) {
-      showToast(str("title.fullscreenBlocked"));
-    }
+    // Always ask. Browsers only grant fullscreen during a user gesture, and a
+    // gamepad poll is not formally one — but Chrome does honour a pad press
+    // here, so try regardless and let enterFullscreen swallow a refusal.
+    enterFullscreen();
   }
 
   // The icon row belongs to the menu and pause screens; the track widget only
@@ -554,6 +553,7 @@
       p.poisonTimer = 0; p.burnTimer = 0; p.chillTimer = 0;
       p.teleCooldown = 0;
       p.hazardGrace = 0;
+      p.pitBounces = 0;
       p.guardianCharges = p.stats.guardian;
       p.roundRevives = p.stats.revives;
       p.trail = [];
@@ -963,7 +963,38 @@
     if (p.x < 110) input.move = 1;
     if (p.x > world.width - 110) input.move = -1;
     p.botJumpLock = Math.max(0, p.botJumpLock - 1 / 60);
-    const shouldJump = p.grounded && p.botJumpLock <= 0 && (dy < -85 || Math.random() < skill.wander || isBotWallAhead(p, input.move));
+
+    // --- look where you are going -------------------------------------------
+    // Standing on top of something that hurts: get off it first, nothing else
+    // matters this frame.
+    const standingOver = botHazardUnder(p);
+    if (standingOver) {
+      input.move = p.x < standingOver.x + standingOver.w / 2 ? -1 : 1;
+      if (p.grounded && p.botJumpLock <= 0) {
+        input.jump = true;
+        p.botJumpLock = 0.3;
+      }
+    }
+
+    // Spikes or lava in the direction of travel: hop them if they are narrow
+    // enough to clear, otherwise turn around.
+    const hazardAhead = !standingOver && botHazardAhead(p, input.move);
+    if (hazardAhead) {
+      if (p.grounded && p.botJumpLock <= 0 && hazardAhead.w < 260) {
+        input.jump = true;
+        p.botJumpLock = 0.4;
+      } else {
+        input.move = -input.move;
+      }
+    }
+
+    // A drop with nothing to land on is just a slower hazard.
+    const walkingOffALedge = !standingOver && !hazardAhead && p.grounded &&
+      input.move && !botGroundAhead(p, input.move);
+    if (walkingOffALedge) input.move = -input.move;
+
+    const shouldJump = p.grounded && p.botJumpLock <= 0 &&
+      (dy < -85 || Math.random() < skill.wander || isBotWallAhead(p, input.move));
     if (shouldJump) {
       input.jump = true;
       p.botJumpLock = 0.35 + Math.random() * 0.25;
@@ -981,6 +1012,36 @@
       if (d < bestD) { bestD = d; best = p; }
     }
     return best;
+  }
+
+  // Hazards the bot is currently standing over (or wading in).
+  function botHazardUnder(p) {
+    if (!settings.hazards) return null;
+    const r = p.stats.radius;
+    for (const h of currentLevel().hazards) {
+      if (p.x > h.x - r && p.x < h.x + h.w + r && p.y + r > h.y - 26 && p.y - r < h.y + h.h) return h;
+    }
+    return null;
+  }
+
+  // Hazards a step ahead, at roughly the height the bot would walk or land at.
+  function botHazardAhead(p, move) {
+    if (!move || !settings.hazards) return null;
+    const r = p.stats.radius;
+    const aheadX = p.x + move * (r + 52);
+    for (const h of currentLevel().hazards) {
+      if (aheadX > h.x - r && aheadX < h.x + h.w + r && p.y + r > h.y - 120 && p.y - r < h.y + h.h + 30) return h;
+    }
+    return null;
+  }
+
+  // Is there anything to land on a step ahead, within a survivable drop?
+  function botGroundAhead(p, move) {
+    const r = p.stats.radius;
+    const aheadX = p.x + move * (r + 46);
+    const feet = p.y + r;
+    return activePlatforms(currentLevel(), world.time).some(pl =>
+      aheadX > pl.x - 6 && aheadX < pl.x + pl.w + 6 && pl.y >= feet - 14 && pl.y < feet + 210);
   }
 
   function isBotWallAhead(p, move) {
@@ -1022,7 +1083,7 @@
     if (world.state === "title") {
       // Gamepads cannot grant the user activation the Fullscreen API needs, so a
       // pad start enters the menu without it (keyboard and click paths can).
-      if (pads.some(pad => pad.buttons.some((_, i) => buttonEdge(pad, i)))) startFromTitle(false);
+      if (pads.some(pad => pad.buttons.some((_, i) => buttonEdge(pad, i)))) startFromTitle();
       updateParticles(dt);
       return;
     }
@@ -1329,8 +1390,10 @@
         if (Math.random() < dt * 12) puffOne(p.x + rand(-14, 14), p.y - 18, "#9ff0e0");
       } else p.soak = 0;
 
-      // world bounds kill; hazards sting and launch instead
-      if (p.x < -80 || p.x > world.width + 80 || p.y > world.height + 120) hurt(p, 999, null, 0, -1);
+      // falling out of the bottom throws you back in — the pit only finishes
+      // the job after a couple of returns
+      if (p.y > world.height + 30) pitBounce(p);
+      if (p.x < -160 || p.x > world.width + 160) hurtRaw(p, 999, null);
       if (settings.hazards) {
         for (const h of level.hazards) {
           if (h.kind === "water") continue; // handled above, as a volume
@@ -1783,10 +1846,13 @@
   // damage first (so guardian/revive rules still apply at low HP), then a hard
   // upward bounce away from the hazard, with a grace window so one dip into
   // lava reads as one hit.
+  const HAZARD_DAMAGE = 30;   // ~3 touches from full health
+  const HAZARD_GRACE = 1.0;   // long enough to steer back to a platform
+  const PIT_BOUNCES = 2;      // falls the floor of the world gives back
   function hazardHit(p, h) {
     if (!p.alive || p.hazardGrace > 0 || p.spawnGrace > 0) return;
-    p.hazardGrace = 0.9;
-    hurtRaw(p, 25, null);
+    p.hazardGrace = HAZARD_GRACE;
+    hurtRaw(p, HAZARD_DAMAGE, null);
     if (!p.alive) return;
     const cx = h.x + h.w / 2;
     p.vy = -Math.max(980, Math.abs(p.vy) * 0.6 + 760);
@@ -1796,6 +1862,32 @@
     pulse(p, 0.4, 150);
     world.shake = Math.max(world.shake, 7);
     burst(p.x, p.y + p.stats.radius, currentLevel().palette.hazard || "#ff6a3d", 18, 420);
+  }
+
+  // The bottom of the world is a trampoline with a temper: it hurts, flings you
+  // high enough to land somewhere, and only swallows you on the third fall.
+  function pitBounce(p) {
+    // No grace check: being under the world must always throw you back, or a
+    // player who fell during hazard grace would keep dropping into nothing.
+    // Re-entry can't double-fire because the bounce lifts them above the line.
+    if (!p.alive) return;
+    p.pitBounces += 1;
+    if (p.pitBounces > PIT_BOUNCES) {
+      hurtRaw(p, 999, null);
+      return;
+    }
+    p.hazardGrace = HAZARD_GRACE;
+    hurtRaw(p, HAZARD_DAMAGE, null);
+    if (!p.alive) return;
+    p.y = world.height + 24;
+    // clear the floor line with room to steer onto a ledge
+    p.vy = -Math.sqrt(2 * levelGravity() * 430);
+    p.vx *= 0.55;
+    p.jumpsLeft = Math.max(p.jumpsLeft, 1);
+    sfx("bounce");
+    pulse(p, 0.45, 170);
+    world.shake = Math.max(world.shake, 9);
+    burst(p.x, world.height + 10, currentLevel().palette.accent || "#ffffff", 22, 460);
   }
 
   function hurt(p, amount, attacker, kx, ky) {
@@ -3450,7 +3542,7 @@
     document.getElementById("pauseSettingsBtn").addEventListener("click", () => openPanel(settingsPanel, "settings"));
     document.getElementById("settingsBack").addEventListener("click", () => closePanel(settingsPanel));
     document.getElementById("howBack").addEventListener("click", () => closePanel(howPanel));
-    titleScreen.addEventListener("pointerdown", () => startFromTitle(true));
+    titleScreen.addEventListener("pointerdown", () => startFromTitle());
 
     // arena picker
     const levelSelect = document.getElementById("levelSelect");
@@ -3505,12 +3597,12 @@
     });
   }
 
+  // Quietly best-effort: if the browser refuses (no user gesture it recognises)
+  // the fullscreen icon in the corner is still there, so nagging adds nothing.
   async function enterFullscreen() {
     try {
       if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
-    } catch {
-      showToast(str("toast.fullscreenBlocked"));
-    }
+    } catch { /* stay windowed */ }
   }
 
   async function toggleFullscreen() {
@@ -3518,7 +3610,7 @@
       if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
       else await document.exitFullscreen();
     } catch {
-      showToast("Fullscreen is blocked by this browser");
+      showToast(str("toast.fullscreenBlocked"));
     }
   }
 
@@ -3547,7 +3639,7 @@
     if (!keys.has(e.code)) pressed.add(e.code);
     keys.add(e.code);
     if (world.state === "title") {
-      startFromTitle(true);
+      startFromTitle();
       e.preventDefault();
       return;
     }

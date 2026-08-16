@@ -210,11 +210,175 @@
     };
   }
 
-  // The body's ball, as the largest circle that fits inside its silhouette.
-  // Area or bounding box both get dragged around by horns, ears, hair and
-  // antennae; the inscribed circle is the round part the collision circle is
-  // supposed to line up with, and everything else can stick out past it.
+  // The body's ball.
+  //
+  // Every character is a ball with things stuck on it — horns, hats, hair,
+  // flames, wings. The ball is what has to line up with the collision circle,
+  // so rather than measuring the whole silhouette (area, bounding box and the
+  // largest inscribed circle all get dragged around by the decorations), fit a
+  // circle to the silhouette's outline and let the decorations be outliers:
+  // RANSAC picks the circle the outline actually agrees on, then a least
+  // squares pass on its inliers sharpens it.
+  //
+  // Falls back to the inscribed circle when the outline isn't round enough to
+  // agree on anything (a wisp, a blob), which is the best guess available.
   function ball(comp, m) {
+    const fitted = fitCircle(comp, m);
+    if (fitted && fitted.support >= 0.45) return fitted;
+    const inscribed = inscribedCircle(comp, m);
+    if (!fitted) return inscribed;
+    // Weak agreement: keep whichever explains more of the outline.
+    return fitted.support >= support(inscribed, comp, m) ? fitted : inscribed;
+  }
+
+  // Outline pixels of a component, in mask coordinates.
+  function outline(comp, m) {
+    const { w, h, mask } = m;
+    const on = (x, y) => x >= 0 && y >= 0 && x < w && y < h && mask[y * w + x];
+    const pts = [];
+    for (const p of comp.pixels) {
+      const x = p % w, y = (p / w) | 0;
+      if (!on(x - 1, y) || !on(x + 1, y) || !on(x, y - 1) || !on(x, y + 1)) pts.push(x, y);
+    }
+    return pts;
+  }
+
+  function circleFrom3(ax, ay, bx, by, cx, cy) {
+    const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+    if (Math.abs(d) < 1e-6) return null;
+    const a2 = ax * ax + ay * ay, b2 = bx * bx + by * by, c2 = cx * cx + cy * cy;
+    const x = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d;
+    const y = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d;
+    return { x, y, r: Math.hypot(ax - x, ay - y) };
+  }
+
+  // Fraction of a circle's own circumference that the outline sits on. A ball
+  // with a hat still scores high; a circle that only grazes the shape doesn't.
+  function arcSupport(circle, pts, tol) {
+    const bins = new Uint8Array(72);
+    for (let i = 0; i < pts.length; i += 2) {
+      const dx = pts[i] - circle.x, dy = pts[i + 1] - circle.y;
+      if (Math.abs(Math.hypot(dx, dy) - circle.r) > tol) continue;
+      const bin = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (Math.PI * 2)) * bins.length);
+      bins[Math.min(bins.length - 1, Math.max(0, bin))] = 1;
+    }
+    let n = 0;
+    for (const b of bins) n += b;
+    return n / bins.length;
+  }
+
+  function fitCircle(comp, m) {
+    const pts = outline(comp, m);
+    const n = pts.length / 2;
+    if (n < 24) return null;
+    const dim = Math.min(m.w, m.h);
+    const tol = Math.max(1.2, dim * 0.018);
+    const minR = dim * 0.15, maxR = dim * 0.62;
+
+    // Deterministic sampling: the same art always fits the same circle.
+    let seed = 0x2f6e2b1;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    const pick = () => (rnd() * n) | 0;
+
+    const { w, h, mask } = m;
+    const insideMask = (x, y) => {
+      const ix = Math.round(x), iy = Math.round(y);
+      return ix >= 0 && iy >= 0 && ix < w && iy < h && mask[iy * w + ix];
+    };
+
+    let best = null;
+    const bins = new Uint8Array(72);
+    for (let it = 0; it < 2400; it += 1) {
+      const i = pick() * 2, j = pick() * 2, k = pick() * 2;
+      const c = circleFrom3(pts[i], pts[i + 1], pts[j], pts[j + 1], pts[k], pts[k + 1]);
+      if (!c || !(c.r > minR && c.r < maxR)) continue;
+      if (!insideMask(c.x, c.y)) continue; // the ball's centre is in the body
+      bins.fill(0);
+      let inl = 0;
+      for (let q = 0; q < pts.length; q += 2) {
+        const dx = pts[q] - c.x, dy = pts[q + 1] - c.y;
+        if (Math.abs(Math.hypot(dx, dy) - c.r) > tol) continue;
+        inl += 1;
+        const bin = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (Math.PI * 2)) * bins.length);
+        bins[Math.min(bins.length - 1, Math.max(0, bin))] = 1;
+      }
+      let arc = 0;
+      for (const bb of bins) arc += bb;
+      // Count the inliers, but favour a circle the outline follows the whole
+      // way round over one that hugs a long flat stretch of a decoration.
+      const score = inl * (0.35 + 0.65 * (arc / bins.length));
+      if (!best || score > best.score) best = { ...c, inl, score };
+    }
+    if (!best) return null;
+
+    // Sharpen: algebraic least squares over the inliers, twice.
+    let circle = best;
+    for (let pass = 0; pass < 2; pass += 1) {
+      let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, sz = 0, sxz = 0, syz = 0, count = 0;
+      for (let q = 0; q < pts.length; q += 2) {
+        const x = pts[q], y = pts[q + 1];
+        if (Math.abs(Math.hypot(x - circle.x, y - circle.y) - circle.r) > tol) continue;
+        const z = x * x + y * y;
+        sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y;
+        sz += z; sxz += x * z; syz += y * z; count += 1;
+      }
+      if (count < 12) break;
+      const a11 = sxx - (sx * sx) / count, a12 = sxy - (sx * sy) / count, a22 = syy - (sy * sy) / count;
+      const b1 = (sxz - (sx * sz) / count) / 2, b2 = (syz - (sy * sz) / count) / 2;
+      const det = a11 * a22 - a12 * a12;
+      if (Math.abs(det) < 1e-9) break;
+      const cx = (b1 * a22 - b2 * a12) / det;
+      const cy = (a11 * b2 - a12 * b1) / det;
+      let rr = 0;
+      for (let q = 0; q < pts.length; q += 2) {
+        const x = pts[q], y = pts[q + 1];
+        if (Math.abs(Math.hypot(x - circle.x, y - circle.y) - circle.r) > tol) continue;
+        rr += Math.hypot(x - cx, y - cy);
+      }
+      circle = { x: cx, y: cy, r: rr / count };
+    }
+
+    // Final polish: nudge centre and radius over a small grid to maximise how
+    // much of the circle the outline actually lies on. Least squares answers
+    // "closest to the inliers"; this answers "hugs the ball", which is the one
+    // that matters when the inliers came with a hat attached.
+    const fine = Math.max(1, tol * 0.6);
+    let bestFit = { c: circle, s: arcSupport(circle, pts, fine) };
+    for (let dx = -2; dx <= 2; dx += 1) {
+      for (let dy = -2; dy <= 2; dy += 1) {
+        for (let dr = -2; dr <= 2; dr += 1) {
+          const c = { x: circle.x + dx, y: circle.y + dy, r: circle.r + dr };
+          if (c.r < minR || c.r > maxR) continue;
+          const sc = arcSupport(c, pts, fine);
+          if (sc > bestFit.s) bestFit = { c, s: sc };
+        }
+      }
+    }
+    circle = bestFit.c;
+
+    return {
+      center: { x: (circle.x + 0.5) * m.sx, y: (circle.y + 0.5) * m.sy },
+      radius: circle.r * ((m.sx + m.sy) / 2),
+      support: arcSupport(circle, pts, tol)
+    };
+  }
+
+  function support(circle, comp, m) {
+    if (!circle) return 0;
+    const pts = outline(comp, m);
+    const dim = Math.min(m.w, m.h);
+    return arcSupport(
+      { x: circle.center.x / m.sx - 0.5, y: circle.center.y / m.sy - 0.5, r: circle.radius / ((m.sx + m.sy) / 2) },
+      pts,
+      Math.max(1.2, dim * 0.018)
+    );
+  }
+
+  // Largest circle that fits inside the silhouette — the fallback.
+  function inscribedCircle(comp, m) {
     const { w, h } = m;
     const inside = new Uint8Array(w * h);
     for (const p of comp.pixels) inside[p] = 1;
@@ -388,6 +552,7 @@
         arms.push({
           sprite: spec.sprite,
           socket, hold,
+          rotation: 0,
           scale: spec.nub || rest < 1
             ? (HAND_RADIUS * body.radius) / Math.max(1, spec.comp.radius)
             : 1,
@@ -406,6 +571,7 @@
       arm: { sprites, anchors },
       rig: {
         bodyScale: 1,
+        bodyRotation: 0,
         weapon: {
           // Scaled to the procedural barrel length, and rotated to cancel
           // whatever tilt the source art was drawn with, so the weapon points
@@ -430,7 +596,7 @@
 
   const DEFAULT_ARM = {
     sprite: 0, socket: { x: 0, y: 0 }, hold: { x: 0, y: 0 },
-    scale: 1, stretch: false, minStretch: 0.8, maxStretch: 1.5, z: "front"
+    scale: 1, rotation: 0, stretch: false, minStretch: 0.8, maxStretch: 1.5, z: "front"
   };
   const Z = ["back", "mid", "front"];
 
@@ -454,6 +620,7 @@
         socket: pt(a.socket, d.socket),
         hold: pt(a.hold, d.hold),
         scale: num(a.scale, d.scale),
+        rotation: num(a.rotation, d.rotation),
         stretch: a.stretch ?? d.stretch,
         minStretch: num(a.minStretch, d.minStretch),
         maxStretch: num(a.maxStretch, d.maxStretch),
@@ -493,6 +660,7 @@
       },
       rig: {
         bodyScale: num(sr.bodyScale, auto.rig.bodyScale),
+        bodyRotation: num(sr.bodyRotation, auto.rig.bodyRotation),
         weapon: {
           scale: num(srw.scale, auto.rig.weapon.scale),
           rotation: num(srw.rotation, auto.rig.weapon.rotation),
@@ -560,12 +728,14 @@
       x: (R.body.mount.x - R.body.pivot.x) * k + R.rig.weapon.offset.x * r,
       y: (R.body.mount.y - R.body.pivot.y) * k + R.rig.weapon.offset.y * r
     };
-    // Orbiting grips swing around the body with the aim (how the procedural
-    // weapon is drawn), which puts the whole barrel on the aim ray. A pinned
-    // grip stays where the art holds it and the weapon just rotates about it.
-    const reach = Math.hypot(off.x, off.y);
+    // An orbiting grip swings around the body with the aim (how the procedural
+    // weapon is drawn): the whole offset turns, so a placement dialled in at one
+    // aim angle holds at every other one, and a grip left on the aim axis keeps
+    // the barrel on the aim ray. A pinned grip stays where the art holds it and
+    // the weapon just rotates about it.
+    const ca = Math.cos(aimAngle), sa = Math.sin(aimAngle);
     const mount = R.rig.weapon.orbit
-      ? { x: Math.cos(aimAngle) * reach, y: Math.sin(aimAngle) * reach + wob }
+      ? { x: off.x * ca - off.y * sa, y: off.x * sa + off.y * ca + wob }
       : { x: off.x, y: off.y + wob };
     return {
       R, facing, k, kw: k * R.rig.weapon.scale, angle, mount, wob,
@@ -639,13 +809,13 @@
       // Rigid: the sprite's hand anchor lands on the hold point and the whole
       // thing turns with the weapon.
       ctx.translate(P.hold.x, P.hold.y);
-      ctx.rotate(P.angle);
+      ctx.rotate(P.angle + ((a.rotation || 0) * Math.PI) / 180);
       ctx.translate(-anchor.hand.x * s, -anchor.hand.y * s);
     } else {
       // Bridged: pivot at the shoulder, swing to face the hold point, then
       // stretch along that line so the hand reaches it.
       ctx.translate(P.socket.x, P.socket.y);
-      ctx.rotate(P.angle);
+      ctx.rotate(P.angle + ((a.rotation || 0) * Math.PI) / 180);
       ctx.scale(P.stretch, 1);
       ctx.rotate(-P.rest);
       ctx.translate(-anchor.shoulder.x * s, -anchor.shoulder.y * s);
@@ -674,11 +844,15 @@
     ctx.scale(T.facing, 1);
     drawArms(ctx, T, "back");
     if (T.R.rig.weapon.behind) drawWeapon(ctx, T);
+    ctx.save();
+    ctx.translate(0, T.wob);
+    if (T.R.rig.bodyRotation) ctx.rotate((T.R.rig.bodyRotation * Math.PI) / 180);
     ctx.drawImage(
       e.body,
-      -T.R.body.pivot.x * T.k, -T.R.body.pivot.y * T.k + T.wob,
+      -T.R.body.pivot.x * T.k, -T.R.body.pivot.y * T.k,
       e.body.width * T.k, e.body.height * T.k
     );
+    ctx.restore();
     drawArms(ctx, T, "mid");
     if (!T.R.rig.weapon.behind) drawWeapon(ctx, T);
     drawArms(ctx, T, "front");

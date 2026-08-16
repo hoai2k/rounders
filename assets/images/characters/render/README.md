@@ -33,7 +33,7 @@ art happened to do:
 
 | | |
 |---|---|
-| body | the **largest circle that fits inside the body silhouette** is the collision circle, so the ball lines up with the hitbox and horns, ears and hair stick out past it |
+| body | a circle is **fitted to the body's outline** (RANSAC, then least squares, then a hug-the-outline polish) and used as the collision circle. Every character is a ball with things stuck on it, so the horns, hat, flames and wings simply fall out as outliers while the round base decides the fit — the ball lands on the collision circle and the decorations stick out past it |
 | weapon | scaled so **grip → muzzle is 1.5 body radii**, with the grip riding **0.55 radii out along the aim** — the same numbers as the procedural weapon, so the muzzle sits 2.05 radii out and the whole barrel lies on the aim ray |
 | aim | the barrel's tilt in the source image is measured and cancelled, so the weapon points exactly where the stick does at every angle, not approximately |
 | hands | bare nub hands are sized to a fraction of the body radius and placed at the grip and fore-grip |
@@ -108,20 +108,28 @@ rigid arm holding at the same point.
 
 ## Hand-tuning
 
-Open `/workbench` (`npm start`, then http://127.0.0.1:4173/workbench/):
+Open `/workbench` (`npm start`, then http://127.0.0.1:4173/workbench/). The
+character and the mode live in the URL (`?c=vex&mode=edit`), so a reload puts
+you back where you were. Edits themselves are transient — they leave via
+**Export rigs.json**.
 
-- **Character mode** — place, rotate, scale, and layer the weapon and arms on the
-  body. Each arm gets a purple shoulder handle (on the body) and a blue hand
-  handle (on the weapon); the line between them turns pink when the arm has hit
-  its stretch limit and the hand has stopped reaching the weapon. Sweep the aim
-  to check the whole arc.
-- **Anchor mode** — drag the anchor points on each source image.
+- **Preview** (default) — just the character. Sweep the aim, or plug in a
+  gamepad and aim with the stick exactly as a player would: right stick (or
+  left) aims and flips facing, LB/RB change character, **A** toggles edit mode.
+- **Edit mode** — the character snaps to the default pose (facing right, level)
+  and an onscreen selector appears: **Body · Weapon · Hand 1 · Hand 2**. The
+  selected piece gets three handles — pink to move, green to resize, yellow to
+  turn — and the same three values are mirrored as numbers in the right panel,
+  so you can drag or type. Arrow keys nudge (shift for bigger steps); on a pad
+  the d-pad nudges, the triggers resize and **Y** cycles the piece.
+  **Show references** (on by default) draws what the piece is being matched
+  against: the procedural character ghosted underneath, the collision circle the
+  ball has to fill, and the default aim line with its grip and muzzle marks.
+  Ctrl+Z / Ctrl+Shift+Z undo and redo, one step per drag.
+- **Anchors** — drag the anchor points on each source image.
 
 Hit **Export rigs.json** and save the file into this folder. The game merges it
-over the auto-detected anchors on boot. (For opening `index.html` straight off
-disk, `fetch` of a local JSON is blocked by the browser — use **Export rigs.js**
-instead and add `<script src="assets/images/characters/render/rigs.js"></script>`
-to `index.html`.)
+over the auto-detected anchors on boot.
 
 ## No art yet?
 

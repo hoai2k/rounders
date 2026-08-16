@@ -21,7 +21,6 @@
       eyebrow: "1–4 player arena brawler",
       tagline: "Round shooters. Power cards. Arenas with attitude.",
       pressStart: "PRESS START",
-      hint: "Any key · any controller button · or click to begin",
       fullscreenBlocked: "Fullscreen needs a key or click — use the fullscreen button"
     },
 
@@ -137,6 +136,9 @@
 
       blockingTitle: "Blocking",
       blockingHtml: "A well-timed block reflects bullets back at the shooter. Cards can make blocks dash, teleport, echo, or explode.",
+
+      wallTitle: "Wall Jumping",
+      wallHtml: "Jump while touching a wall to kick off it — up and away. Wall kicks are free (they don't spend an air jump), so you can climb a wall by steering back into it and jumping again. Sliding down a wall is slowed too, giving you time to line the next kick up.",
 
       pausingTitle: "Pausing",
       pausingHtml: "<kbd>Esc</kbd>, <kbd>P</kbd> or the <b>Menu</b> button pauses. From there you can resume, open settings, or quit to the menu."

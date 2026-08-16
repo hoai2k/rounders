@@ -156,6 +156,7 @@
       aimX: i % 2 === 0 ? 1 : -1, aimY: 0,
       hp: 100, score: 0, alive: true,
       grounded: false, groundPlatform: null, jumpsLeft: 1,
+      wallDir: 0, wallTimer: 0, wallCooldown: 0,
       ammo: 3, reloadTimer: 0, fireTimer: 0,
       blockTimer: 0, blockCooldown: 0, echoTimer: 0,
       activeCooldown: 0, teleWasInside: false,
@@ -542,6 +543,7 @@
       p.grounded = false;
       p.groundPlatform = null;
       p.jumpsLeft = 1 + p.stats.extraJumps;
+      p.wallDir = 0; p.wallTimer = 0; p.wallCooldown = 0;
       p.ammo = p.stats.maxAmmo;
       p.reloadTimer = 0; p.fireTimer = 0;
       p.blockTimer = 0; p.blockCooldown = 0; p.echoTimer = 0;
@@ -1062,6 +1064,8 @@
       p.spawnGrace = Math.max(0, p.spawnGrace - dt);
       p.hazardGrace = Math.max(0, p.hazardGrace - dt);
       p.teleCooldown = Math.max(0, p.teleCooldown - dt);
+      p.wallTimer = Math.max(0, p.wallTimer - dt);
+      p.wallCooldown = Math.max(0, p.wallCooldown - dt);
       p.blinkClock += dt;
 
       if (p.echoTimer > 0) {
@@ -1129,20 +1133,44 @@
       const aimMag = Math.hypot(p.aimX, p.aimY) || 1;
       p.aimX /= aimMag; p.aimY /= aimMag;
 
-      if (p.input.jumpPressed && p.jumpsLeft > 0) {
-        p.vy = -p.stats.jump * (p.chillTimer > 0 ? 0.75 : 1);
-        p.jumpsLeft -= 1;
-        p.grounded = false;
-        p.groundPlatform = null;
-        pulse(p, 0.12, 25);
-        sfx("jump");
-        puff(p.x, p.y + p.stats.radius, "#ffffff", 10);
+      const chillJump = p.chillTimer > 0 ? 0.75 : 1;
+      if (p.input.jumpPressed) {
+        const canWallJump = !p.grounded && p.wallTimer > 0 && p.wallCooldown <= 0;
+        if (canWallJump) {
+          // Kick up and away from the wall. It costs no air jump, so a wall can
+          // be climbed by steering back into it and jumping again — the push is
+          // deliberately small enough that air control gets you back in ~0.15s.
+          p.vy = -p.stats.jump * 0.92 * chillJump;
+          p.vx = p.wallDir * WALL_JUMP_PUSH;
+          p.wallTimer = 0;
+          p.wallCooldown = 0.14;
+          p.grounded = false;
+          p.groundPlatform = null;
+          pulse(p, 0.16, 35);
+          sfx("jump");
+          burst(p.x - p.wallDir * p.stats.radius, p.y, "#ffffff", 9, 190);
+        } else if (p.jumpsLeft > 0) {
+          p.vy = -p.stats.jump * chillJump;
+          p.jumpsLeft -= 1;
+          p.grounded = false;
+          p.groundPlatform = null;
+          pulse(p, 0.12, 25);
+          sfx("jump");
+          puff(p.x, p.y + p.stats.radius, "#ffffff", 10);
+        }
       }
 
       if (p.input.blockPressed && !tryActive(p)) tryBlock(p);
       if (p.input.shoot) tryShoot(p);
 
       p.vy += levelGravity() * dt;
+      // hugging a wall slows the fall, giving you time to line up the next kick
+      if (!p.grounded && p.wallTimer > 0 && p.vy > WALL_SLIDE_MAX) {
+        p.vy = WALL_SLIDE_MAX;
+        if (Math.random() < dt * 22) {
+          puffOne(p.x - p.wallDir * p.stats.radius, p.y + rand(-10, 14), "rgba(255,255,255,0.75)");
+        }
+      }
       if (wind) p.vx += wind * 0.55 * dt;
       p.vx *= Math.pow(p.grounded && !onIce ? world.floorDrag : world.airDrag, dt * 60);
       // carry by mover
@@ -1214,8 +1242,9 @@
 
   function collidePlayer(p, plats) {
     const r = p.stats.radius;
-    if (p.x < r) { p.x = r; p.vx = Math.abs(p.vx) * 0.46; }
-    if (p.x > world.width - r) { p.x = world.width - r; p.vx = -Math.abs(p.vx) * 0.46; }
+    // wallDir points AWAY from the surface, i.e. the way a wall jump throws you
+    if (p.x < r) { p.x = r; p.vx = Math.abs(p.vx) * 0.46; touchWall(p, 1); }
+    if (p.x > world.width - r) { p.x = world.width - r; p.vx = -Math.abs(p.vx) * 0.46; touchWall(p, -1); }
     if (p.y < r) { p.y = r; p.vy = Math.abs(p.vy) * 0.42; }
     for (const platform of plats) {
       const overlap = playerPlatformOverlap(p, platform);
@@ -1232,11 +1261,24 @@
       } else if (overlap.side === "left") {
         p.x -= overlap.amount;
         p.vx = Math.min(0, p.vx) * 0.22;
+        touchWall(p, -1);
       } else if (overlap.side === "right") {
         p.x += overlap.amount;
         p.vx = Math.max(0, p.vx) * 0.22;
+        touchWall(p, 1);
       }
     }
+  }
+
+  // Wall contact is remembered for a short window so a jump pressed a frame or
+  // two after sliding off the edge of a wall still counts (coyote time).
+  const WALL_COYOTE = 0.12;
+  const WALL_JUMP_PUSH = 300;   // sideways kick; small so the same wall is climbable
+  const WALL_SLIDE_MAX = 250;   // fall speed cap while touching a wall
+  function touchWall(p, awayDir) {
+    if (p.grounded) return;
+    p.wallDir = awayDir;
+    p.wallTimer = WALL_COYOTE;
   }
 
   function playerPlatformOverlap(p, platform) {

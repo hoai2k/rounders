@@ -189,6 +189,7 @@
     const ar = auto.rig;
     if (!sameNum(rec.rig.bodyScale, ar.bodyScale)) r.bodyScale = rec.rig.bodyScale;
     if (!sameNum(rec.rig.bodyRotation, ar.bodyRotation)) r.bodyRotation = rec.rig.bodyRotation;
+    if (!samePt(rec.rig.bodyOffset, ar.bodyOffset)) r.bodyOffset = rec.rig.bodyOffset;
 
     const w = {};
     const aw = ar.weapon;

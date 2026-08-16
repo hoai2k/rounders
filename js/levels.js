@@ -14,7 +14,10 @@
 //                 settles on whatever it lands on (or falls into the void)
 //   crates[]     {x,y,s,hp} — pushable, climbable, destructible boxes; they
 //                 shove, stack, block bullets, and float on tides
-//   hazards[]    deadly rects (spikes/lava/water) — style via palette.hazard
+//   hazards[]    hurt rects — style via palette.hazard. {kind:"water"} makes one
+//                a fluid volume: you float and swim in it taking small ticks of
+//                damage, and bullets crossing it are slowed. Anything else is a
+//                contact hazard (spikes, lava): one hit and a launch clear of it
 //   bouncePads[] {x,y,w,power} launch upward on touch
 //   teleporters[]{ax,ay,bx,by} bidirectional portals
 //   zones[]      {x,y,w,h,type:'syrup'} slow fields
@@ -171,7 +174,7 @@
       movers: [P(560, 585, 160, 22, { dx: 320, dy: 0, period: 6 })],
       hung: [{ x: 660, y: 350, w: 280, h: 24, chains: [720, 880] }],
       crates: [{ x: 380, y: 774, s: 56 }, { x: 1120, y: 774, s: 56 }, { x: 1122, y: 718, s: 56 }],
-      hazards: [P(520, 852, 560, 48)],
+      hazards: [P(520, 852, 560, 48, { kind: "water" })],
       spawns: [{ x: 240, y: 790 }, { x: 1360, y: 790 }, { x: 320, y: 610 }, { x: 1280, y: 610 }]
     },
     {
@@ -329,7 +332,7 @@
       ],
       hung: [{ x: 730, y: 600, w: 140, h: 26, chains: [800], anchorY: 532 }],
       crates: [{ x: 120, y: 774, s: 56 }, { x: 1420, y: 774, s: 56 }],
-      hazards: [P(560, 852, 480, 48)],
+      hazards: [P(560, 852, 480, 48, { kind: "water" })],
       spawns: [{ x: 260, y: 790 }, { x: 1340, y: 790 }, { x: 520, y: 466 }, { x: 1080, y: 466 }]
     },
     {
@@ -397,7 +400,7 @@
         P(1060, 400, 200, 24, { ice: true })
       ],
       crates: [{ x: 60, y: 776, s: 54 }, { x: 1480, y: 776, s: 54 }],
-      hazards: [P(500, 852, 600, 48)],
+      hazards: [P(500, 852, 600, 48, { kind: "water" })],
       spawns: [{ x: 240, y: 790 }, { x: 1360, y: 790 }, { x: 700, y: 700 }, { x: 900, y: 700 }]
     },
     {
@@ -491,7 +494,7 @@
         P(1070, 450, 150, 22, { dx: 0, dy: -80, period: 5.5, phase: 0.5 })
       ],
       crates: [{ x: 150, y: 774, s: 52 }, { x: 1400, y: 774, s: 52 }],
-      hazards: [P(480, 852, 640, 48)],
+      hazards: [P(480, 852, 640, 48, { kind: "water" })],
       spawns: [{ x: 240, y: 790 }, { x: 1360, y: 790 }, { x: 300, y: 615 }, { x: 1300, y: 615 }]
     },
     {

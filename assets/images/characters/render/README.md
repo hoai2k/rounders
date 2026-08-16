@@ -25,23 +25,31 @@ Don't hand-place files here if they arrived on a solid backdrop — drop them in
 out, writes the transparent PNG here, and keeps the delivered original in
 `../archive/`.
 
-## When the parts aren't on the same canvas
+## How the pieces get sized and placed
 
-The current cast is delivered the other way: every part is drawn full-frame on
-its own canvas, so nothing shares a position or a scale. `npm run fitrig`
-recovers the composition from the canonical hero image — it matches each part's
-silhouette into the canonical silhouette and writes the resulting mount, weapon
-scale and arm anchors to `rigs.json`. Re-run it whenever new parts land; tune
-anything it gets wrong in `/workbench`.
+The weapon is the player's aim indicator, so it is fitted to the same geometry
+the procedural renderer in `js/characters.js` draws, not to whatever the source
+art happened to do:
+
+| | |
+|---|---|
+| body | the **largest circle that fits inside the body silhouette** is the collision circle, so the ball lines up with the hitbox and horns, ears and hair stick out past it |
+| weapon | scaled so **grip → muzzle is 1.5 body radii**, with the grip riding **0.55 radii out along the aim** — the same numbers as the procedural weapon, so the muzzle sits 2.05 radii out and the whole barrel lies on the aim ray |
+| aim | the barrel's tilt in the source image is measured and cancelled, so the weapon points exactly where the stick does at every angle, not approximately |
+| hands | bare nub hands are sized to a fraction of the body radius and placed at the grip and fore-grip |
+
+That is all automatic and needs no rig file. The one thing the art can't tell
+the game is how big a character's hands are meant to be — the parts are drawn
+full-frame, so a hand arrives as a ball half the size of the body. `npm run
+fitrig` recovers that from the canonical hero image (it matches the arm art into
+the canonical silhouette) and writes the measured hand size and grip position to
+`rigs.json`. Re-run it when new parts land; adjust anything in `/workbench`.
 
 ## Export tips
 
-- **Keep all three parts on the same canvas as the original render** (e.g. all
-  512×512, weapon and hands still where they were in the full illustration).
-  When the frames match, every anchor is detected automatically and the character
-  composes correctly with no hand-tuning at all.
-- If a part is exported cropped to its own frame, that also works — the weapon
-  just gets a generic default position that you will want to fix in `/workbench`.
+- Any framing works: parts may share the original canvas or each be drawn
+  full-frame on their own. Position and scale are re-derived either way (see
+  above), so what matters is that each part is drawn cleanly and **aimed right**.
 - The arm image may contain one blob or two (near arm and far arm); each blob is
   cropped into its own sprite automatically. **Draw arms pointing right**, the
   same way the weapon does: the shoulder end (the end that meets the body) on the
@@ -71,7 +79,7 @@ needs to contain what you want to override.
 |---|---|---|
 | body | `pivot` | the physics center — the point the game positions the character by |
 | body | `radius` | the body's visual radius in image px; maps to the player's collision radius |
-| body | `mount` | where the weapon's grip sits on the body |
+| body | `mount` | where the weapon's grip sits; only its distance from the pivot is used while `orbit` is on |
 | weapon | `grip` | the point that lands on the body's mount and the weapon rotates around |
 | weapon | `muzzle` | the barrel tip — bullets and the aim ray originate here |
 | arm | `anchors[i].shoulder` | the end of arm sprite *i* that meets the body |
@@ -86,6 +94,14 @@ Placement then lives in `rig.arms[i]`:
 | `stretch` | — | when true the arm swings from the socket and stretches along its own axis to reach the hold; when false it is rigidly parented to the weapon (the old hand behaviour) |
 | `minStretch` / `maxStretch` | — | how far the arm may squash or reach before it stops following, so it never turns into a noodle |
 | `z` | — | `back` (behind the body), `mid` (behind the weapon) or `front` |
+
+And in `rig.weapon`:
+
+| Field | Meaning |
+|---|---|
+| `scale` | multiplies the body's px→world scale; the default makes the barrel 1.5 radii |
+| `rotation` | degrees added to the aim angle; the default cancels the barrel's tilt in the art |
+| `orbit` | when true the grip swings around the body with the aim, so the barrel stays on the aim ray (how the procedural weapon behaves). Turn it off to pin the grip where the art holds it and let the weapon rotate about that point |
 
 Rig files written before arms existed still load: a `rig.hands` entry becomes a
 rigid arm holding at the same point.

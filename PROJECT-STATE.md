@@ -77,10 +77,14 @@ Pillars:
       for the 6 arenas whose silhouette changed most (Neon Skyline, Koi Temple,
       Tidal Wreck, Midnight Library, Lantern Festival, Aurora Summit), painted
       to the new geometry and filed at `assets/images/arenas/`
-- [ ] **Card art panels** (`image-requests-history.md` §7): the 52 painted
-      512×384 scenes are delivered and filed at `assets/images/cards/art/<id>.png`,
-      but nothing draws them yet — the card face needs an art panel above the
-      name in the draft hand (and maybe the HUD chips)
+- [x] **Card art panels wired in** (`image-requests-history.md` §7): the 52
+      painted 512×384 scenes at `assets/images/cards/art/<id>.png` are drawn
+      full-bleed across the top of every full card face — the draft hand (CSS
+      layers) and the card a bot is shown taking (canvas, centre-cropped and
+      clipped to the rounded panel). The 256×256 emblems still drive the tiny
+      HUD chips and stand in if a scene is ever missing; a card with neither
+      draws the tinted panel. Card text clamps to 3 lines so the effect pills
+      always keep their space
 
 ### 4. Characters — 24 pilots across two waves, procedural + generated art
 - [x] Round 2: 12 indie-badass characters lead the roster (Vex, Rook, Jinx,

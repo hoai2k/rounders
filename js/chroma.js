@@ -90,12 +90,37 @@
       if (!best || b.n > best.n) best = b;
     }
     if (!best || !total) return null;
+
+    // Refine off the bucket mean: a flat backdrop that straddles a quantization
+    // boundary (127/128 grey) lands in two buckets and would otherwise look
+    // like a half-covered border. Re-measure against the color itself.
+    let mean = { r: best.r / best.n, g: best.g / best.n, b: best.b / best.n };
+    let near = 0;
+    for (let pass = 0; pass < 2; pass += 1) {
+      let n = 0, sr = 0, sg = 0, sb = 0;
+      const visit = (x, y) => {
+        const i = (y * w + x) * 4;
+        if (rgba[i + 3] < 128) return;
+        if (dist(rgba[i], rgba[i + 1], rgba[i + 2], mean.r, mean.g, mean.b) > 0.05) return;
+        n += 1; sr += rgba[i]; sg += rgba[i + 1]; sb += rgba[i + 2];
+      };
+      for (let y = 0; y < h; y += 1) {
+        const edgeRow = y < band || y >= h - band;
+        for (let x = 0; x < w; x += 1) {
+          if (edgeRow || x < band || x >= w - band) visit(x, y);
+        }
+      }
+      if (!n) break;
+      mean = { r: sr / n, g: sg / n, b: sb / n };
+      near = n;
+    }
+
     return {
-      r: Math.round(best.r / best.n),
-      g: Math.round(best.g / best.n),
-      b: Math.round(best.b / best.n),
+      r: Math.round(mean.r),
+      g: Math.round(mean.g),
+      b: Math.round(mean.b),
       // Share of the border that is this color — a real backdrop is near 1.
-      coverage: best.n / total
+      coverage: Math.max(best.n, near) / total
     };
   }
 

@@ -78,6 +78,11 @@
     window.ROUNDERS.rig.loadRigs();
   }
 
+  // Settings toggle: draw everyone with the built-in procedural art instead of
+  // the generated sprites, everywhere (arena, HUD, lobby, victory).
+  let procedural = false;
+  function setProceduralCharacters(on) { procedural = !!on; }
+
   function hasImage(id) { return images.has(id); }
   function getImage(id) { return images.get(id) || null; }
 
@@ -92,13 +97,13 @@
 
     // 1) composed rig (body + aimable weapon + attached arms) when the parts exist
     const rig = window.ROUNDERS.rig;
-    if (rig && opts.useImage !== false && opts.useRig !== false) {
+    if (rig && !procedural && opts.useImage !== false && opts.useRig !== false) {
       if (rig.draw(ctx, ch, r, { aimX, aimY, wob })) return;
     }
 
     // 2) single canonical PNG
     const img = images.get(ch.id);
-    if (img && opts.useImage !== false) {
+    if (img && !procedural && opts.useImage !== false) {
       const s = r * 2.5;
       ctx.save();
       if (aimX < 0) ctx.scale(-1, 1);
@@ -1064,5 +1069,6 @@
 
   window.ROUNDERS.CHARACTERS = CHARACTERS;
   window.ROUNDERS.drawCharacter = drawCharacter;
+  window.ROUNDERS.setProceduralCharacters = setProceduralCharacters;
   window.ROUNDERS.characterImage = { has: hasImage, get: getImage };
 })();

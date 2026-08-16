@@ -7,7 +7,8 @@ npm run intake          # add --dry-run first to see what it would do
 ```
 
 Each file is inspected, keyed if it needs it, written to the path the game
-expects, and the delivered original is moved to `art-source/characters/`.
+expects, and any file that had to be keyed is preserved as delivered in
+`assets/images/characters/archive/`.
 
 | Dropped file | Goes to |
 |---|---|
@@ -21,7 +22,7 @@ appear somewhere in the name.
 
 **What happens to the background:**
 
-- already transparent → copied through untouched;
+- already transparent → moved into place untouched (nothing to archive);
 - flat backdrop (magenta / green / white screen) → detected from the border,
   cut out with a soft edge, and its color bleed removed from the outline. Only
   backdrop connected to the border is cut, so a magenta visor on a magenta

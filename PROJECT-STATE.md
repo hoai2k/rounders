@@ -92,6 +92,18 @@ Pillars:
       already-transparent art passes through untouched. `/workbench/intake.html`
       is the visual version for stubborn cutouts; `js/chroma.js` is shared by
       both and also keys at load time as a safety net
+- [x] **Art landed (24 characters)**: canonical hero images in
+      `assets/images/characters/canonical/`, body/weapon/arm parts in `render/`.
+      22 of the 96 delivered files arrived opaque on magenta/green/grey screens
+      and were keyed at intake; the delivered originals are kept in
+      `characters/archive/`
+- [x] **`npm run fitrig`**: the delivered parts are each drawn full-frame on
+      their own canvas, so nothing shares a position or scale. The fitter
+      matches each part's silhouette into the canonical hero image to recover
+      the composition (mount, weapon scale, arm anchors) and writes
+      `render/rigs.json`, which the game merges over its auto-detection
+- [x] Settings → Visuals → **Use Procedural Characters** (default off) draws the
+      whole roster with the built-in vector art instead of the sprites
 - [x] Files: `js/characters.js`, `js/rig.js`, `js/chroma.js`, `tools/`, `workbench/`
 
 ### 5. Game flow redesign

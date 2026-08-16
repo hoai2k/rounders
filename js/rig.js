@@ -5,12 +5,19 @@
 //
 //   <id>_body.png    the body, facing right, no weapon
 //   <id>_weapon.png  the weapon alone, aimed right
-//   <id>_arm.png     one or two small blobs used as the hands on the weapon
+//   <id>_arm.png     one or two arms/hands, facing right (shoulder end left,
+//                    hand end right) — a round nub hand works too
 //
 // When those exist the character is drawn as a composition: the body mirrors
-// with facing, and the weapon rotates to the aim direction with the hands
-// riding along on it. Anchors (body pivot/radius/mount, weapon grip/muzzle,
-// hand pivots) are detected automatically from the alpha channel and can be
+// with facing, and the weapon rotates to the aim direction. Each arm bridges
+// the two: its shoulder end stays pinned to a socket on the *body* and its
+// hand end rides a hold point on the *weapon*, so the arm swings (and stretches
+// a little, within limits) as the weapon tracks the aim. A stubby blob with no
+// direction to it degrades to the old behaviour — a hand rigidly parented to
+// the weapon.
+//
+// Anchors (body pivot/radius/mount/sockets, weapon grip/muzzle, arm
+// shoulder/hand) are detected automatically from the alpha channel and can be
 // overridden by a rig file authored in /workbench.
 //
 // Everything degrades: no rig images -> the single canonical character PNG,
@@ -74,6 +81,7 @@
   const ALPHA = 24;       // alpha above this counts as ink
   const MAX_DIM = 320;    // analysis resolution cap
   const MIN_AREA = 0.0006; // component smaller than this fraction of the frame is noise
+  const MIN_ELONGATION = 1.45; // below this an arm blob is treated as a bare hand
 
   function alphaMask(img) {
     const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
@@ -150,6 +158,49 @@
     return n ? ((sum / n) + 0.5) * sy : comp.cy;
   }
 
+  // Principal axis of a component, oriented rightwards (art faces right, so the
+  // shoulder is the trailing end and the hand the leading one). Returns the two
+  // end points in image px plus how elongated the blob is.
+  function axis(comp) {
+    const { pixels, w, sx, sy, cx, cy } = comp;
+    let xx = 0, yy = 0, xy = 0;
+    for (const p of pixels) {
+      const dx = ((p % w) + 0.5) * sx - cx;
+      const dy = (((p / w) | 0) + 0.5) * sy - cy;
+      xx += dx * dx; yy += dy * dy; xy += dx * dy;
+    }
+    const n = pixels.length;
+    xx /= n; yy /= n; xy /= n;
+    // Major eigenvector of the 2x2 covariance matrix.
+    const t = (xx + yy) / 2;
+    const d = Math.sqrt(Math.max(0, ((xx - yy) / 2) ** 2 + xy * xy));
+    const l1 = t + d, l2 = Math.max(1e-6, t - d);
+    let ux = xy, uy = l1 - xx;
+    if (Math.hypot(ux, uy) < 1e-6) { ux = 1; uy = 0; }
+    const len = Math.hypot(ux, uy);
+    ux /= len; uy /= len;
+    if (ux < 0) { ux = -ux; uy = -uy; } // point along +x: shoulder → hand
+
+    let lo = Infinity, hi = -Infinity, perp = 0;
+    for (const p of pixels) {
+      const dx = ((p % w) + 0.5) * sx - cx;
+      const dy = (((p / w) | 0) + 0.5) * sy - cy;
+      const a = dx * ux + dy * uy;
+      if (a < lo) lo = a;
+      if (a > hi) hi = a;
+      perp = Math.max(perp, Math.abs(-dx * uy + dy * ux));
+    }
+    // Pull the ends in by half the blob's width so the anchors sit inside the
+    // ink rather than on the silhouette's tip.
+    const inset = Math.min(perp, (hi - lo) * 0.25);
+    const at = (a) => ({ x: cx + ux * a, y: cy + uy * a });
+    return {
+      shoulder: at(lo + inset),
+      hand: at(hi - inset),
+      elongation: Math.sqrt(l1 / l2)
+    };
+  }
+
   // Crop a component out of the source image into its own canvas sprite.
   function cropSprite(img, comp) {
     const pad = 2;
@@ -193,36 +244,60 @@
       ? { x: weapon.grip.x, y: weapon.grip.y }
       : { x: body.pivot.x + body.radius * 0.5, y: body.pivot.y + body.radius * 0.2 };
 
-    // Hands: every blob in the arm image becomes a hand sprite, positioned in
-    // weapon space (same-frame exports place themselves; otherwise they get
-    // spread along the barrel).
-    const hands = [];
+    // Arms: every blob in the arm image becomes one arm sprite with a shoulder
+    // end and a hand end. Same-frame exports place themselves (the shoulder is
+    // already touching the body and the hand already on the weapon); otherwise
+    // sockets sit on the body's mount side and holds spread along the barrel.
+    const arms = [];
     const sprites = [];
+    const anchors = [];
     if (e.arm) {
       const armComps = components(alphaMask(e.arm)).sort((p, q) => p.cx - q.cx);
       const armSame = e.arm.width === e.weapon.width && e.arm.height === e.weapon.height;
       const dx = weapon.muzzle.x - weapon.grip.x;
       const dy = weapon.muzzle.y - weapon.grip.y;
       armComps.forEach((comp, i) => {
-        sprites.push(cropSprite(e.arm, comp));
+        const sprite = cropSprite(e.arm, comp);
+        const ax = axis(comp);
+        // A round nub has no direction worth trusting: collapse it to a hand.
+        const nub = ax.elongation < MIN_ELONGATION;
+        sprites.push(sprite);
+        anchors.push({
+          shoulder: nub ? { x: comp.cx, y: comp.cy } : ax.shoulder,
+          hand: nub ? { x: comp.cx, y: comp.cy } : ax.hand,
+          radius: comp.radius
+        });
         const along = armComps.length > 1 ? 0.12 + i * 0.3 : 0.18;
-        hands.push({
+        const hold = armSame
+          ? { x: nub ? comp.cx : ax.hand.x, y: nub ? comp.cy : ax.hand.y }
+          : { x: weapon.grip.x + dx * along, y: weapon.grip.y + dy * along };
+        const socket = armSame && !nub
+          ? { x: ax.shoulder.x, y: ax.shoulder.y }
+          : {
+            x: body.pivot.x + (body.mount.x - body.pivot.x) * 0.55,
+            y: body.pivot.y + (body.mount.y - body.pivot.y) * 0.55
+          };
+        arms.push({
           sprite: i,
-          x: armSame ? comp.cx : weapon.grip.x + dx * along,
-          y: armSame ? comp.cy : weapon.grip.y + dy * along,
+          socket, hold,
           scale: 1,
-          behind: false
+          stretch: !nub,
+          minStretch: 0.8,
+          maxStretch: 1.5,
+          // With two arms the left-hand blob is the far one: it reads better
+          // tucked behind the body and the weapon.
+          z: armComps.length > 1 && i === 0 ? "back" : "front"
         });
       });
     }
 
     e.auto = {
       body, weapon,
-      arm: { sprites, pivots: sprites.map((s) => ({ x: s.cx, y: s.cy, radius: s.radius })) },
+      arm: { sprites, anchors },
       rig: {
         bodyScale: 1,
         weapon: { scale: 1, rotation: 0, offset: { x: 0, y: 0 }, behind: false },
-        hands
+        arms
       },
       meta: { sameFrame, bodySize: [e.body.width, e.body.height], weaponSize: [e.weapon.width, e.weapon.height] }
     };
@@ -233,6 +308,40 @@
 
   function num(a, b) { return typeof a === "number" && isFinite(a) ? a : b; }
   function pt(a, b) { return a ? { x: num(a.x, b.x), y: num(a.y, b.y) } : { ...b }; }
+
+  const DEFAULT_ARM = {
+    sprite: 0, socket: { x: 0, y: 0 }, hold: { x: 0, y: 0 },
+    scale: 1, stretch: false, minStretch: 0.8, maxStretch: 1.5, z: "front"
+  };
+  const Z = ["back", "mid", "front"];
+
+  // Saved arms merge slot-by-slot over the detected ones. Rig files written
+  // before arms existed carry `hands` (a sprite parented straight to the
+  // weapon) — those still load, as rigid arms holding at the same point.
+  function mergeArms(auto, sr) {
+    const saved = Array.isArray(sr.arms) && sr.arms.length
+      ? sr.arms
+      : Array.isArray(sr.hands) && sr.hands.length
+        ? sr.hands.map((h) => ({
+          sprite: h.sprite, hold: { x: h.x, y: h.y }, scale: h.scale,
+          stretch: false, z: h.behind ? "mid" : "front"
+        }))
+        : null;
+    if (!saved) return auto.rig.arms;
+    return saved.map((a, i) => {
+      const d = auto.rig.arms[i] || auto.rig.arms[0] || DEFAULT_ARM;
+      return {
+        sprite: num(a.sprite, d.sprite),
+        socket: pt(a.socket, d.socket),
+        hold: pt(a.hold, d.hold),
+        scale: num(a.scale, d.scale),
+        stretch: a.stretch ?? d.stretch,
+        minStretch: num(a.minStretch, d.minStretch),
+        maxStretch: num(a.maxStretch, d.maxStretch),
+        z: Z.includes(a.z) ? a.z : d.z
+      };
+    });
+  }
 
   // Merge the saved (possibly sparse) override on top of detected anchors.
   function resolve(id) {
@@ -256,9 +365,11 @@
       },
       arm: {
         sprites: auto.arm.sprites,
-        pivots: auto.arm.pivots.map((p, i) => {
-          const s = saved.arm && saved.arm.pivots && saved.arm.pivots[i];
-          return s ? { x: num(s.x, p.x), y: num(s.y, p.y), radius: num(s.radius, p.radius) } : p;
+        anchors: auto.arm.anchors.map((a, i) => {
+          const s = saved.arm && saved.arm.anchors && saved.arm.anchors[i];
+          return s
+            ? { shoulder: pt(s.shoulder, a.shoulder), hand: pt(s.hand, a.hand), radius: num(s.radius, a.radius) }
+            : a;
         })
       },
       rig: {
@@ -269,17 +380,7 @@
           offset: pt(srw.offset, auto.rig.weapon.offset),
           behind: srw.behind ?? auto.rig.weapon.behind
         },
-        hands: Array.isArray(sr.hands) && sr.hands.length
-          ? sr.hands.map((h, i) => {
-            const d = auto.rig.hands[i] || auto.rig.hands[0] || { sprite: 0, x: 0, y: 0, scale: 1, behind: false };
-            return {
-              sprite: num(h.sprite, d.sprite),
-              x: num(h.x, d.x), y: num(h.y, d.y),
-              scale: num(h.scale, d.scale),
-              behind: h.behind ?? d.behind
-            };
-          })
-          : auto.rig.hands
+        arms: mergeArms(auto, sr)
       },
       meta: auto.meta
     };
@@ -344,41 +445,93 @@
     };
   }
 
-  function drawWeaponGroup(ctx, T) {
+  function drawWeapon(ctx, T) {
     const { R, kw, angle, mount } = T;
     ctx.save();
     ctx.translate(mount.x, mount.y);
     ctx.rotate(angle);
-    const hands = R.rig.hands;
-    const back = hands.filter((h) => h.behind);
-    const front = hands.filter((h) => !h.behind);
-    for (const h of back) drawHand(ctx, T, h);
     ctx.drawImage(
       T.weaponImg,
       -R.weapon.grip.x * kw, -R.weapon.grip.y * kw,
       T.weaponImg.width * kw, T.weaponImg.height * kw
     );
-    for (const h of front) drawHand(ctx, T, h);
     ctx.restore();
   }
 
-  function drawHand(ctx, T, h) {
-    const { R, k, kw } = T;
-    const sprite = R.arm.sprites[h.sprite];
-    if (!sprite) return;
-    const pivot = R.arm.pivots[h.sprite] || { x: sprite.cx, y: sprite.cy };
-    const s = k * h.scale;
+  // Where a hold point (weapon-image px) ends up in the mirrored rig frame.
+  function holdPoint(T, p) {
+    const { R, kw, angle, mount } = T;
+    const x = (p.x - R.weapon.grip.x) * kw;
+    const y = (p.y - R.weapon.grip.y) * kw;
+    return {
+      x: mount.x + x * Math.cos(angle) - y * Math.sin(angle),
+      y: mount.y + x * Math.sin(angle) + y * Math.cos(angle)
+    };
+  }
+
+  // Solve one arm: shoulder pinned to the body socket, hand riding the weapon.
+  // Everything is in the mirrored rig frame, so it works for either facing.
+  // Returns null when the arm has no sprite to draw.
+  function armPose(T, a) {
+    const { R, k, wob } = T;
+    const sprite = R.arm.sprites[a.sprite];
+    if (!sprite) return null;
+    const anchor = R.arm.anchors[a.sprite] || { shoulder: { x: sprite.cx, y: sprite.cy }, hand: { x: sprite.cx, y: sprite.cy } };
+    const s = k * a.scale;
+    // The socket rides the body, so it takes the body's bob with it.
+    const socket = {
+      x: (a.socket.x - R.body.pivot.x) * k,
+      y: (a.socket.y - R.body.pivot.y) * k + wob
+    };
+    const hold = holdPoint(T, a.hold);
+    const rest = Math.hypot(anchor.hand.x - anchor.shoulder.x, anchor.hand.y - anchor.shoulder.y) * s;
+
+    // A hand (or an arm explicitly pinned) is simply parented to the weapon.
+    if (!a.stretch || rest < 1e-3) {
+      return { sprite, anchor, s, socket, hold, pivot: "hand", angle: T.angle, stretch: 1 };
+    }
+    const dist = Math.hypot(hold.x - socket.x, hold.y - socket.y);
+    const stretch = Math.min(a.maxStretch, Math.max(a.minStretch, dist / rest));
+    return {
+      sprite, anchor, s, socket, hold, pivot: "shoulder",
+      angle: Math.atan2(hold.y - socket.y, hold.x - socket.x),
+      // The sprite's own shoulder→hand direction, so art drawn at any angle
+      // still lines up along the socket→hold line.
+      rest: Math.atan2(anchor.hand.y - anchor.shoulder.y, anchor.hand.x - anchor.shoulder.x),
+      stretch
+    };
+  }
+
+  function drawArm(ctx, T, a) {
+    const P = armPose(T, a);
+    if (!P) return;
+    const { sprite, anchor, s } = P;
     ctx.save();
-    // Hand coordinates are weapon-image pixels; the weapon frame's origin is
-    // the grip, so they are placed relative to it.
-    ctx.translate((h.x - R.weapon.grip.x) * kw, (h.y - R.weapon.grip.y) * kw);
-    // The sprite's own pivot lands on the hand point.
+    if (P.pivot === "hand") {
+      // Rigid: the sprite's hand anchor lands on the hold point and the whole
+      // thing turns with the weapon.
+      ctx.translate(P.hold.x, P.hold.y);
+      ctx.rotate(P.angle);
+      ctx.translate(-anchor.hand.x * s, -anchor.hand.y * s);
+    } else {
+      // Bridged: pivot at the shoulder, swing to face the hold point, then
+      // stretch along that line so the hand reaches it.
+      ctx.translate(P.socket.x, P.socket.y);
+      ctx.rotate(P.angle);
+      ctx.scale(P.stretch, 1);
+      ctx.rotate(-P.rest);
+      ctx.translate(-anchor.shoulder.x * s, -anchor.shoulder.y * s);
+    }
     ctx.drawImage(
       sprite.canvas,
-      (sprite.frame.x - pivot.x) * s, (sprite.frame.y - pivot.y) * s,
+      sprite.frame.x * s, sprite.frame.y * s,
       sprite.frame.w * s, sprite.frame.h * s
     );
     ctx.restore();
+  }
+
+  function drawArms(ctx, T, z) {
+    for (const a of T.R.rig.arms) if (a.z === z) drawArm(ctx, T, a);
   }
 
   // Draws the rigged character centered at (0,0). Returns false if unavailable.
@@ -391,13 +544,16 @@
 
     ctx.save();
     ctx.scale(T.facing, 1);
-    if (T.R.rig.weapon.behind) drawWeaponGroup(ctx, T);
+    drawArms(ctx, T, "back");
+    if (T.R.rig.weapon.behind) drawWeapon(ctx, T);
     ctx.drawImage(
       e.body,
       -T.R.body.pivot.x * T.k, -T.R.body.pivot.y * T.k + T.wob,
       e.body.width * T.k, e.body.height * T.k
     );
-    if (!T.R.rig.weapon.behind) drawWeaponGroup(ctx, T);
+    drawArms(ctx, T, "mid");
+    if (!T.R.rig.weapon.behind) drawWeapon(ctx, T);
+    drawArms(ctx, T, "front");
     ctx.restore();
     return true;
   }
@@ -408,12 +564,8 @@
     const id = typeof ch === "string" ? ch : ch.id;
     const T = transform(id, r, aimX, aimY, wob);
     if (!T) return null;
-    const { R, kw, angle, mount, facing } = T;
-    const mx = (R.weapon.muzzle.x - R.weapon.grip.x) * kw;
-    const my = (R.weapon.muzzle.y - R.weapon.grip.y) * kw;
-    const x = mount.x + mx * Math.cos(angle) - my * Math.sin(angle);
-    const y = mount.y + mx * Math.sin(angle) + my * Math.cos(angle);
-    return { x: x * facing, y };
+    const p = holdPoint(T, T.R.weapon.muzzle);
+    return { x: p.x * T.facing, y: p.y };
   }
 
   window.ROUNDERS.rig = {
@@ -421,7 +573,7 @@
     preload, assets, hasRig,
     analyze: (id) => analyze(entry(id)),
     resolved: getResolved,
-    transform, draw, muzzle,
+    transform, draw, muzzle, armPose, holdPoint,
     setRigs, setCharacterRig, getRigFile, loadRigs, invalidate
   };
 })();

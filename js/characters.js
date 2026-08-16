@@ -90,7 +90,7 @@
     const body = opts.color || ch.color;
     const wob = Math.sin(t * 8.5) * r * 0.04;
 
-    // 1) composed rig (body + aimable weapon + hands) when the render parts exist
+    // 1) composed rig (body + aimable weapon + attached arms) when the parts exist
     const rig = window.ROUNDERS.rig;
     if (rig && opts.useImage !== false && opts.useRig !== false) {
       if (rig.draw(ctx, ch, r, { aimX, aimY, wob })) return;

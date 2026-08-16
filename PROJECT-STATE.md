@@ -68,12 +68,20 @@ Pillars:
 - [x] Character select in the lobby: each player joins, cycles characters, locks in
 - [x] **Composed sprites**: when `assets/images/characters/render/<id>_body.png` +
       `_weapon.png` (+ optional `_arm.png`) exist, the character is drawn from parts —
-      body mirrors with facing, weapon rotates to the aim, hands ride the weapon,
-      bullets spawn at the real muzzle. Anchors (body pivot/radius/mount, weapon
-      grip/muzzle, hand pivots) are auto-detected from the alpha channel; parts
-      exported on the same canvas as the original render need no tuning at all
+      body mirrors with facing, weapon rotates to the aim, bullets spawn at the
+      real muzzle. Anchors (body pivot/radius/mount, weapon grip/muzzle, arm
+      shoulder/hand) are auto-detected from the alpha channel; parts exported on
+      the same canvas as the original render need no tuning at all
+- [x] **Arm attachment**: each arm sprite (drawn facing right like the weapon)
+      keeps its shoulder pinned to a socket on the body and its hand on a hold
+      point that rides the weapon, swinging and stretching within limits as the
+      weapon tracks the aim. Round nub hands with no direction to them fall back
+      to being rigidly parented to the weapon; per-arm layering is back / behind
+      weapon / front. `npm run mock-parts <id>` writes placeholder parts so the
+      whole path can be exercised before art arrives
 - [x] `/workbench` UI for hand-tuning: character grid on the left, interactive viewer
-      on the right, **character** mode (place/orient/size weapon + hands) and
+      on the right, **character** mode (place/orient/size weapon + arms, with a
+      shoulder and a hand handle per arm and a stretch-limit warning) and
       **anchor** mode (anchor points on body/weapon/arm), exports `rigs.json`
       (or `rigs.js` for `file://`) which the game merges over the auto anchors
 - [x] **Art intake**: `npm run intake` takes delivered files from `intake/`, keys

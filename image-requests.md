@@ -59,13 +59,17 @@ protruding to the right, thick outline, flat vibrant colors, transparent backgro
 > **Split parts (preferred).** Alongside each canonical image, export the same
 > render split into three transparent PNGs **on the identical 512×512 canvas** —
 > nothing moved, just parts erased — into `assets/images/characters/render/`:
-> `<id>_body.png` (body only, no weapon, no hands), `<id>_weapon.png` (weapon
-> only, aimed right), `<id>_arm.png` (just the one or two nub hands). The game
-> then composes the character so the weapon aims wherever the player aims while
-> the body mirrors with facing. Keeping the same canvas means every anchor is
-> detected automatically; see `assets/images/characters/render/README.md` and the
-> `/workbench` tuning UI. The canonical single image stays the hero/reference art
-> (victory scenes, card portraits) and the fallback when parts are missing.
+> `<id>_body.png` (body only, no weapon, no arms), `<id>_weapon.png` (weapon
+> only, aimed right), `<id>_arm.png` (just the one or two nub arms, **also facing
+> right** — the shoulder end that meets the body on the left, the hand end that
+> grips the weapon on the right). The game then composes the character so the
+> weapon aims wherever the player aims while the body mirrors with facing, and
+> each arm keeps its shoulder on the body and its hand on the weapon as the
+> weapon swings. Keeping the same canvas means every anchor — including each
+> arm's shoulder and hand — is detected automatically; see
+> `assets/images/characters/render/README.md` and the `/workbench` tuning UI. The
+> canonical single image stays the hero/reference art (victory scenes, card
+> portraits) and the fallback when parts are missing.
 
 | File | Character | Prompt additions |
 |---|---|---|
@@ -221,7 +225,8 @@ background.*
 
 Same split-parts request as §3: also export `<id>_body.png`, `<id>_weapon.png`
 and `<id>_arm.png` on the identical canvas into
-`assets/images/characters/render/`.
+`assets/images/characters/render/` — arms facing right, shoulder end left, hand
+end right, so they attach to the body and ride the weapon.
 
 | File | Character | Prompt additions |
 |---|---|---|

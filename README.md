@@ -53,7 +53,10 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
   Rook, Jinx, Diesel, Nyx, Saber, Havoc, Wraith, Blitz, Fang, Onyx, Riot) and
   the founding cheerful cast — round bodies, signature weapons, big personalities.
   Fully procedural art, with automatic upgrade to generated images when dropped
-  into `assets/images/` (see `image-requests.md`).
+  into `assets/images/` (see `image-requests.md`). Characters whose art is split
+  into body/weapon/arm parts under `assets/images/characters/render/` are drawn
+  composed — the body mirrors with facing while the weapon aims where the player
+  aims. Tune the composition at `/workbench`.
 - **Simultaneous drafting** — when several players lose a round, they all draft at
   once, each with their own hand and controls.
 - Bots (three difficulties), controller rumble, screen shake, synth SFX, and a
@@ -73,6 +76,8 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 | `game.js` | Engine: physics, combat, arena features, draft flow, rendering, menus |
 | `js/cards.js` | The 52-card set + rarity metadata |
 | `js/levels.js` | The 25 arenas |
-| `js/characters.js` | The 12 characters + procedural renderer |
+| `js/characters.js` | The 24 characters + procedural renderer |
+| `js/rig.js` | Composed sprites: loads body/weapon/arm parts, detects anchors, draws the aimable rig |
+| `workbench/` | Sprite workbench — tune anchors and weapon/hand placement, export `rigs.json` |
 | `index.html`, `styles.css` | UI |
 | `server.mjs` | Zero-dependency static server |

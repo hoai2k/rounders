@@ -1202,13 +1202,17 @@
     const rageMul = p.stats.rage > 0 ? 1 + p.stats.rage * (1 - clamp(p.hp / p.stats.maxHp, 0, 1)) : 1;
     const baseAngle = Math.atan2(p.aimY, p.aimX);
     const pellets = p.stats.pellets;
+    // Rigged characters fire from the actual barrel tip; everyone else keeps
+    // the old fixed offset along the aim.
+    const muz = window.ROUNDERS.rig ? window.ROUNDERS.rig.muzzle(p.character, p.stats.radius, p.aimX, p.aimY) : null;
     for (let i = 0; i < pellets; i += 1) {
       const spread = (i - (pellets - 1) / 2) * p.stats.spread + rand(-0.018, 0.018);
       const a = baseAngle + spread;
       const speed = p.stats.bulletSpeed * rand(0.94, 1.05);
       bullets.push({
         owner: p,
-        x: p.x + Math.cos(a) * 34, y: p.y + Math.sin(a) * 34,
+        x: p.x + (muz ? muz.x : Math.cos(a) * 34),
+        y: p.y + (muz ? muz.y : Math.sin(a) * 34),
         prevX: p.x, prevY: p.y, ox: p.x, oy: p.y,
         vx: Math.cos(a) * speed + p.vx * 0.18,
         vy: Math.sin(a) * speed + p.vy * 0.08,

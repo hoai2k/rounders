@@ -64,7 +64,13 @@
     const img = new Image();
     img.onload = () => images.set(ch.id, img);
     img.onerror = () => {};
-    img.src = `assets/images/characters/${ch.id}.png`;
+    img.src = `${window.ROUNDERS_ASSET_BASE || ""}assets/images/characters/${ch.id}.png`;
+  }
+
+  // Composed render parts (body/weapon/arm) + their hand-tweaked rig file.
+  if (window.ROUNDERS.rig) {
+    window.ROUNDERS.rig.preload(CHARACTERS.map((c) => c.id));
+    window.ROUNDERS.rig.loadRigs();
   }
 
   function hasImage(id) { return images.has(id); }
@@ -79,6 +85,13 @@
     const body = opts.color || ch.color;
     const wob = Math.sin(t * 8.5) * r * 0.04;
 
+    // 1) composed rig (body + aimable weapon + hands) when the render parts exist
+    const rig = window.ROUNDERS.rig;
+    if (rig && opts.useImage !== false && opts.useRig !== false) {
+      if (rig.draw(ctx, ch, r, { aimX, aimY, wob })) return;
+    }
+
+    // 2) single canonical PNG
     const img = images.get(ch.id);
     if (img && opts.useImage !== false) {
       const s = r * 2.5;

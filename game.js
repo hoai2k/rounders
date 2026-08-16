@@ -137,9 +137,16 @@
   function defaultStats() {
     return {
       maxHp: 100, speed: 560, accel: 12, airAccel: 5.2, brake: 10, jump: 880,
-      // ROUNDS-style baseline: 100 HP, no regen, the default gun two-shots
-      // (55 a hit), 3 ammo with an automatic whole-clip reload when empty
-      damage: 55, bulletSpeed: 980, bulletGravity: 1300, bulletDrag: 0.997,
+      // Baseline: 100 HP, no regen, 3 ammo with an automatic whole-clip reload
+      // when empty. The default gun takes *three* hits to kill (36 a hit), so
+      // one full clip is exactly lethal and a fight has room to turn around —
+      // two-shotting off spawn left no time to react.
+      //
+      // Damage is the number that moved, not health: every other source in the
+      // game (hazard contact 25, a meteor 34, an explosion 26, poison and burn
+      // ticks) is an absolute number weighed against a 100 HP pool, and
+      // inflating health would have quietly made all of them weaker.
+      damage: 36, bulletSpeed: 980, bulletGravity: 1300, bulletDrag: 0.997,
       bulletRestitution: 0.72, bulletSize: 1,
       maxAmmo: 3, reload: 2.0, fireDelay: 0.3,
       blockCooldown: 1.55, blockDuration: 0.25,

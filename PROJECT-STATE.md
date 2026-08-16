@@ -162,8 +162,10 @@ Pillars:
       playing cards (corner pips, deal-in animation, lift on select); two
       choosers split the screen side by side
 - [x] **ROUNDS-style baseline**: 100 HP, no regen, damage subtracted and reset
-      each round; default gun two-shots (55 dmg), 3 ammo, automatic whole-clip
-      reload when empty (2s), no manual reload
+      each round; default gun three-shots (36 dmg — one full clip is exactly
+      lethal), 3 ammo, automatic whole-clip reload when empty (2s), no manual
+      reload. Health stays at 100 on purpose: hazard contact, meteors,
+      explosions and DoT ticks are absolute numbers weighed against that pool
 - [x] **Hazards sting, not kill**: touching a hazard deals 25 damage and
       launches the player up and away (0.9s grace between hits); falling out
       of the world still kills

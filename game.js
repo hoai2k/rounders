@@ -146,7 +146,13 @@
       // game (hazard contact 25, a meteor 34, an explosion 26, poison and burn
       // ticks) is an absolute number weighed against a 100 HP pool, and
       // inflating health would have quietly made all of them weaker.
-      damage: 36, bulletSpeed: 980, bulletGravity: 1300, bulletDrag: 0.997,
+      //
+      // Ballistics are tuned so lobbing is a real tactic (ROUNDS-style): max
+      // ballistic range is v²/g ≈ 1330px, so a 45° arc clears mid-map cover
+      // and reaches most of a standard arena, while flat shots still drop
+      // visibly at range. The old 980/1300 pairing capped arcs at ~740px —
+      // half the arena — which made every fight close-range.
+      damage: 36, bulletSpeed: 1180, bulletGravity: 1050, bulletDrag: 0.997,
       bulletRestitution: 0.72, bulletSize: 1,
       maxAmmo: 3, reload: 2.0, fireDelay: 0.3,
       blockCooldown: 1.55, blockDuration: 0.25,
@@ -557,6 +563,11 @@
   function resetRound() {
     pickNextLevel();
     const level = currentLevel();
+    // Arenas vary in playfield size (ROUNDS-style): the whole level is always
+    // framed, so a bigger field renders the fighters smaller and opens room
+    // for lobbed arcs, while a tight one plays up close.
+    world.width = (level.size && level.size.w) || 1600;
+    world.height = (level.size && level.size.h) || 900;
     bullets = [];
     particles = [];
     fields = [];
@@ -1767,9 +1778,9 @@
         prevX: p.x, prevY: p.y, ox: p.x, oy: p.y,
         vx: Math.cos(a) * speed + p.vx * 0.18,
         vy: Math.sin(a) * speed + p.vy * 0.08,
-        r: (6 + Math.min(9, p.stats.damage / 20)) * p.stats.bulletSize,
+        r: (5.5 + Math.min(9, p.stats.damage / 22)) * p.stats.bulletSize,
         damage: p.stats.damage * rageMul * (golden ? (pellets > 1 ? 2 : 3) : 1),
-        life: 2.7,
+        life: 3.2,
         gravity: p.stats.bulletGravity,
         drag: p.stats.bulletDrag,
         restitution: p.stats.bulletRestitution,
@@ -2517,6 +2528,8 @@
     hudRefs = [];
     duckMusic(false);
     setMusicContext("menu");
+    world.width = 1600;   // menu background is authored for the default field
+    world.height = 900;
     world.state = "menu";
     world.panelReturn = "menu";
     world.winner = null;
@@ -3355,17 +3368,23 @@
   function drawAmmoPips(p, r) {
     const n = Math.max(1, Math.round(p.stats.maxAmmo));
     if (n > 14) return;                       // absurd magazines would ring the body
-    const aim = Math.atan2(p.aimY, p.aimX);
-    const step = Math.min(0.19, 1.5 / n);
-    const pipR = r + 20;
+    // The pips ride in a row just above the weapon: along the aim direction,
+    // offset to the screen-up side of the barrel, so the count reads where the
+    // eye already is instead of arcing perpendicular around the body.
+    const ax = p.aimX, ay = p.aimY;
+    let px = -ay, py = ax;                    // perpendicular to the aim
+    if (py > 0) { px = -px; py = -py; }       // pick the side that points up
+    const lift = 13;                          // clearance above the barrel
+    const gap = 8.5;                          // spacing along the barrel
+    const start = r + 4;                      // first pip sits past the body edge
     const reloading = p.reloadTimer > 0;
     const filled = reloading
       ? (1 - clamp(p.reloadTimer / Math.max(0.01, p.stats.reload), 0, 1)) * n
       : p.ammo;
     for (let i = 0; i < n; i += 1) {
-      const a = aim + (i - (n - 1) / 2) * step;
-      const x = Math.cos(a) * pipR;
-      const y = Math.sin(a) * pipR;
+      const d = start + i * gap;
+      const x = ax * d + px * lift;
+      const y = ay * d + py * lift;
       const on = i < filled;
       ctx.beginPath();
       ctx.arc(x, y, on ? 3.1 : 2.2, 0, Math.PI * 2);

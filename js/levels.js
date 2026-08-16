@@ -1,8 +1,18 @@
 // Rounders — 25 arenas, each with its own theme, palette, weather, and
-// signature mechanics. World space is 1600×900; the engine renders backdrops
-// procedurally (or from assets/images/arenas/<id>.png when present).
+// signature mechanics. The default world space is 1600×900; the engine renders
+// backdrops procedurally (or from assets/images/arenas/<id>.png when present).
 //
 // Feature reference:
+//   size         {w,h} optional playfield size (default 1600×900). The whole
+//                 level is always framed on screen, so a grand field (up to
+//                 2000×1000) renders the fighters ~20% smaller with open sky
+//                 for lobbed arcs, while a tight one (1460×820) plays up
+//                 close. Vary it like ROUNDS varies map scale.
+//
+//                 LOB ARENAS: several fields deliberately keep the upper air
+//                 EMPTY — nothing above the low structures but sky — so duels
+//                 turn into artillery: arc shots over the cover, shuffle
+//                 between crates, punish the peek. Don't fill their sky in.
 //   platforms[]  {x,y,w,h, ice, conveyor(px/s), phase:{period,offset,duty},
 //                 breakable:hp} — breakable platforms shatter after soaking
 //                 that much bullet damage (rebuilt every round). Tall rects
@@ -46,19 +56,20 @@
       // each side, AC-unit crates to shove, and a neon sign hung over the gap.
       id: "neon-skyline", name: "Neon Skyline",
       tagline: "Rain-slick rooftops. Shoot the sign down — the landlord's not looking.",
-      backdrop: "city", weather: "rain",
+      backdrop: "city", weather: "rain", size: { w: 1760, h: 990 },
       palette: { skyTop: "#141134", skyMid: "#33175c", skyBottom: "#a12a6e", plat: "#2b2b45", platEdge: "#12121f", accent: "#ff5fd0", hazard: "#ff2e63" },
       platforms: [
-        P(0, 830, 700, 70), P(900, 830, 700, 70),
-        P(40, 516, 120, 314),
-        P(1440, 546, 120, 284),
-        P(250, 670, 220, 24), P(1130, 670, 220, 24),
-        P(620, 560, 360, 26, { conveyor: 150 })
+        P(0, 920, 760, 70), P(1000, 920, 760, 70),
+        P(40, 606, 120, 314),
+        P(1600, 636, 120, 284),
+        P(270, 760, 220, 24), P(1270, 760, 220, 24),
+        P(700, 650, 360, 26, { conveyor: 150 })
       ],
-      hung: [{ x: 660, y: 340, w: 280, h: 26, chains: [720, 880] }],
-      crates: [{ x: 320, y: 774, s: 56 }, { x: 1210, y: 774, s: 56 }],
+      // sky is open above the hung sign — lob between the tower tops
+      hung: [{ x: 730, y: 430, w: 280, h: 26, chains: [790, 950] }],
+      crates: [{ x: 360, y: 864, s: 56 }, { x: 1330, y: 864, s: 56 }],
       hazards: [],
-      spawns: [{ x: 200, y: 790 }, { x: 1400, y: 790 }, { x: 340, y: 630 }, { x: 1260, y: 630 }]
+      spawns: [{ x: 220, y: 880 }, { x: 1540, y: 880 }, { x: 380, y: 720 }, { x: 1390, y: 720 }]
     },
     {
       // Furnace towers to scale on each side, phase catwalks over the lava,
@@ -130,42 +141,46 @@
       // hung cargo pods to cut loose, and floating supply crates.
       id: "orbital-drift", name: "Orbital Drift",
       tagline: "Low gravity, no floor. Cut the cargo loose and count the seconds.",
-      backdrop: "space", weather: "stars", gravityScale: 0.55,
+      backdrop: "space", weather: "stars", gravityScale: 0.55, size: { w: 1920, h: 1080 },
       palette: { skyTop: "#05060f", skyMid: "#101a38", skyBottom: "#1c2f57", plat: "#8b93b8", platEdge: "#3d4460", accent: "#63e8ff", hazard: "#ff5f8f" },
       platforms: [
-        P(180, 720, 320, 28), P(1100, 720, 320, 28),
-        P(620, 620, 360, 28),
-        P(740, 276, 120, 344),
-        P(140, 460, 260, 24), P(1200, 460, 260, 24)
+        P(220, 860, 340, 28), P(1360, 860, 340, 28),
+        P(760, 740, 400, 28),
+        P(890, 380, 120, 360),
+        P(160, 560, 260, 24), P(1500, 560, 260, 24)
       ],
+      // everything above the mast is open space — slow-motion artillery
       hung: [
-        { x: 460, y: 380, w: 180, h: 26, chains: [540] },
-        { x: 960, y: 380, w: 180, h: 26, chains: [1060] }
+        { x: 540, y: 470, w: 180, h: 26, chains: [630] },
+        { x: 1200, y: 470, w: 180, h: 26, chains: [1290] }
       ],
-      crates: [{ x: 260, y: 664, s: 56 }, { x: 1290, y: 664, s: 56 }],
+      crates: [{ x: 300, y: 804, s: 56 }, { x: 1560, y: 804, s: 56 }],
       hazards: [],
-      spawns: [{ x: 340, y: 680 }, { x: 1260, y: 680 }, { x: 240, y: 420 }, { x: 1360, y: 420 }]
+      spawns: [{ x: 390, y: 820 }, { x: 1530, y: 820 }, { x: 280, y: 520 }, { x: 1630, y: 520 }]
     },
     {
       // Two mesas with sheer inner faces, a breakable plank bridge across the
       // ravine, and crates for the wind to whistle past.
       id: "sirocco-canyon", name: "Sirocco Canyon",
-      tagline: "The wind changes its mind every few seconds. The bridge won't last either.",
-      backdrop: "canyon", weather: "dust", windX: 260, gustPeriod: 5.5,
+      tagline: "Open sky, shifting wind. Lob it and let the canyon decide.",
+      backdrop: "canyon", weather: "dust", windX: 260, gustPeriod: 5.5, size: { w: 2000, h: 1000 },
       palette: { skyTop: "#3f1f3d", skyMid: "#b3542e", skyBottom: "#e8a04b", plat: "#a4643a", platEdge: "#5c3a20", accent: "#ffd27a", hazard: "#d44a2f" },
       platforms: [
-        P(0, 830, 620, 70), P(980, 830, 620, 70),
-        P(560, 650, 60, 180), P(980, 650, 60, 180),
-        P(640, 700, 150, 22, { breakable: 100 }),
-        P(810, 700, 150, 22, { breakable: 100 }),
-        P(150, 620, 280, 24), P(1170, 620, 280, 24),
-        P(700, 520, 200, 24),
-        P(300, 400, 220, 24), P(1080, 400, 220, 24),
-        P(680, 330, 240, 24)
+        P(0, 930, 780, 70), P(1220, 930, 780, 70),
+        P(720, 750, 60, 180), P(1220, 750, 60, 180),
+        P(800, 800, 180, 22, { breakable: 100 }),
+        P(1020, 800, 180, 22, { breakable: 100 }),
+        P(170, 720, 280, 24), P(1550, 720, 280, 24),
+        P(860, 620, 280, 24)
       ],
-      crates: [{ x: 80, y: 774, s: 56 }, { x: 1470, y: 774, s: 56 }],
-      hazards: [P(620, 850, 360, 50)],
-      spawns: [{ x: 260, y: 790 }, { x: 1340, y: 790 }, { x: 410, y: 360 }, { x: 1190, y: 360 }]
+      // LOB ARENA: nothing above 620 but wind — the mesa tops trade arcs
+      // across the ravine, ducking behind the crates between volleys
+      crates: [
+        { x: 90, y: 874, s: 56 }, { x: 1850, y: 874, s: 56 },
+        { x: 500, y: 874, s: 56 }, { x: 1440, y: 874, s: 56 }
+      ],
+      hazards: [P(780, 950, 440, 50)],
+      spawns: [{ x: 300, y: 890 }, { x: 1700, y: 890 }, { x: 250, y: 680 }, { x: 1660, y: 680 }]
     },
     {
       // Pier posts rising out of the water to perch on, stacked cargo on the
@@ -192,27 +207,27 @@
       // from the dark on chains, and the mushroom pads still bounce.
       id: "glimmer-hollow", name: "Glimmer Hollow",
       tagline: "Giant mushrooms below, nervous stalactites above.",
-      backdrop: "cave", weather: "spores",
+      backdrop: "cave", weather: "spores", size: { w: 1460, h: 820 },
       palette: { skyTop: "#0a0d1f", skyMid: "#182042", skyBottom: "#27355c", plat: "#5c4a78", platEdge: "#2a2140", accent: "#ff7ac8", hazard: "#8f4ae0" },
       platforms: [
-        P(0, 830, 1600, 70),
-        P(470, 616, 116, 214),
-        P(1020, 616, 116, 214),
-        P(200, 655, 260, 26), P(1140, 655, 260, 26),
-        P(640, 520, 320, 26),
-        P(690, 240, 220, 24)
+        P(0, 750, 1460, 70),
+        P(430, 536, 116, 214),
+        P(920, 536, 116, 214),
+        P(170, 575, 260, 26), P(1030, 575, 260, 26),
+        P(580, 440, 300, 26),
+        P(620, 170, 220, 24)
       ],
       hung: [
-        { x: 380, y: 340, w: 200, h: 24, chains: [440, 520] },
-        { x: 1020, y: 340, w: 200, h: 24, chains: [1080, 1160] }
+        { x: 330, y: 270, w: 190, h: 24, chains: [390, 470] },
+        { x: 940, y: 270, w: 190, h: 24, chains: [1000, 1080] }
       ],
-      crates: [{ x: 750, y: 774, s: 52 }],
+      crates: [{ x: 690, y: 696, s: 52 }],
       hazards: [],
       bouncePads: [
-        { x: 40, y: 818, w: 150, power: 1650 },
-        { x: 1410, y: 818, w: 150, power: 1650 }
+        { x: 30, y: 738, w: 140, power: 1650 },
+        { x: 1290, y: 738, w: 140, power: 1650 }
       ],
-      spawns: [{ x: 330, y: 615 }, { x: 1270, y: 615 }, { x: 700, y: 480 }, { x: 900, y: 480 }]
+      spawns: [{ x: 290, y: 535 }, { x: 1160, y: 535 }, { x: 640, y: 400 }, { x: 820, y: 400 }]
     },
     {
       // A climbable spire rises straight out of the gear pit, elevators on
@@ -266,42 +281,43 @@
       // breakable cookie shelf, and gumdrop crates by the syrup pools.
       id: "sugar-rush", name: "Sugar Rush",
       tagline: "Gumdrops bounce. Syrup doesn't. The cookie shelf is load-bearing — briefly.",
-      backdrop: "candy", weather: "confetti",
+      backdrop: "candy", weather: "confetti", size: { w: 1460, h: 820 },
       palette: { skyTop: "#7fc4ff", skyMid: "#c9e8ff", skyBottom: "#ffd9ec", plat: "#ff8fbe", platEdge: "#b04a7c", accent: "#fff3a0", hazard: "#8a4a2a" },
       platforms: [
-        P(0, 830, 1600, 70),
-        P(570, 536, 124, 294),
-        P(910, 616, 124, 214),
-        P(160, 655, 300, 26), P(1140, 655, 300, 26),
-        P(330, 420, 190, 24), P(1080, 400, 190, 24),
-        P(720, 450, 160, 22, { breakable: 100 })
+        P(0, 750, 1460, 70),
+        P(520, 456, 124, 294),
+        P(830, 536, 124, 214),
+        P(140, 575, 280, 26), P(1050, 575, 280, 26),
+        P(300, 340, 190, 24), P(1000, 380, 190, 24),
+        P(660, 300, 160, 22, { breakable: 100 })
       ],
-      hung: [{ x: 660, y: 290, w: 240, h: 24, chains: [700, 860] }],
-      crates: [{ x: 240, y: 776, s: 54 }, { x: 1310, y: 776, s: 54 }],
+      hung: [{ x: 590, y: 180, w: 240, h: 24, chains: [630, 790] }],
+      crates: [{ x: 220, y: 696, s: 54 }, { x: 1190, y: 696, s: 54 }],
       hazards: [],
       bouncePads: [
-        { x: 16, y: 818, w: 120, power: 1500 },
-        { x: 1464, y: 818, w: 120, power: 1500 }
+        { x: 16, y: 738, w: 120, power: 1500 },
+        { x: 1324, y: 738, w: 120, power: 1500 }
       ],
-      zones: [P(140, 790, 240, 40, { type: "syrup" }), P(1220, 790, 240, 40, { type: "syrup" })],
-      spawns: [{ x: 280, y: 615 }, { x: 1320, y: 615 }, { x: 620, y: 496 }, { x: 950, y: 576 }]
+      zones: [P(130, 710, 220, 40, { type: "syrup" }), P(1110, 710, 220, 40, { type: "syrup" })],
+      spawns: [{ x: 260, y: 535 }, { x: 1200, y: 535 }, { x: 560, y: 416 }, { x: 890, y: 496 }]
     },
     {
       // Cloud islands around a lightning-rod tower: the best perch on the map
       // is also the one the storm likes most.
       id: "thunderhead-perch", name: "Thunderhead Perch",
       tagline: "Lovely view from the rod. Periodic smiting.",
-      backdrop: "storm", weather: "rain", lightning: { period: 4.4, warn: 1.1 }, windX: 170, gustPeriod: 4,
+      backdrop: "storm", weather: "rain", lightning: { period: 4.4, warn: 1.1 }, windX: 170, gustPeriod: 4, size: { w: 1920, h: 1080 },
       palette: { skyTop: "#151a2c", skyMid: "#2a3450", skyBottom: "#48587a", plat: "#a8b4d0", platEdge: "#525f80", accent: "#ffe95e", hazard: "#ffe95e" },
       platforms: [
-        P(80, 760, 380, 30), P(1140, 760, 380, 30),
-        P(600, 690, 400, 30),
-        P(740, 406, 120, 284),
-        P(280, 560, 260, 26), P(1060, 560, 260, 26),
-        P(400, 290, 220, 24), P(980, 290, 220, 24)
+        P(100, 900, 420, 30), P(1400, 900, 420, 30),
+        P(710, 820, 500, 30),
+        P(880, 536, 120, 284),
+        P(320, 730, 280, 26), P(1320, 730, 280, 26)
       ],
+      // LOB ARENA: the storm owns everything above the rod — arcs sail
+      // between the side islands while lightning punishes whoever camps it
       hazards: [],
-      spawns: [{ x: 260, y: 720 }, { x: 1340, y: 720 }, { x: 410, y: 520 }, { x: 1190, y: 520 }]
+      spawns: [{ x: 310, y: 860 }, { x: 1610, y: 860 }, { x: 460, y: 690 }, { x: 1460, y: 690 }]
     },
     {
       // A central bookcase divides the room; climb it, drop the chandelier,
@@ -337,8 +353,8 @@
         P(620, 760, 360, 28),
         P(500, 530, 52, 300), P(1048, 530, 52, 300),
         P(500, 506, 600, 26),
-        P(180, 655, 280, 26), P(1140, 655, 280, 26),
-        P(720, 340, 160, 22)
+        P(180, 655, 280, 26), P(1140, 655, 280, 26)
+        // sky above the gate beam is open — lob over it from dock to dock
       ],
       hung: [{ x: 730, y: 600, w: 140, h: 26, chains: [800], anchorY: 532 }],
       crates: [{ x: 120, y: 774, s: 56 }, { x: 1420, y: 774, s: 56 }],
@@ -372,71 +388,73 @@
       // hanging cage to drop, and bone crates for improvised cover.
       id: "bonepit-arena", name: "Bonepit Arena",
       tagline: "The crowd is long dead. The floor is following their example.",
-      backdrop: "colosseum", weather: "dust",
+      backdrop: "colosseum", weather: "dust", size: { w: 1760, h: 990 },
       palette: { skyTop: "#5c2c1a", skyMid: "#a05a2c", skyBottom: "#d9a05c", plat: "#d8c9a8", platEdge: "#7a6a48", accent: "#ffefc9", hazard: "#b03a2a" },
       platforms: [
-        P(0, 830, 1600, 70),
-        P(30, 546, 120, 284),
-        P(1450, 546, 120, 284),
-        P(170, 650, 280, 26, { phase: { period: 4.6, offset: 0, duty: 0.65 } }),
-        P(1150, 650, 280, 26, { phase: { period: 4.6, offset: 2.3, duty: 0.65 } }),
-        P(620, 580, 360, 26),
-        P(390, 430, 220, 24, { phase: { period: 4.6, offset: 1.15, duty: 0.65 } }),
-        P(990, 430, 220, 24, { phase: { period: 4.6, offset: 3.45, duty: 0.65 } }),
-        P(680, 290, 240, 24)
+        P(0, 920, 1760, 70),
+        P(30, 636, 120, 284),
+        P(1610, 636, 120, 284),
+        P(190, 740, 280, 26, { phase: { period: 4.6, offset: 0, duty: 0.65 } }),
+        P(1290, 740, 280, 26, { phase: { period: 4.6, offset: 2.3, duty: 0.65 } }),
+        P(700, 670, 360, 26)
       ],
-      hung: [{ x: 690, y: 430, w: 220, h: 24, chains: [740, 860], anchorY: 314 }],
-      crates: [{ x: 560, y: 774, s: 56 }, { x: 990, y: 774, s: 56 }],
-      hazards: [P(740, 812, 120, 18)],
-      spawns: [{ x: 260, y: 790 }, { x: 1340, y: 790 }, { x: 520, y: 790 }, { x: 1080, y: 790 }]
+      // LOB ARENA: open desert sky above the cage — floor duels arc shots
+      // over the center and duck behind the bone crates
+      hung: [{ x: 770, y: 520, w: 220, h: 24, chains: [820, 940] }],
+      crates: [{ x: 620, y: 864, s: 56 }, { x: 1090, y: 864, s: 56 }],
+      hazards: [P(820, 902, 120, 18)],
+      spawns: [{ x: 280, y: 880 }, { x: 1480, y: 880 }, { x: 580, y: 880 }, { x: 1180, y: 880 }]
     },
     {
       // An asymmetric summit: staircase ridge on the left, a sheer ice wall at
       // the cliff edge, and ice crates skating in the wind.
       id: "aurora-summit", name: "Aurora Summit",
       tagline: "Ice underfoot, wind overhead, and the sky showing off.",
-      backdrop: "aurora", weather: "snow", windX: 190, gustPeriod: 7,
+      backdrop: "aurora", weather: "snow", windX: 190, gustPeriod: 7, size: { w: 2000, h: 1000 },
       palette: { skyTop: "#071224", skyMid: "#0e2c44", skyBottom: "#1c4a5c", plat: "#dff2ff", platEdge: "#6f9cbf", accent: "#5effc3", hazard: "#7fb8ff" },
       platforms: [
-        P(0, 830, 500, 70, { ice: true }), P(1100, 830, 500, 70, { ice: true }),
-        P(470, 496, 124, 334, { ice: true }),
-        P(60, 655, 240, 26, { ice: true }),
-        P(200, 490, 220, 24, { ice: true }),
-        P(300, 330, 160, 24, { ice: true }),
-        P(600, 740, 400, 28, { ice: true }),
-        P(720, 540, 180, 24, { ice: true }),
-        P(700, 300, 200, 24, { ice: true }),
-        P(1120, 655, 260, 24, { ice: true }),
-        P(1060, 400, 200, 24, { ice: true })
+        P(0, 930, 620, 70, { ice: true }), P(1380, 930, 620, 70, { ice: true }),
+        P(590, 596, 124, 334, { ice: true }),
+        P(70, 755, 240, 26, { ice: true }),
+        P(210, 590, 220, 24, { ice: true }),
+        P(310, 430, 160, 24, { ice: true }),
+        P(760, 840, 400, 28, { ice: true }),
+        P(880, 640, 180, 24, { ice: true }),
+        P(1420, 755, 260, 24, { ice: true })
       ],
-      crates: [{ x: 60, y: 776, s: 54 }, { x: 1480, y: 776, s: 54 }],
-      hazards: [P(500, 852, 600, 48, { kind: "water" })],
-      spawns: [{ x: 240, y: 790 }, { x: 1360, y: 790 }, { x: 700, y: 700 }, { x: 900, y: 700 }]
+      // LOB ARENA: the left peak rains arcs down the wind onto the open
+      // right lowland; the lowland answers from behind its crates
+      crates: [
+        { x: 70, y: 876, s: 54 }, { x: 1880, y: 876, s: 54 },
+        { x: 1500, y: 876, s: 54 }
+      ],
+      hazards: [P(620, 952, 760, 48, { kind: "water" })],
+      spawns: [{ x: 300, y: 890 }, { x: 1700, y: 890 }, { x: 830, y: 800 }, { x: 1080, y: 800 }]
     },
     {
       // Junk piles you can climb, a crate stack mid-field, a wrecked chassis
       // hanging from the crane, and one rusted-through platform.
       id: "rustyard", name: "Rustyard",
       tagline: "One crane, zero safety inspections, and a chassis on borrowed time.",
-      backdrop: "junkyard", weather: "sparks",
+      backdrop: "junkyard", weather: "sparks", size: { w: 1760, h: 990 },
       palette: { skyTop: "#2a1e2c", skyMid: "#4d3038", skyBottom: "#8a5038", plat: "#6e5a4a", platEdge: "#33281e", accent: "#ffb35c", hazard: "#d9622e" },
       platforms: [
-        P(0, 830, 1600, 70),
-        P(100, 650, 180, 180),
-        P(1320, 620, 260, 130),
-        P(480, 600, 220, 26), P(900, 600, 220, 26),
-        P(300, 440, 220, 24, { breakable: 110 }),
-        P(1080, 440, 220, 24),
-        P(680, 330, 240, 24)
+        P(0, 920, 1760, 70),
+        P(110, 740, 180, 180),
+        P(1440, 720, 260, 200),
+        P(480, 690, 220, 26), P(980, 690, 220, 26),
+        P(320, 530, 220, 24, { breakable: 110 }),
+        P(1160, 530, 220, 24)
       ],
-      movers: [P(620, 480, 180, 22, { dx: -180, dy: -140, period: 6.5 })],
-      hung: [{ x: 900, y: 400, w: 200, h: 26, chains: [950, 1050] }],
+      // open sky above the crane's sweep — junk-pile artillery
+      movers: [P(700, 570, 180, 22, { dx: -180, dy: -140, period: 6.5 })],
+      hung: [{ x: 1000, y: 490, w: 200, h: 26, chains: [1050, 1150] }],
       crates: [
-        { x: 700, y: 774, s: 56 }, { x: 702, y: 716, s: 56 },
-        { x: 460, y: 774, s: 56 }, { x: 1060, y: 774, s: 52 }
+        { x: 790, y: 864, s: 56 }, { x: 792, y: 806, s: 56 },
+        { x: 550, y: 864, s: 56 }, { x: 1160, y: 864, s: 52 }
       ],
-      hazards: [P(700, 812, 200, 18)],
-      spawns: [{ x: 270, y: 610 }, { x: 1330, y: 580 }, { x: 590, y: 560 }, { x: 1010, y: 560 }]
+      hazards: [P(360, 902, 160, 18)],
+      spawns: [{ x: 200, y: 700 }, { x: 1560, y: 680 }, { x: 590, y: 650 }, { x: 1090, y: 650 }]
     },
     {
       // Hexwood trunks with canopy perches, a wisp-hung platform, and the
@@ -467,20 +485,21 @@
       // crow's nest above the waterline, and cargo crates that float.
       id: "tidal-wreck", name: "Tidal Wreck",
       tagline: "The tide is coming in. The crow's nest is not a suggestion.",
-      backdrop: "wreck", weather: "rain", tide: { min: 870, max: 640, period: 14 },
+      backdrop: "wreck", weather: "rain", tide: { min: 1050, max: 770, period: 14 }, size: { w: 1920, h: 1080 },
       palette: { skyTop: "#1e2c38", skyMid: "#33505c", skyBottom: "#5c8a8a", plat: "#7a5c3a", platEdge: "#3a2c1c", accent: "#7fe8d0", hazard: "#2a6e8f" },
       platforms: [
-        P(0, 830, 420, 70), P(1180, 830, 420, 70),
-        P(560, 700, 480, 30),
-        P(620, 730, 360, 90),
-        P(750, 396, 100, 304),
-        P(180, 620, 260, 26), P(1160, 620, 260, 26),
-        P(380, 440, 200, 24), P(1020, 440, 200, 24),
-        P(660, 560, 140, 22, { breakable: 100 })
+        P(0, 1010, 500, 70), P(1420, 1010, 500, 70),
+        P(680, 840, 560, 30),
+        P(740, 870, 440, 96),
+        P(910, 516, 100, 324),
+        P(220, 700, 260, 26), P(1440, 700, 260, 26),
+        P(460, 540, 200, 24), P(1260, 540, 200, 24),
+        P(760, 680, 140, 22, { breakable: 100 })
       ],
-      crates: [{ x: 480, y: 770, s: 56 }, { x: 1070, y: 770, s: 56 }],
+      // storm sky is open above the mast — shore-to-shore mortar over the wreck
+      crates: [{ x: 560, y: 950, s: 56 }, { x: 1290, y: 950, s: 56 }],
       hazards: [],
-      spawns: [{ x: 210, y: 790 }, { x: 1390, y: 790 }, { x: 700, y: 660 }, { x: 900, y: 660 }]
+      spawns: [{ x: 250, y: 970 }, { x: 1670, y: 970 }, { x: 820, y: 800 }, { x: 1080, y: 800 }]
     },
     {
       // A two-tier pagoda mid-river, lantern platforms drifting upward, and

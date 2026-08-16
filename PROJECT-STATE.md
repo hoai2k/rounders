@@ -67,6 +67,12 @@ Pillars:
       walls/towers everywhere (wall-jump finally has terrain), perches,
       overhangs, and asymmetric silhouettes. Per-round prop state resets in
       `resetRound`
+- [x] **Scale & ballistics pass** (AUDIT.md §5 follow-up): per-level playfield
+      sizes (`size:{w,h}` — 1460×820 tight up to 2000×1000 grand, ROUNDS-style
+      scale variety); default bullets retuned for lobbing (speed 1180, gravity
+      1050 → max arc ≈ 1330px, life 3.2s, slightly slimmer); seven explicit
+      open-sky **lob arenas** whose upper air stays empty on purpose; ammo pips
+      moved to a row just above the weapon barrel
 - [ ] **Backdrop refreshes** (`image-requests.md` §1): repaints for the 6
       arenas whose silhouette changed most (Neon Skyline, Koi Temple, Tidal
       Wreck, Midnight Library, Lantern Festival, Aurora Summit)

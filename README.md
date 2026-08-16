@@ -78,6 +78,7 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 | File | Purpose |
 |---|---|
 | `game.js` | Engine: physics, combat, arena features, draft flow, rendering, menus |
+| `js/strings.js` | **All UI wording** — every menu and in-game string in one editable file |
 | `js/cards.js` | The 52-card set + rarity metadata |
 | `js/levels.js` | The 25 arenas |
 | `js/characters.js` | The 24 characters + procedural renderer |

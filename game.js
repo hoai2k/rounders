@@ -3,6 +3,20 @@
   "use strict";
 
   const { CARDS, RARITIES, CHARACTERS, LEVELS, drawCharacter, setProceduralCharacters, arenaImage } = window.ROUNDERS;
+  const str = window.ROUNDERS.str;
+
+  // Fills every [data-str] / [data-str-html] node from js/strings.js so all UI
+  // wording can be edited in one file.
+  function applyStrings() {
+    for (const el of document.querySelectorAll("[data-str]")) el.textContent = str(el.dataset.str);
+    for (const el of document.querySelectorAll("[data-str-html]")) el.innerHTML = str(el.dataset.strHtml);
+    for (const [id, key] of [["iconHow", "icons.instructions"], ["iconSettings", "icons.settings"], ["iconFullscreen", "icons.fullscreen"]]) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      el.title = str(key);
+      el.setAttribute("aria-label", str(key));
+    }
+  }
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -10,6 +24,10 @@
   const toast = document.getElementById("toast");
   const menu = document.getElementById("menu");
   const titleScreen = document.getElementById("title");
+  const iconBar = document.getElementById("iconBar");
+  const nowPlayingBar = document.getElementById("nowPlaying");
+  const addBotBtn = () => document.getElementById("addBotBtn");
+  const startBtn = () => document.getElementById("startBtn");
   const settingsPanel = document.getElementById("settings");
   const howPanel = document.getElementById("how");
   const draftPanel = document.getElementById("draft");
@@ -76,9 +94,11 @@
   const playerColors = ["#ff5277", "#52d7ff", "#ffe169", "#74f08b"];
 
   const keyboardSchemes = [
-    { left: "KeyA", right: "KeyD", jump: "KeyW", shoot: "KeyF", block: "KeyG", label: "Keyboard 1 (WASD + F/G)" },
-    { left: "ArrowLeft", right: "ArrowRight", jump: "ArrowUp", shoot: "Slash", block: "Period", label: "Keyboard 2 (Arrows + / .)" }
+    { left: "KeyA", right: "KeyD", up: "KeyW", down: "KeyS", jump: "KeyW", shoot: "KeyF", block: "KeyG", label: "Keyboard 1 (WASD + F/G)" },
+    { left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp", down: "ArrowDown", jump: "ArrowUp", shoot: "Slash", block: "Period", label: "Keyboard 2 (Arrows + / .)" }
   ];
+  // any directional key on a scheme takes that keyboard's slot
+  const schemeJoinKeys = sc => [sc.left, sc.right, sc.up, sc.down];
 
   const keys = new Set();
   const pressed = new Set();
@@ -244,7 +264,7 @@
 
   function addSlot(slot) {
     if (lobbySlots.length >= settings.playerCount) {
-      showToast("Lobby is full");
+      showToast(str("menu.lobbyFull"));
       return null;
     }
     slot.charIndex = freeCharIndex();
@@ -277,9 +297,10 @@
 
   function updateLobby(pads) {
     if (world.state !== "menu") return;
-    // keyboard joins: press that scheme's shoot key
+    // keyboard joins: any of WASD (player 1) or the arrow keys (player 2)
     keyboardSchemes.forEach((scheme, i) => {
-      if (pressed.has(scheme.shoot) && !slotJoined("keyboard", i)) {
+      if (slotJoined("keyboard", i)) return;
+      if (schemeJoinKeys(scheme).some(k => pressed.has(k)) || pressed.has(scheme.shoot)) {
         addSlot({ type: "keyboard", schemeIndex: i, label: scheme.label });
       }
     });
@@ -333,8 +354,8 @@
         cells.push(`
           <article class="join-slot empty">
             <div class="slot-portrait empty-portrait">?</div>
-            <strong>Open Slot</strong>
-            <span>Press F, /, or any pad button</span>
+            <strong>${escapeHtml(str("menu.slotOpenTitle"))}</strong>
+            <span class="slot-join">${escapeHtml(str("menu.slotJoinPrompt"))}</span>
           </article>`);
         continue;
       }
@@ -345,12 +366,13 @@
           <div class="slot-portrait"><canvas data-portrait="${slot.charIndex}" width="96" height="96"></canvas></div>
           <strong>${ch.name} <em>${ch.title}</em></strong>
           <span class="slot-blurb">${ch.blurb}</span>
-          <span class="slot-input">${slot.type === "bot" ? "Bot" : escapeHtml(slot.label)}</span>
-          <span class="slot-state">${slot.locked ? "✓ Ready" : slot.type === "bot" ? "✓ Ready" : "◀ ▶ choose · shoot to lock"}</span>
-          ${slot.type === "bot" ? `<button type="button" class="bot-remove" data-remove-bot="${i}">✕ remove</button>` : ""}
+          <span class="slot-input">${slot.type === "bot" ? escapeHtml(str("menu.slotBot")) : escapeHtml(slot.label)}</span>
+          <span class="slot-state">${escapeHtml(slot.locked || slot.type === "bot" ? str("menu.slotReady") : str("menu.slotChoosing"))}</span>
+          ${slot.type === "bot" ? `<button type="button" class="bot-remove" data-remove-bot="${i}">${escapeHtml(str("menu.botRemove"))}</button>` : ""}
         </article>`);
     }
     joinSlots.innerHTML = cells.join("");
+    syncLobbyActions();
     for (const cv of joinSlots.querySelectorAll("canvas[data-portrait]")) {
       const ch = CHARACTERS[Number(cv.dataset.portrait)];
       const c2 = cv.getContext("2d");
@@ -363,7 +385,22 @@
   }
 
   function addBot() {
-    addSlot({ type: "bot", label: "Bot" });
+    addSlot({ type: "bot", label: str("menu.slotBot") });
+  }
+
+  // Add Bot appears once someone has joined; Start Match once there are 2+.
+  function syncLobbyActions() {
+    const bot = addBotBtn();
+    const start = startBtn();
+    if (!bot || !start) return;
+    const wasHidden = start.classList.contains("hidden");
+    bot.classList.toggle("hidden", lobbySlots.length < 1 || lobbySlots.length >= settings.playerCount);
+    start.classList.toggle("hidden", lobbySlots.length < 2);
+    if (wasHidden && !start.classList.contains("hidden") && world.state === "menu") {
+      const controls = visibleControls();
+      const i = controls.indexOf(start);
+      if (i >= 0) setMenuIndex(i, controls);
+    }
   }
 
   // ------------------------------------------------------------------ match
@@ -371,7 +408,7 @@
     ensureAudio();
     if (lobbySlots.length < 2) {
       startMusic();
-      showToast("Need at least 2 fighters — join up or add a bot");
+      showToast(str("menu.needPlayers"));
       return;
     }
     setMusicContext("battle");
@@ -411,7 +448,27 @@
     if (canFullscreen) {
       enterFullscreen();
     } else if (!document.fullscreenElement) {
-      showToast("Fullscreen needs a key or click — use the Fullscreen button");
+      showToast(str("title.fullscreenBlocked"));
+    }
+  }
+
+  // The icon row belongs to the menu and pause screens; the track widget only
+  // shows once a match is running.
+  function syncChrome() {
+    const showIcons = world.state === "menu" || world.state === "paused";
+    const showTracks = players.length > 0 && world.state !== "menu" && world.state !== "title";
+    if (world.chromeIcons !== showIcons) {
+      world.chromeIcons = showIcons;
+      iconBar.classList.toggle("hidden", !showIcons);
+    }
+    const iconsTop = world.state === "paused";
+    if (world.chromeIconsTop !== iconsTop) {
+      world.chromeIconsTop = iconsTop;
+      iconBar.classList.toggle("at-top", iconsTop);
+    }
+    if (nowPlayingBar && world.chromeTracks !== showTracks) {
+      world.chromeTracks = showTracks;
+      nowPlayingBar.classList.toggle("hidden", !showTracks);
     }
   }
 
@@ -467,7 +524,7 @@
     if (winner.score >= settings.scoreLimit) {
       world.state = "ended";
       world.winner = winner;
-      showToast(`${winner.name} takes the match! Enter / Start for rematch.`);
+      showToast(str("round.matchWon", { name: winner.name }));
       return;
     }
     world.state = "round-won";
@@ -476,13 +533,13 @@
     // has more than two hands on screen at once
     const ranked = players.filter(p => p !== winner).sort((a, b) => a.score - b.score || a.id - b.id);
     const losers = ranked.slice(0, 2);
-    battleKicker.textContent = "Round " + players.reduce((s, p) => s + p.score, 0);
-    battleTitle.textContent = `${winner.name} wins the round`;
+    battleKicker.textContent = str("round.kicker", { number: players.reduce((a, p) => a + p.score, 0) });
+    battleTitle.textContent = str("round.winner", { name: winner.name });
     battleTitle.style.color = winner.color;
     battleSub.textContent =
-      ranked.length > 2 ? "The two furthest behind draft new powers…"
-      : losers.length > 1 ? "The fallen draft new powers…"
-      : `${losers[0].name} drafts a new power…`;
+      ranked.length > 2 ? str("round.subTwo")
+      : losers.length > 1 ? str("round.subMulti")
+      : str("round.subSolo", { name: losers[0].name });
     battleSplash.classList.remove("hidden");
     sfx("win");
     setTimeout(() => {
@@ -522,7 +579,7 @@
       index: 0,
       picked: false
     }));
-    world.draftBaseTitle = losers.length > 1 ? "Draft — both pick at once" : `${losers[0].name} drafts`;
+    world.draftBaseTitle = losers.length > 1 ? str("draft.titleMulti") : str("draft.titleSolo", { name: losers[0].name });
     world.draftTimer = 30;
     draftTitle.textContent = world.draftBaseTitle;
     renderDraftPanel();
@@ -556,7 +613,7 @@
         <canvas width="220" height="220"></canvas>
         <div class="draft-who-text">
           <strong>${escapeHtml(d.player.name)}</strong>
-          <span>${d.picked ? "Locked in!" : "◀ ▶ browse · shoot to pick"}</span>
+          <span>${escapeHtml(str(d.picked ? "draft.rowLocked" : "draft.rowPrompt"))}</span>
         </div>`;
       const pc = who.querySelector("canvas").getContext("2d");
       pc.translate(110, 124);
@@ -607,7 +664,7 @@
     });
     d.rowEl.classList.toggle("locked", d.picked);
     const state = d.rowEl.querySelector(".draft-who-text span");
-    if (state) state.textContent = d.picked ? "Locked in!" : "◀ ▶ browse · shoot to pick";
+    if (state) state.textContent = str(d.picked ? "draft.rowLocked" : "draft.rowPrompt");
   }
 
   function confirmPick(d) {
@@ -621,7 +678,7 @@
     sfx("card");
     pulse(d.player, 0.5, 150);
     refreshDraftSelection(d);
-    showToast(`${d.player.name} picked ${c.name}`);
+    showToast(str("draft.picked", { name: d.player.name, card: c.name }));
     if (world.drafters.every(x => x.picked)) {
       setTimeout(() => {
         if (world.state === "draft") {
@@ -644,7 +701,7 @@
         }
       }
     } else if (world.draftTimer < 9.5) {
-      draftTitle.textContent = `${world.draftBaseTitle} — auto-pick in ${Math.ceil(world.draftTimer)}s`;
+      draftTitle.textContent = str("draft.autoPick", { title: world.draftBaseTitle, seconds: Math.ceil(world.draftTimer) });
     }
     for (const d of world.drafters) {
       const p = d.player;
@@ -813,7 +870,7 @@
         : { aim: 0.52, shoot: 0.3, block: 0.03, wander: 0.018 };
   }
 
-  function botDifficultyLabel(v) { return Number(v) === 3 ? "Hard" : Number(v) === 2 ? "Normal" : "Easy"; }
+  function botDifficultyLabel(v) { return str(Number(v) === 3 ? "settings.difficultyHard" : Number(v) === 2 ? "settings.difficultyNormal" : "settings.difficultyEasy"); }
 
   // ------------------------------------------------------------------ update
   function update(dt) {
@@ -1204,7 +1261,7 @@
           color: "#ff9e3d", meteor: true, hitIds: new Set()
         });
       }
-      showToast(`${p.name} calls STARFALL PROTOCOL`);
+      showToast(str("toast.starfall", { name: p.name }));
     } else if (p.stats.active === "eventHorizon") {
       fields.push({
         type: "blackhole", owner: p,
@@ -1212,7 +1269,7 @@
         y: clamp(p.y + p.aimY * 260, 150, world.height - 150),
         r: 300, life: 3, force: -950, dps: 16
       });
-      showToast(`${p.name} opens the EVENT HORIZON`);
+      showToast(str("toast.eventHorizon", { name: p.name }));
     } else if (p.stats.active === "chronoshift") {
       const past = p.trail[0];
       if (past) {
@@ -1224,7 +1281,7 @@
         burst(p.x, p.y, "#8fd8ff", 24, 380);
         sfx("teleport");
       }
-      showToast(`${p.name} rewinds with CHRONOSHIFT`);
+      showToast(str("toast.chronoshift", { name: p.name }));
     }
     return true;
   }
@@ -1534,7 +1591,7 @@
       p.hp = p.stats.maxHp * 0.25;
       p.spawnGrace = Math.max(p.spawnGrace, 0.5);
       burst(p.x, p.y, "#ffd700", 36, 480);
-      showToast(`${p.name}'s Guardian Halo saves them!`);
+      showToast(str("toast.guardianSave", { name: p.name }));
       sfx("mythic");
       return;
     }
@@ -1545,7 +1602,7 @@
         p.hp = p.stats.maxHp * 0.5;
         p.spawnGrace = 0.75;
         p.vy = -760;
-        showToast(`${p.name} rises from the ashes!`);
+        showToast(str("toast.revive", { name: p.name }));
         burst(p.x, p.y, "#ff9e3d", 48, 620);
         sfx("mythic");
       } else {
@@ -1569,7 +1626,7 @@
     const alive = players.filter(p => p.alive);
     if (alive.length === 1) endRound(alive[0]);
     else if (alive.length === 0) {
-      showToast("Nobody survived. Rerolling the arena…");
+      showToast(str("round.nobodySurvived"));
       resetRound();
     }
   }
@@ -1595,12 +1652,13 @@
     const controls = visibleControls();
     if (!controls.length) return;
     world.menuIndex = clamp(world.menuIndex, 0, controls.length - 1);
-    const move = menuMove(pads);
-    if (move) setMenuIndex(world.menuIndex + move, controls);
-    const focused = controls[world.menuIndex];
-    const adjust = menuAdjust(pads);
-    if (focused && (focused.matches("input") || focused.matches("select")) && adjust) {
-      adjustMenuControl(focused, adjust);
+    const nav = menuNav(pads);
+    if (nav) {
+      const focused = controls[world.menuIndex];
+      const onValue = focused && (focused.matches("input[type='range']") || focused.matches("select"));
+      // left/right tunes a slider or dropdown; anything else moves the cursor
+      if (onValue && nav.x) adjustMenuControl(focused, nav.x);
+      else moveFocusSpatial({ x: nav.x, y: nav.y }, controls);
     }
     if (menuConfirm(pads)) {
       const target = controls[world.menuIndex];
@@ -1622,38 +1680,82 @@
 
   function visibleControls() {
     const panel = world.state === "settings" ? settingsPanel : world.state === "how" ? howPanel : world.state === "paused" ? pausePanel : menu;
-    return [...panel.querySelectorAll("button, input, select")].filter(el => !el.disabled && el.offsetParent !== null);
+    const roots = [panel];
+    // the icon row is part of the menu and pause screens
+    if (!iconBar.classList.contains("hidden")) roots.push(iconBar);
+    const out = [];
+    for (const root of roots) {
+      for (const el of root.querySelectorAll("button, input, select")) {
+        if (!el.disabled && el.offsetParent !== null) out.push(el);
+      }
+    }
+    return out;
   }
 
   function setMenuIndex(index, controls = visibleControls()) {
     if (!controls.length) return;
     world.menuIndex = (index + controls.length) % controls.length;
-    controls.forEach(el => el.classList.remove("controller-focus"));
+    // clear the cursor everywhere: a panel we navigated away from would
+    // otherwise keep a stale highlight on one of its hidden buttons
+    for (const el of document.querySelectorAll(".controller-focus")) el.classList.remove("controller-focus");
     const target = controls[world.menuIndex];
     target.classList.add("controller-focus");
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: "nearest" });
   }
 
-  function menuMove(pads) {
-    if (pressed.has("ArrowDown") || pressed.has("KeyS")) return 1;
-    if (pressed.has("ArrowUp") || pressed.has("KeyW")) return -1;
-    for (const pad of pads) {
-      if (buttonEdge(pad, 13) || axisEdge(pad, 1, 1)) return 1;
-      if (buttonEdge(pad, 12) || axisEdge(pad, 1, -1)) return -1;
-    }
-    return 0;
+  // A keyboard scheme's direction keys belong to the lobby (join / pick a
+  // fighter) until that player has locked in; only then do they drive the menu.
+  function schemeFreeForNav(sc, i) {
+    if (world.state !== "menu") return true;
+    const slot = lobbySlots.find(s => s.type === "keyboard" && s.schemeIndex === i);
+    return Boolean(slot && slot.locked);
   }
 
-  function menuAdjust(pads) {
-    if (world.state === "menu") return 0; // left/right reserved for character select
-    if (pressed.has("ArrowRight") || pressed.has("KeyD")) return 1;
-    if (pressed.has("ArrowLeft") || pressed.has("KeyA")) return -1;
+  // Returns a direction vector {x, y} for menu navigation, or null.
+  function menuNav(pads) {
+    if (world.joinedThisFrame || world.lockedThisFrame) return null;
+    let x = 0, y = 0;
+    keyboardSchemes.forEach((sc, i) => {
+      if (!schemeFreeForNav(sc, i)) return;
+      if (pressed.has(sc.right)) x = 1;
+      if (pressed.has(sc.left)) x = -1;
+      if (pressed.has(sc.down)) y = 1;
+      if (pressed.has(sc.up)) y = -1;
+    });
     for (const pad of pads) {
-      if (buttonEdge(pad, 15) || axisEdge(pad, 0, 1)) return 1;
-      if (buttonEdge(pad, 14) || axisEdge(pad, 0, -1)) return -1;
+      if (buttonEdge(pad, 13) || axisEdge(pad, 1, 1)) y = 1;
+      if (buttonEdge(pad, 12) || axisEdge(pad, 1, -1)) y = -1;
+      // in the lobby left/right picks a fighter until that pad is locked in
+      if (world.state !== "menu" || padSlotLocked(pad)) {
+        if (buttonEdge(pad, 15) || axisEdge(pad, 0, 1)) x = 1;
+        if (buttonEdge(pad, 14) || axisEdge(pad, 0, -1)) x = -1;
+      }
     }
-    return 0;
+    return x || y ? { x, y } : null;
+  }
+
+  // Moves the cursor to whichever control actually sits in that direction, so a
+  // row of buttons is crossed with left/right and a column with up/down.
+  function moveFocusSpatial(dir, controls) {
+    const current = controls[world.menuIndex];
+    if (!current) return;
+    const a = current.getBoundingClientRect();
+    const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+    let best = -1, bestScore = Infinity;
+    controls.forEach((el, i) => {
+      if (el === current) return;
+      const r = el.getBoundingClientRect();
+      const vx = r.left + r.width / 2 - ax;
+      const vy = r.top + r.height / 2 - ay;
+      const along = vx * dir.x + vy * dir.y;
+      if (along <= 6) return;                       // must lie that way
+      const across = Math.abs(vx * -dir.y + vy * dir.x);
+      if (across > along * 2 + 90) return;          // and roughly in line
+      const score = along + across * 2.2;
+      if (score < bestScore) { bestScore = score; best = i; }
+    });
+    if (best >= 0) setMenuIndex(best, controls);
   }
 
   function padSlotLocked(pad) {
@@ -1664,6 +1766,8 @@
   function menuConfirm(pads) {
     if (world.pausedThisFrame || world.joinedThisFrame || world.lockedThisFrame) return false;
     if (pressed.has("Enter") || pressed.has("Space") || pressed.has("NumpadEnter")) return true;
+    // a locked-in keyboard player confirms with their shoot key
+    if (keyboardSchemes.some((sc, i) => pressed.has(sc.shoot) && schemeFreeForNav(sc, i))) return true;
     if (world.state === "menu") {
       // In the lobby A locks your character first; once you're ready it confirms
       // the focused button. Start always confirms.
@@ -1802,12 +1906,12 @@
       ref.el.classList.toggle("dead", !p.alive);
       const hpPct = clamp(p.hp / p.stats.maxHp, 0, 1) * 100;
       ref.bar.style.width = `${hpPct}%`;
-      ref.score.textContent = `★ ${p.score}/${settings.scoreLimit}`;
+      ref.score.textContent = str("hud.score", { score: p.score, limit: settings.scoreLimit });
       const reloading = p.reloadTimer > 0;
       if (force || p.ammo !== ref.lastAmmo || reloading !== ref.lastReload) {
         ref.lastAmmo = p.ammo; ref.lastReload = reloading;
         ref.ammo.innerHTML = reloading
-          ? `<span class="reloading">reloading…</span>`
+          ? `<span class="reloading">${escapeHtml(str("hud.reloading"))}</span>`
           : Array.from({ length: p.stats.maxAmmo }, (_, i) => `<i class="${i < p.ammo ? "full" : ""}"></i>`).join("");
       }
       if (force || p.cards.length !== ref.lastCards) {
@@ -1815,8 +1919,8 @@
         const shown = p.cards.slice(-3);
         ref.cards.innerHTML = shown.map(c =>
           `<span style="--rcol:${RARITIES[c.rarity].color}">${c.name}</span>`).join("") +
-          (p.cards.length > 3 ? `<span class="more">+${p.cards.length - 3}</span>` : "") ||
-          `<span class="none">no cards yet</span>`;
+          (p.cards.length > 3 ? `<span class="more">${escapeHtml(str("hud.more", { count: p.cards.length - 3 }))}</span>` : "") ||
+          `<span class="none">${escapeHtml(str("hud.noCards"))}</span>`;
       }
       const activeReady = p.stats.active && p.activeCooldown <= 0;
       ref.el.classList.toggle("active-ready", Boolean(activeReady));
@@ -1826,6 +1930,7 @@
   // ------------------------------------------------------------------ render
   function render() {
     resize();
+    syncChrome();
     const onMenuScreen = world.state === "title" || world.state === "menu" ||
       ((world.state === "settings" || world.state === "how") && (world.panelReturn !== "paused" || !players.length));
     const inGame = !onMenuScreen;
@@ -2388,7 +2493,7 @@
     ctx.fillStyle = "#ffffff";
     ctx.font = "900 78px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(world.roundFreeze > 0.35 ? "READY" : "FIGHT!", world.width / 2, 180);
+    ctx.fillText(str(world.roundFreeze > 0.35 ? "round.ready" : "round.fight"), world.width / 2, 180);
   }
 
   function drawWinner() {
@@ -2405,33 +2510,66 @@
     ctx.fillStyle = world.winner.color;
     ctx.font = "900 84px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(`${world.winner.name.toUpperCase()} WINS`, 0, 120);
+    ctx.fillText(str("round.championName", { name: world.winner.name.toUpperCase() }), 0, 120);
     ctx.fillStyle = "#f5f2ff";
     ctx.font = "700 28px system-ui, sans-serif";
-    ctx.fillText("Champion of the arena — Enter / Start for a rematch", 0, 170);
+    ctx.fillText(str("round.championSub"), 0, 170);
     ctx.restore();
   }
 
   function drawMenuBackground() {
     const t = world.time;
-    const g = ctx.createLinearGradient(0, 0, world.width, world.height);
-    const hue1 = (t * 6) % 360;
-    g.addColorStop(0, `hsl(${hue1}, 45%, 12%)`);
-    g.addColorStop(0.5, `hsl(${(hue1 + 60) % 360}, 42%, 16%)`);
-    g.addColorStop(1, `hsl(${(hue1 + 120) % 360}, 45%, 9%)`);
+    // A fixed indigo→violet→magenta ramp: hues stay in one harmonious family
+    // instead of cycling through the whole wheel (which turned everything olive).
+    const g = ctx.createLinearGradient(0, 0, world.width * 0.35, world.height);
+    g.addColorStop(0, "#140f2e");
+    g.addColorStop(0.45, "#2a1250");
+    g.addColorStop(0.78, "#4a1554");
+    g.addColorStop(1, "#5c1440");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, world.width, world.height);
+
+    // slow coloured spotlights, added rather than blended so they stay vivid
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const lights = [
+      { c: "255,61,132", x: 0.24, y: 0.32, r: 0.62, s: 0.11, a: 0.3 },
+      { c: "69,208,255", x: 0.78, y: 0.28, r: 0.55, s: 0.083, a: 0.24 },
+      { c: "255,216,77", x: 0.55, y: 0.86, r: 0.5, s: 0.061, a: 0.16 }
+    ];
+    for (const l of lights) {
+      const cx = (l.x + Math.sin(t * l.s) * 0.09) * world.width;
+      const cy = (l.y + Math.cos(t * l.s * 1.3) * 0.07) * world.height;
+      const rad = l.r * world.height;
+      const rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      rg.addColorStop(0, `rgba(${l.c},${l.a})`);
+      rg.addColorStop(1, `rgba(${l.c},0)`);
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, world.width, world.height);
+    }
+    ctx.restore();
+
     // drifting round fighters
     for (let i = 0; i < 16; i += 1) {
       const ch = CHARACTERS[i % CHARACTERS.length];
       const x = (i * 233 + t * 34) % (world.width + 260) - 130;
       const y = 130 + ((i * 131) % 640) + Math.sin(t + i) * 26;
       ctx.save();
-      ctx.globalAlpha = 0.16;
+      ctx.globalAlpha = 0.13;
       ctx.translate(x, y);
       drawCharacter(ctx, ch, 30 + (i % 3) * 10, { t: t + i, aimX: Math.sin(t * 0.4 + i) > 0 ? 1 : -1, useImage: false });
       ctx.restore();
     }
+
+    // corner falloff keeps the panels readable without dulling the centre
+    const vg = ctx.createRadialGradient(
+      world.width / 2, world.height / 2, world.height * 0.32,
+      world.width / 2, world.height / 2, world.height * 0.98
+    );
+    vg.addColorStop(0, "rgba(8,4,18,0)");
+    vg.addColorStop(1, "rgba(8,4,18,0.62)");
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, world.width, world.height);
   }
 
   // -------- weather
@@ -2752,8 +2890,8 @@
   }
   function toggleMusic() {
     settings.music = !settings.music;
-    if (settings.music) { ensureAudio(); startMusic(); showToast("Music on"); }
-    else { pauseMusic(); showToast("Music off"); }
+    if (settings.music) { ensureAudio(); startMusic(); showToast(str("toast.soundOn")); }
+    else { pauseMusic(); showToast(str("toast.soundOff")); }
     syncMusicButtons();
     renderNowPlaying();
   }
@@ -2765,11 +2903,12 @@
     if (bar) bar.classList.toggle("muted", !settings.music);
   }
   function syncMusicButtons() {
-    const label = `Music: ${settings.music ? "On" : "Off"}`;
-    for (const id of ["musicBtn", "pauseMusicBtn"]) {
-      const el = document.getElementById(id);
-      if (el) el.textContent = label;
-    }
+    const icon = document.getElementById("iconSound");
+    if (!icon) return;
+    icon.classList.toggle("muted", !settings.music);
+    const label = str(settings.music ? "icons.soundOn" : "icons.soundOff");
+    icon.title = label;
+    icon.setAttribute("aria-label", label);
   }
   function setMusicVolume(value) {
     settings.musicVolume = clamp(Number(value) / 100, 0, 1);
@@ -2815,6 +2954,7 @@
   }
 
   function sfx(name) {
+    if (!settings.music) return; // the speaker icon is a full mute
     ensureAudio();
     if (!audioCtx) return;
     const now = audioCtx.currentTime;
@@ -2846,18 +2986,15 @@
         renderLobby();
       }
     });
-    document.getElementById("fullscreenBtn").addEventListener("click", toggleFullscreen);
-    document.getElementById("musicBtn").addEventListener("click", toggleMusic);
     document.getElementById("resumeBtn").addEventListener("click", () => togglePause(false));
-    document.getElementById("pauseFullscreenBtn").addEventListener("click", toggleFullscreen);
-    document.getElementById("pauseMusicBtn").addEventListener("click", toggleMusic);
     document.getElementById("musicPrev").addEventListener("click", () => skipTrack(-1));
     document.getElementById("musicNext").addEventListener("click", () => skipTrack(1));
     document.getElementById("pauseMenuBtn").addEventListener("click", returnToMainMenu);
-    document.getElementById("settingsBtn").addEventListener("click", () => openPanel(settingsPanel, "settings"));
-    document.getElementById("howBtn").addEventListener("click", () => openPanel(howPanel, "how"));
+    document.getElementById("iconSettings").addEventListener("click", () => openPanel(settingsPanel, "settings"));
+    document.getElementById("iconHow").addEventListener("click", () => openPanel(howPanel, "how"));
+    document.getElementById("iconFullscreen").addEventListener("click", toggleFullscreen);
+    document.getElementById("iconSound").addEventListener("click", toggleMusic);
     document.getElementById("pauseSettingsBtn").addEventListener("click", () => openPanel(settingsPanel, "settings"));
-    document.getElementById("pauseHowBtn").addEventListener("click", () => openPanel(howPanel, "how"));
     document.getElementById("settingsBack").addEventListener("click", () => closePanel(settingsPanel));
     document.getElementById("howBack").addEventListener("click", () => closePanel(howPanel));
     titleScreen.addEventListener("pointerdown", () => startFromTitle(true));
@@ -2866,7 +3003,7 @@
     const levelSelect = document.getElementById("levelSelect");
     const rnd = document.createElement("option");
     rnd.value = "-1";
-    rnd.textContent = "🎲 Random every round";
+    rnd.textContent = str("settings.arenaRandom");
     levelSelect.appendChild(rnd);
     LEVELS.forEach((lv, i) => {
       const o = document.createElement("option");
@@ -2919,7 +3056,7 @@
     try {
       if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
     } catch {
-      showToast("This browser blocked fullscreen");
+      showToast(str("toast.fullscreenBlocked"));
     }
   }
 
@@ -2982,9 +3119,9 @@
     const orphan = players.find(p => !p.bot && !p.scheme && (p.gamepadIndex === null || p.gamepadIndex === undefined));
     if (orphan && world.state !== "menu") {
       orphan.gamepadIndex = e.gamepad.index;
-      showToast(`Controller reconnected — welcome back, ${orphan.name}`);
+      showToast(str("toast.controllerReconnected", { name: orphan.name }));
     } else {
-      showToast(`${e.gamepad.id.split("(")[0].trim() || "Controller"} detected — press a button to join`);
+      showToast(str("toast.controllerDetected", { name: e.gamepad.id.split("(")[0].trim() || "Controller" }));
     }
   });
   addEventListener("gamepaddisconnected", e => {
@@ -2992,7 +3129,7 @@
     if (slotIndex >= 0) lobbySlots.splice(slotIndex, 1);
     for (const p of players) if (p.gamepadIndex === e.gamepad.index) p.gamepadIndex = null;
     renderLobby();
-    showToast("Controller disconnected");
+    showToast(str("toast.controllerLost"));
   });
 
   if (!CanvasRenderingContext2D.prototype.roundRect) {
@@ -3007,6 +3144,7 @@
     };
   }
 
+  applyStrings();
   bindUi();
   renderLobby();
   syncMusicButtons();

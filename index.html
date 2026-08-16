@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rounder</title>
+    <link rel="stylesheet" href="styles.css?v=17">
+  </head>
+  <body>
+    <canvas id="game" aria-label="Rounder game canvas"></canvas>
+
+    <section id="menu" class="panel menu-panel">
+      <div>
+        <p class="eyebrow">Local arena roguelite</p>
+        <h1>Rounder</h1>
+        <p class="tagline">Four-player physics duels with loser drafts, volatile cards, controller rumble, and fast rematches.</p>
+      </div>
+
+      <div class="menu-grid">
+        <button id="startBtn" class="primary">Start Match</button>
+        <button id="createOnlineBtn">Create Online Game</button>
+        <button id="fullscreenBtn">Fullscreen</button>
+        <button id="musicBtn">Music: On</button>
+        <button id="settingsBtn">Settings</button>
+        <button id="howBtn">Controls</button>
+      </div>
+
+      <div id="onlineGames" class="online-games"></div>
+
+      <div id="joinSlots" class="join-slots"></div>
+
+      <div class="quick-card">
+        <strong>Join:</strong> press any controller button. Start uses joined players only.
+      </div>
+    </section>
+
+    <section id="settings" class="panel settings-panel hidden">
+      <h2>Settings</h2>
+      <label>
+        Max Players
+        <input id="playerCount" type="range" min="2" max="4" value="4">
+        <span id="playerCountValue">4</span>
+      </label>
+      <label>
+        Bots
+        <input id="botCount" type="range" min="0" max="3" value="0">
+        <span id="botCountValue">0</span>
+      </label>
+      <label>
+        Bot Difficulty
+        <input id="botDifficulty" type="range" min="1" max="3" value="1">
+        <span id="botDifficultyValue">Easy</span>
+      </label>
+      <label>
+        Score to Win
+        <input id="scoreLimit" type="range" min="3" max="8" value="5">
+        <span id="scoreLimitValue">5</span>
+      </label>
+      <label>
+        Cards Per Draft
+        <input id="draftCount" type="range" min="3" max="5" value="5">
+        <span id="draftCountValue">5</span>
+      </label>
+      <label>
+        Arena Hazards
+        <input id="hazards" type="checkbox" checked>
+      </label>
+      <label>
+        Controller Haptics
+        <input id="haptics" type="checkbox" checked>
+      </label>
+      <label>
+        Screen Shake
+        <input id="shake" type="checkbox" checked>
+      </label>
+      <label>
+        Music Volume
+        <input id="musicVolume" type="range" min="0" max="100" value="20">
+        <span id="musicVolumeValue">20</span>
+      </label>
+      <label>
+        Common Rate
+        <input id="commonWeight" type="range" min="0" max="20" value="9">
+        <span id="commonWeightValue">9</span>
+      </label>
+      <label>
+        Uncommon Rate
+        <input id="uncommonWeight" type="range" min="0" max="20" value="6">
+        <span id="uncommonWeightValue">6</span>
+      </label>
+      <label>
+        Rare Rate
+        <input id="rareWeight" type="range" min="0" max="20" value="4">
+        <span id="rareWeightValue">4</span>
+      </label>
+      <label>
+        Epic Rate
+        <input id="epicWeight" type="range" min="0" max="20" value="3">
+        <span id="epicWeightValue">3</span>
+      </label>
+      <label>
+        Legendary Rate
+        <input id="legendaryWeight" type="range" min="0" max="20" value="2">
+        <span id="legendaryWeightValue">2</span>
+      </label>
+      <label>
+        Mythical Rate
+        <input id="mythicalWeight" type="range" min="0" max="20" value="1">
+        <span id="mythicalWeightValue">1</span>
+      </label>
+      <div class="menu-grid">
+        <button id="settingsBack">Back</button>
+      </div>
+    </section>
+
+    <section id="how" class="panel how-panel hidden">
+      <h2>Controls</h2>
+      <div class="controls-grid">
+        <div>
+          <h3>Keyboard P1</h3>
+          <p>A/D move, W jump, F shoot, G block</p>
+        </div>
+        <div>
+          <h3>Keyboard P2</h3>
+          <p>Left/Right move, Up jump, / shoot, . block</p>
+        </div>
+        <div>
+          <h3>Controller</h3>
+          <p>Left stick/D-pad move, A jump, RT/RB shoot, LT/LB block</p>
+        </div>
+        <div>
+          <h3>Draft</h3>
+          <p>Move left/right and press shoot/jump to pick a card. Mythical cards activate with G or LB.</p>
+        </div>
+      </div>
+      <div class="menu-grid">
+        <button id="howBack">Back</button>
+      </div>
+    </section>
+
+    <section id="draft" class="draft hidden" aria-live="polite">
+      <div class="draft-header">
+        <p id="draftPrompt"></p>
+      </div>
+      <div id="draftCards" class="draft-cards"></div>
+    </section>
+
+    <section id="battleSplash" class="splash hidden" aria-live="polite">
+      <p id="battleKicker"></p>
+      <h2 id="battleTitle"></h2>
+      <p id="battleSub"></p>
+    </section>
+
+    <section id="pausePanel" class="panel pause-panel hidden">
+      <h2>Paused</h2>
+      <div class="menu-grid">
+        <button id="resumeBtn" class="primary">Resume</button>
+        <button id="pauseFullscreenBtn">Fullscreen</button>
+        <button id="pauseMusicBtn">Music: On</button>
+        <button id="pauseMenuBtn">Main Menu</button>
+      </div>
+    </section>
+
+    <section id="hud" class="hud"></section>
+    <section id="toast" class="toast hidden"></section>
+
+    <script src="https://www.unpkg.com/@instantdb/core@latest/dist/standalone/index.umd.cjs"></script>
+    <script src="game.js?v=17"></script>
+  </body>
+</html>

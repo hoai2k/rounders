@@ -98,15 +98,16 @@
     // 1) composed rig (body + aimable weapon + attached arms) when the parts exist
     const rig = window.ROUNDERS.rig;
     if (rig && !procedural && opts.useImage !== false && opts.useRig !== false) {
-      if (rig.draw(ctx, ch, r, { aimX, aimY, wob })) return;
+      if (rig.draw(ctx, ch, r, { aimX, aimY, wob, facing: opts.facing || 0 })) return;
     }
 
     // 2) single canonical PNG
     const img = images.get(ch.id);
     if (img && !procedural && opts.useImage !== false) {
       const s = r * 2.5;
+      const facing = opts.facing ? (opts.facing < 0 ? -1 : 1) : (aimX < 0 ? -1 : 1);
       ctx.save();
-      if (aimX < 0) ctx.scale(-1, 1);
+      if (facing < 0) ctx.scale(-1, 1);
       ctx.drawImage(img, -s / 2, -s / 2 + wob, s, s);
       ctx.restore();
       return;

@@ -2,9 +2,10 @@
 
 Drop the per-character render parts here. When a character has **both** a body and
 a weapon in this folder, the game stops drawing the flat `characters/<id>.png` and
-composes the character instead: the body mirrors with facing while the weapon
-rotates to the aim direction, and the arms bridge the two — each arm keeps its
-shoulder on the body and its hand on the weapon as the weapon swings.
+composes the character instead: the body mirrors with **facing** (which the game
+takes from movement, not from aim, so a fighter can back away while still
+shooting where the stick points) while the weapon swings to the **aim**, with the
+arms riding along on the weapon.
 
 ```
 assets/images/characters/render/
@@ -77,8 +78,8 @@ needs to contain what you want to override.
 
 | Part | Anchor | Meaning |
 |---|---|---|
-| body | `pivot` | the physics center — the point the game positions the character by |
-| body | `radius` | the body's visual radius in image px; maps to the player's collision radius |
+| body | `pivot` | the detected centre of the ball, in image px |
+| body | `radius` | the detected radius of the ball, in image px; this is what maps onto the player's collision circle |
 | weapon | `grip` | the end held; it sits `distance` radii out along the aim and the weapon turns about it |
 | weapon | `muzzle` | the business end; lands at 2.05 radii and is where shots come from. Together with `grip` it defines the weapon's direction and length |
 | arm | `anchors[i].hand` | the point on arm sprite *i* that lands on its hold |
@@ -94,6 +95,15 @@ Placement then lives in `rig.arms[i]`:
 | `stretch` | — | when true the arm swings from the socket and stretches along its own axis to reach the hold; when false it is rigidly parented to the weapon (the old hand behaviour) |
 | `minStretch` / `maxStretch` | — | how far the arm may squash or reach before it stops following, so it never turns into a noodle |
 | `z` | — | `back` (behind the body), `mid` (behind the weapon) or `front` |
+
+The body's own adjustment, for art whose ball doesn't land on the circle on its
+own — all three are body-only and leave the weapon and arms alone:
+
+| Field | Meaning |
+|---|---|
+| `bodyScale` | multiplies the body sprite's size |
+| `bodyOffset` | shifts the body sprite, in body radii |
+| `bodyRotation` | turns the body sprite, in degrees |
 
 And in `rig.weapon`:
 

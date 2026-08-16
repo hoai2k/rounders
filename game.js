@@ -492,6 +492,7 @@
       p.x = sp.x; p.y = sp.y;
       p.vx = 0; p.vy = 0;
       p.aimX = p.x < world.width / 2 ? 1 : -1; p.aimY = 0;
+      p.facing = p.aimX;
       p.hp = p.stats.maxHp;
       p.alive = true;
       p.grounded = false;
@@ -1071,6 +1072,10 @@
       p.vx += (targetVx - p.vx) * clamp(accel * dt, 0, 1);
       if (!move && p.grounded) p.vx += (0 - p.vx) * clamp(brake * dt, 0, 1);
 
+      // Which way the character is turned follows where they are *moving*, so
+      // they can back away while still shooting where the stick points. It
+      // holds the last direction when they stop.
+      if (move) p.facing = move < 0 ? -1 : 1;
       if (move) { p.aimX = move; p.aimY = 0; }
       if (Math.abs(p.input.aimX) > 0.2 || Math.abs(p.input.aimY) > 0.2) {
         const mag = Math.hypot(p.input.aimX, p.input.aimY) || 1;
@@ -1297,7 +1302,9 @@
     const pellets = p.stats.pellets;
     // Rigged characters fire from the actual barrel tip; everyone else keeps
     // the old fixed offset along the aim.
-    const muz = window.ROUNDERS.rig ? window.ROUNDERS.rig.muzzle(p.character, p.stats.radius, p.aimX, p.aimY) : null;
+    const muz = window.ROUNDERS.rig
+      ? window.ROUNDERS.rig.muzzle(p.character, p.stats.radius, p.aimX, p.aimY, 0, p.facing || 0)
+      : null;
     for (let i = 0; i < pellets; i += 1) {
       const spread = (i - (pellets - 1) / 2) * p.stats.spread + rand(-0.018, 0.018);
       const a = baseAngle + spread;
@@ -2355,7 +2362,7 @@
       ctx.globalAlpha = 1;
       drawCharacter(ctx, p.character, r, {
         t: world.time + p.botSeed,
-        aimX: p.aimX, aimY: p.aimY,
+        aimX: p.aimX, aimY: p.aimY, facing: p.facing,
         blink: p.blinkClock % 4 > 3.8
       });
       // status tints

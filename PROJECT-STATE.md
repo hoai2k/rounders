@@ -123,6 +123,11 @@ Pillars:
       The fitter matches the arm art into the canonical hero image to recover the
       hand size and grip position, and writes those to `render/rigs.json`;
       everything else stays automatic
+- [x] **Facing follows movement, aiming follows the aim stick**: the body turns
+      with the direction the player is moving (holding the last direction when
+      they stop) while the weapon points wherever they aim, so a fighter can
+      retreat while shooting. The workbench mirrors that split — left stick
+      turns the body, right stick aims
 - [x] Settings → Visuals → **Use Procedural Characters** (default off) draws the
       whole roster with the built-in vector art instead of the sprites
 - [x] Files: `js/characters.js`, `js/rig.js`, `js/chroma.js`, `tools/`, `workbench/`

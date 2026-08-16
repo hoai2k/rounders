@@ -73,9 +73,14 @@ Pillars:
       1050 → max arc ≈ 1330px, life 3.2s, slightly slimmer); seven explicit
       open-sky **lob arenas** whose upper air stays empty on purpose; ammo pips
       moved to a row just above the weapon barrel
-- [ ] **Backdrop refreshes** (`image-requests.md` §1): repaints for the 6
-      arenas whose silhouette changed most (Neon Skyline, Koi Temple, Tidal
-      Wreck, Midnight Library, Lantern Festival, Aurora Summit)
+- [x] **Backdrop refreshes delivered** (`image-requests-history.md` §8): repaints
+      for the 6 arenas whose silhouette changed most (Neon Skyline, Koi Temple,
+      Tidal Wreck, Midnight Library, Lantern Festival, Aurora Summit), painted
+      to the new geometry and filed at `assets/images/arenas/`
+- [ ] **Card art panels** (`image-requests-history.md` §7): the 52 painted
+      512×384 scenes are delivered and filed at `assets/images/cards/art/<id>.png`,
+      but nothing draws them yet — the card face needs an art panel above the
+      name in the draft hand (and maybe the HUD chips)
 
 ### 4. Characters — 24 pilots across two waves, procedural + generated art
 - [x] Round 2: 12 indie-badass characters lead the roster (Vex, Rook, Jinx,

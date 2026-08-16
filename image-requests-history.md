@@ -233,3 +233,21 @@ end right, so they attach to the body and ride the weapon.
 | `assets/images/characters/canonical/fang.png` | **Fang** — the stray | Steel-blue ball with sharp battle-notched wolf ears, narrow feral red eyes, one visible fang, chain-blade launcher with a length of chain whipping behind it. |
 | `assets/images/characters/canonical/onyx.png` | **Onyx** — the magma golem | Obsidian-black stone ball cracked with glowing magma seams, jagged rock shards for a crown, slow-burning ember eyes, massive rock-knuckled gauntlet cannon. |
 | `assets/images/characters/canonical/riot.png` | **Riot** — the paint prophet | Dark-teal ball wearing a backwards cap and a paint-splattered bandana over its mouth, defiant eyes, neon-pink paint drips, rapid-fire spray-paint gatling with a rainbow mist. |
+
+## 7. Card art panels (52 images) — delivered
+
+512×384 full-bleed painted scene per card at `assets/images/cards/art/<id>.png`,
+one per card in `js/cards.js`, so a draft hand is recognised instead of read.
+Base prompt: the global style guide plus each card's name, tagline, and effect
+as the scene. Delivered 2026-08-16 straight to the canonical path (opaque
+full-bleed panels — no keying needed). Display wiring is tracked in
+PROJECT-STATE.md.
+
+## 8. Arena backdrop refreshes (6 images) — delivered
+
+1600×900 repaints for the arenas whose silhouette changed most in the
+level-design pass (AUDIT.md §5): Neon Skyline, Koi Temple, Tidal Wreck,
+Midnight Library, Lantern Festival, Aurora Summit. Each prompt carried
+geometry notes (alley chasm, torii span, hull mass, central bookcase, pagoda,
+left-peak ridge) so the painting agrees with the play space. Delivered
+2026-08-16, replacing the originals at `assets/images/arenas/<id>.png`.

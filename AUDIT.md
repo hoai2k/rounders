@@ -108,6 +108,7 @@ mirrored, with nothing to shoot except the other player.
 | L2 | **CRITICAL** — Zero destructible or physics-reactive terrain; bullets only ever hit players or dead geometry. | ✅ Three new engine systems, all per-round: **breakable platforms** (`breakable: hp` — crack visibly, shatter, telegraphed with a stitched accent outline), **chain-hung platforms** (`hung[]` — cut every chain with bullets and the platform drops, then settles where it lands), and **crates** (`crates[]` — pushable, climbable, stackable, shootable; knocked around by hits and explosions; float on tides). |
 | L3 | Layouts were almost all left-right mirrors of the same stack; no perches, no overhangs, no high-ground worth fighting over. | ✅ Redesigns favor asymmetry (Aurora Summit's staircase ridge, Prism's offset monoliths, Rustyard's uneven junk piles) and true perches (tower caps, crow's nest, torii beam, lightning-rod plate). |
 | L4 | Explosions ignored the arena entirely. | ✅ Explosive splash now damages crates and breakable platforms in radius. |
+| L5b | **CRITICAL (follow-up)** — The first draft of the rebuild capped almost every tower with a *wider* plate ("narrow column + cap"), used in 20 of 25 arenas. That overhang is a ceiling, not a perch: a wall-climber rises up the column face and bonks the cap's underside, so the towers added for wall-jumping were mostly unclimbable — 36 walls blocked on both faces. | ✅ Design rule adopted and written into `js/levels.js`: **no lips.** A tower is one rectangle whose own top is the perch (widened where a roomier perch is wanted), or it steps like a pyramid with each tier no wider than the one below. Koi Temple's torii beam and Cloud Nine's propped ledges keep a deliberate overhang on the inner face only, with the outer face flush so there is always one clean way up. Lantern Festival's pagoda became a stepped pyramid; Ion Lift's under-platform pylon became two flush service pylons; Rustyard's junk piles and four incidental ledges were shifted clear. |
 | L5 | Nothing in a round ever changed the map (movers/phase loops aside), so long rounds played identically to their first ten seconds. | ✅ Dropped chain platforms, shattered floors, and shoved/broken crates persist for the rest of the round and reset for the next — rounds now develop. |
 
 ### Per-arena changes
@@ -150,7 +151,11 @@ step, a bounce pad, or an elevator.
 - Static validator over all 25 arenas: spawns above ground and outside solids,
   chains inside their platform span and not passing through geometry, crates
   non-intersecting with ground below (or a tide to float on), mover sweeps
-  clear of hung platforms and crates.
+  clear of hung platforms and crates, and a **lip check** — every wall ≥100px
+  tall must have at least one face with no overhang roofing its top, so the
+  climb always ends on a perch. Both-faces-blocked is a hard failure; a single
+  lipped face is reported as a note so it stays a deliberate choice (4 remain:
+  the two torii pillars and the two Cloud Nine columns).
 - Headless playthroughs (Playwright/Chromium) across sampled arenas: no JS
   errors. A purpose-built test arena confirmed the full loop live: chain shot →
   platform drops and settles; crates shoved across the floor by gunfire;

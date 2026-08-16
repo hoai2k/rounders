@@ -1,8 +1,19 @@
 {
   "version": 1,
-  "note": "Hand size and grip position measured against the canonical art by tools/fitrig.mjs. Everything else is auto-detected by js/rig.js. Tune in /workbench.",
+  "note": "Authored in /workbench. Values are source-image pixels unless noted.",
   "characters": {
     "vex": {
+      "body": {
+        "pivot": {
+          "x": 261.9,
+          "y": 284.27
+        },
+        "radius": 197.18,
+        "mount": {
+          "x": 370.35,
+          "y": 284.27
+        }
+      },
       "weapon": {
         "grip": {
           "x": 48.75,
@@ -13,32 +24,84 @@
           "y": 98.69
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 254.87,
+              "y": 247.75
+            },
+            "hand": {
+              "x": 254.87,
+              "y": 247.75
+            },
+            "radius": 124.17
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.76,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 316.13,
+              "y": 268.49
+            },
             "hold": {
-              "x": 72.66,
-              "y": 245.98
+              "x": 97.54,
+              "y": 230.96
             },
             "scale": 0.29,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 316.13,
+              "y": 300.04
+            },
             "hold": {
               "x": 176.19,
               "y": 255.55
             },
             "scale": 0.29,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "rook": {
+      "body": {
+        "pivot": {
+          "x": 251.84,
+          "y": 243.45
+        },
+        "radius": 239.44,
+        "mount": {
+          "x": 383.53,
+          "y": 243.45
+        }
+      },
       "weapon": {
         "grip": {
           "x": 122.3,
@@ -49,32 +112,84 @@
           "y": 187.15
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 256.47,
+              "y": 250.67
+            },
+            "hand": {
+              "x": 256.47,
+              "y": 250.67
+            },
+            "radius": 102.05
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.9,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 317.68,
+              "y": 224.3
+            },
             "hold": {
               "x": 78.81,
               "y": 347.21
             },
             "scale": 0.37,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 317.68,
+              "y": 262.61
+            },
             "hold": {
               "x": 183.41,
               "y": 297.86
             },
             "scale": 0.37,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "jinx": {
+      "body": {
+        "pivot": {
+          "x": 251.11,
+          "y": 314.29
+        },
+        "radius": 178.45,
+        "mount": {
+          "x": 349.26,
+          "y": 314.29
+        }
+      },
       "weapon": {
         "grip": {
           "x": 118.02,
@@ -85,32 +200,84 @@
           "y": 219.67
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 256.13,
+              "y": 251.2
+            },
+            "hand": {
+              "x": 256.13,
+              "y": 251.2
+            },
+            "radius": 145.37
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.93,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 300.18,
+              "y": 300.02
+            },
             "hold": {
               "x": 75.29,
               "y": 374.81
             },
             "scale": 0.19,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 300.18,
+              "y": 328.57
+            },
             "hold": {
               "x": 179.1,
               "y": 313.05
             },
             "scale": 0.19,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "diesel": {
+      "body": {
+        "pivot": {
+          "x": 253.76,
+          "y": 273.71
+        },
+        "radius": 190.35,
+        "mount": {
+          "x": 358.46,
+          "y": 273.71
+        }
+      },
       "weapon": {
         "grip": {
           "x": 63.88,
@@ -121,32 +288,84 @@
           "y": 259.41
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 255.25,
+              "y": 248.05
+            },
+            "hand": {
+              "x": 255.25,
+              "y": 248.05
+            },
+            "radius": 124.02
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 306.11,
+              "y": 258.48
+            },
             "hold": {
               "x": 289.81,
               "y": 249.65
             },
             "scale": 0.39,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 306.11,
+              "y": 288.94
+            },
             "hold": {
               "x": 188.89,
               "y": 244.59
             },
             "scale": 0.39,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "nyx": {
+      "body": {
+        "pivot": {
+          "x": 264.38,
+          "y": 235.83
+        },
+        "radius": 193.71,
+        "mount": {
+          "x": 370.92,
+          "y": 235.83
+        }
+      },
       "weapon": {
         "grip": {
           "x": 71.7,
@@ -157,32 +376,84 @@
           "y": 231.74
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 252.62,
+              "y": 250.77
+            },
+            "hand": {
+              "x": 252.62,
+              "y": 250.77
+            },
+            "radius": 122.52
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 317.65,
+              "y": 220.33
+            },
             "hold": {
               "x": 125.22,
               "y": 246.99
             },
             "scale": 0.23,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 317.65,
+              "y": 251.33
+            },
             "hold": {
               "x": 187.75,
               "y": 244.03
             },
             "scale": 0.23,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "saber": {
+      "body": {
+        "pivot": {
+          "x": 269.03,
+          "y": 262.68
+        },
+        "radius": 159.63,
+        "mount": {
+          "x": 356.82,
+          "y": 262.68
+        }
+      },
       "weapon": {
         "grip": {
           "x": 47.34,
@@ -193,32 +464,84 @@
           "y": 249.22
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 255.76,
+              "y": 246.97
+            },
+            "hand": {
+              "x": 255.76,
+              "y": 246.97
+            },
+            "radius": 111.03
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 312.92,
+              "y": 249.91
+            },
             "hold": {
               "x": 72.16,
               "y": 247.13
             },
             "scale": 0.21,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 312.92,
+              "y": 275.45
+            },
             "hold": {
               "x": 179.3,
               "y": 244.56
             },
             "scale": 0.21,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "havoc": {
+      "body": {
+        "pivot": {
+          "x": 253.08,
+          "y": 288.24
+        },
+        "radius": 190.47,
+        "mount": {
+          "x": 357.84,
+          "y": 288.24
+        }
+      },
       "weapon": {
         "grip": {
           "x": 94.88,
@@ -229,32 +552,84 @@
           "y": 225.2
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 255.63,
+              "y": 255.55
+            },
+            "hand": {
+              "x": 255.63,
+              "y": 255.55
+            },
+            "radius": 77.9
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 305.46,
+              "y": 273
+            },
             "hold": {
               "x": 87.59,
               "y": 314.7
             },
             "scale": 0.17,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 305.46,
+              "y": 303.48
+            },
             "hold": {
               "x": 185.13,
               "y": 291.63
             },
             "scale": 0.17,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "wraith": {
+      "body": {
+        "pivot": {
+          "x": 255.62,
+          "y": 261.29
+        },
+        "radius": 199.36,
+        "mount": {
+          "x": 365.26,
+          "y": 261.29
+        }
+      },
       "weapon": {
         "grip": {
           "x": 25.55,
@@ -265,32 +640,84 @@
           "y": 242.28
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 255.86,
+              "y": 244.48
+            },
+            "hand": {
+              "x": 255.86,
+              "y": 244.48
+            },
+            "radius": 124.17
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 310.44,
+              "y": 245.34
+            },
             "hold": {
               "x": 61.05,
               "y": 285.2
             },
             "scale": 0.18,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 310.44,
+              "y": 277.24
+            },
             "hold": {
               "x": 169.5,
               "y": 265.11
             },
             "scale": 0.18,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "blitz": {
+      "body": {
+        "pivot": {
+          "x": 262.69,
+          "y": 287.81
+        },
+        "radius": 199.99,
+        "mount": {
+          "x": 372.69,
+          "y": 287.81
+        }
+      },
       "weapon": {
         "grip": {
           "x": 76.9,
@@ -301,32 +728,84 @@
           "y": 236.33
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 259.03,
+              "y": 249.99
+            },
+            "hand": {
+              "x": 259.03,
+              "y": 249.99
+            },
+            "radius": 70.88
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 317.69,
+              "y": 271.81
+            },
             "hold": {
               "x": 293.13,
               "y": 251.18
             },
             "scale": 0.3,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 317.69,
+              "y": 303.8
+            },
             "hold": {
               "x": 194.13,
               "y": 262.88
             },
             "scale": 0.3,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "fang": {
+      "body": {
+        "pivot": {
+          "x": 235.67,
+          "y": 278.31
+        },
+        "radius": 212.18,
+        "mount": {
+          "x": 352.37,
+          "y": 278.31
+        }
+      },
       "weapon": {
         "grip": {
           "x": 45.72,
@@ -337,32 +816,84 @@
           "y": 247.64
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 255.98,
+              "y": 255
+            },
+            "hand": {
+              "x": 255.98,
+              "y": 255
+            },
+            "radius": 81.57
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 294.02,
+              "y": 261.33
+            },
             "hold": {
               "x": 279.99,
               "y": 252.93
             },
             "scale": 0.26,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 294.02,
+              "y": 295.28
+            },
             "hold": {
               "x": 176.7,
               "y": 252.5
             },
             "scale": 0.26,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "onyx": {
+      "body": {
+        "pivot": {
+          "x": 255.19,
+          "y": 270.85
+        },
+        "radius": 211.72,
+        "mount": {
+          "x": 371.64,
+          "y": 270.85
+        }
+      },
       "weapon": {
         "grip": {
           "x": 39.75,
@@ -373,32 +904,84 @@
           "y": 224.45
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 256.58,
+              "y": 255.81
+            },
+            "hand": {
+              "x": 256.58,
+              "y": 255.81
+            },
+            "radius": 151.78
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 313.41,
+              "y": 253.91
+            },
             "hold": {
               "x": 290.09,
               "y": 235.25
             },
             "scale": 0.19,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 313.41,
+              "y": 287.79
+            },
             "hold": {
               "x": 181.6,
               "y": 251.65
             },
             "scale": 0.19,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "riot": {
+      "body": {
+        "pivot": {
+          "x": 262.08,
+          "y": 273.94
+        },
+        "radius": 198.89,
+        "mount": {
+          "x": 371.47,
+          "y": 273.94
+        }
+      },
       "weapon": {
         "grip": {
           "x": 83.55,
@@ -409,32 +992,84 @@
           "y": 274.46
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 255.92,
+              "y": 244.29
+            },
+            "hand": {
+              "x": 255.92,
+              "y": 244.29
+            },
+            "radius": 152.09
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 316.78,
+              "y": 258.03
+            },
             "hold": {
               "x": 132.2,
               "y": 281.81
             },
             "scale": 0.23,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 316.78,
+              "y": 289.85
+            },
             "hold": {
               "x": 179.05,
               "y": 280.58
             },
             "scale": 0.23,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "pip": {
+      "body": {
+        "pivot": {
+          "x": 269.35,
+          "y": 295.61
+        },
+        "radius": 191.24,
+        "mount": {
+          "x": 374.53,
+          "y": 295.61
+        }
+      },
       "weapon": {
         "grip": {
           "x": 118.38,
@@ -445,32 +1080,84 @@
           "y": 214.84
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 256.29,
+              "y": 254.17
+            },
+            "hand": {
+              "x": 256.29,
+              "y": 254.17
+            },
+            "radius": 106.3
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 321.94,
+              "y": 280.31
+            },
             "hold": {
               "x": 190.43,
               "y": 304.5
             },
             "scale": 0.27,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 321.94,
+              "y": 310.91
+            },
             "hold": {
               "x": 191.89,
               "y": 303.93
             },
             "scale": 0.27,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "bolt": {
+      "body": {
+        "pivot": {
+          "x": 255.8,
+          "y": 302.62
+        },
+        "radius": 193.21,
+        "mount": {
+          "x": 362.07,
+          "y": 302.62
+        }
+      },
       "weapon": {
         "grip": {
           "x": 71.9,
@@ -481,32 +1168,84 @@
           "y": 219.84
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 255.76,
+              "y": 253.2
+            },
+            "hand": {
+              "x": 255.76,
+              "y": 253.2
+            },
+            "radius": 141
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 308.93,
+              "y": 287.16
+            },
             "hold": {
               "x": 291.85,
               "y": 256.28
             },
             "scale": 0.24,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 308.93,
+              "y": 318.08
+            },
             "hold": {
               "x": 189.07,
               "y": 289.04
             },
             "scale": 0.24,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "mochi": {
+      "body": {
+        "pivot": {
+          "x": 254.65,
+          "y": 278.17
+        },
+        "radius": 203.97,
+        "mount": {
+          "x": 366.84,
+          "y": 278.17
+        }
+      },
       "weapon": {
         "grip": {
           "x": 62.89,
@@ -517,32 +1256,84 @@
           "y": 221.21
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 256.09,
+              "y": 253.72
+            },
+            "hand": {
+              "x": 256.09,
+              "y": 253.72
+            },
+            "radius": 106.84
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 310.75,
+              "y": 261.85
+            },
             "hold": {
               "x": 110.93,
               "y": 310.7
             },
             "scale": 0.3,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 310.75,
+              "y": 294.49
+            },
             "hold": {
               "x": 204.95,
               "y": 280
             },
             "scale": 0.3,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "gruff": {
+      "body": {
+        "pivot": {
+          "x": 242.75,
+          "y": 252.15
+        },
+        "radius": 166.14,
+        "mount": {
+          "x": 334.13,
+          "y": 252.15
+        }
+      },
       "weapon": {
         "grip": {
           "x": 26.57,
@@ -553,32 +1344,84 @@
           "y": 229.17
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 254.82,
+              "y": 249.23
+            },
+            "hand": {
+              "x": 254.82,
+              "y": 249.23
+            },
+            "radius": 108.11
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 288.44,
+              "y": 238.85
+            },
             "hold": {
               "x": 67.57,
               "y": 330.57
             },
             "scale": 0.24,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 288.44,
+              "y": 265.44
+            },
             "hold": {
               "x": 174.11,
               "y": 277.9
             },
             "scale": 0.24,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "nova": {
+      "body": {
+        "pivot": {
+          "x": 260.28,
+          "y": 266.78
+        },
+        "radius": 169.98,
+        "mount": {
+          "x": 353.77,
+          "y": 266.78
+        }
+      },
       "weapon": {
         "grip": {
           "x": 97.32,
@@ -589,32 +1432,84 @@
           "y": 212.2
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 256,
+              "y": 248.34
+            },
+            "hand": {
+              "x": 256,
+              "y": 248.34
+            },
+            "radius": 128.15
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 307.03,
+              "y": 253.18
+            },
             "hold": {
               "x": 287.52,
               "y": 192.08
             },
             "scale": 0.14,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 307.03,
+              "y": 280.38
+            },
             "hold": {
               "x": 180.62,
               "y": 180.5
             },
             "scale": 0.14,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "fizz": {
+      "body": {
+        "pivot": {
+          "x": 266.02,
+          "y": 281.82
+        },
+        "radius": 188.1,
+        "mount": {
+          "x": 369.48,
+          "y": 281.82
+        }
+      },
       "weapon": {
         "grip": {
           "x": 50.47,
@@ -625,32 +1520,84 @@
           "y": 230.07
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 255.64,
+              "y": 246.34
+            },
+            "hand": {
+              "x": 255.64,
+              "y": 246.34
+            },
+            "radius": 123.84
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 317.75,
+              "y": 266.77
+            },
             "hold": {
               "x": 246.95,
               "y": 246.81
             },
             "scale": 0.17,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 317.75,
+              "y": 296.87
+            },
             "hold": {
               "x": 184.09,
               "y": 252.57
             },
             "scale": 0.17,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "ember": {
+      "body": {
+        "pivot": {
+          "x": 266.13,
+          "y": 309.42
+        },
+        "radius": 178.81,
+        "mount": {
+          "x": 364.47,
+          "y": 309.42
+        }
+      },
       "weapon": {
         "grip": {
           "x": 69.66,
@@ -661,32 +1608,84 @@
           "y": 274.41
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 254.61,
+              "y": 243.42
+            },
+            "hand": {
+              "x": 254.61,
+              "y": 243.42
+            },
+            "radius": 108.62
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 315.3,
+              "y": 295.11
+            },
             "hold": {
               "x": 179.89,
               "y": 323.6
             },
             "scale": 0.31,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 315.3,
+              "y": 323.72
+            },
             "hold": {
               "x": 188.17,
               "y": 316.39
             },
             "scale": 0.31,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "glacia": {
+      "body": {
+        "pivot": {
+          "x": 268.97,
+          "y": 323.55
+        },
+        "radius": 150.76,
+        "mount": {
+          "x": 351.89,
+          "y": 323.55
+        }
+      },
       "weapon": {
         "grip": {
           "x": 43.3,
@@ -697,32 +1696,84 @@
           "y": 264.51
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 256,
+              "y": 249.74
+            },
+            "hand": {
+              "x": 256,
+              "y": 249.74
+            },
+            "radius": 110.48
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 310.43,
+              "y": 311.49
+            },
             "hold": {
               "x": 246.09,
               "y": 276.23
             },
             "scale": 0.15,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 310.43,
+              "y": 335.61
+            },
             "hold": {
               "x": 174.84,
               "y": 282.09
             },
             "scale": 0.15,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "shade": {
+      "body": {
+        "pivot": {
+          "x": 289.85,
+          "y": 295.69
+        },
+        "radius": 170.47,
+        "mount": {
+          "x": 383.61,
+          "y": 295.69
+        }
+      },
       "weapon": {
         "grip": {
           "x": 54.05,
@@ -733,32 +1784,84 @@
           "y": 244.9
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 256.04,
+              "y": 254.42
+            },
+            "hand": {
+              "x": 256.04,
+              "y": 254.42
+            },
+            "radius": 124.89
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 336.73,
+              "y": 282.05
+            },
             "hold": {
               "x": 284.64,
               "y": 248.46
             },
             "scale": 0.16,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 336.73,
+              "y": 309.32
+            },
             "hold": {
               "x": 177.98,
               "y": 250.56
             },
             "scale": 0.16,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "duke": {
+      "body": {
+        "pivot": {
+          "x": 268.74,
+          "y": 304.88
+        },
+        "radius": 187.87,
+        "mount": {
+          "x": 372.07,
+          "y": 304.88
+        }
+      },
       "weapon": {
         "grip": {
           "x": 28.39,
@@ -769,32 +1872,84 @@
           "y": 214.23
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 256.06,
+              "y": 244.9
+            },
+            "hand": {
+              "x": 256.06,
+              "y": 244.9
+            },
+            "radius": 130.29
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 320.41,
+              "y": 289.85
+            },
             "hold": {
               "x": 61.96,
               "y": 298.99
             },
             "scale": 0.23,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 320.41,
+              "y": 319.91
+            },
             "hold": {
               "x": 171.92,
               "y": 273.34
             },
             "scale": 0.23,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "sprocket": {
+      "body": {
+        "pivot": {
+          "x": 256.55,
+          "y": 309.58
+        },
+        "radius": 184.2,
+        "mount": {
+          "x": 357.86,
+          "y": 309.58
+        }
+      },
       "weapon": {
         "grip": {
           "x": 62.18,
@@ -805,32 +1960,84 @@
           "y": 210.67
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 257.9,
+              "y": 248.96
+            },
+            "hand": {
+              "x": 257.9,
+              "y": 248.96
+            },
+            "radius": 68.42
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 307.2,
+              "y": 294.85
+            },
             "hold": {
               "x": 97.55,
               "y": 274.95
             },
             "scale": 0.42,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 307.2,
+              "y": 324.32
+            },
             "hold": {
               "x": 191.84,
               "y": 258.15
             },
             "scale": 0.42,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]
       }
     },
     "luna": {
+      "body": {
+        "pivot": {
+          "x": 269.52,
+          "y": 318.01
+        },
+        "radius": 170.39,
+        "mount": {
+          "x": 363.24,
+          "y": 318.01
+        }
+      },
       "weapon": {
         "grip": {
           "x": 98.31,
@@ -841,26 +2048,67 @@
           "y": 242.84
         }
       },
+      "arm": {
+        "anchors": [
+          {
+            "shoulder": {
+              "x": 247.18,
+              "y": 242.88
+            },
+            "hand": {
+              "x": 247.18,
+              "y": 242.88
+            },
+            "radius": 125.46
+          }
+        ]
+      },
       "rig": {
+        "bodyScale": 1,
+        "bodyRotation": 0,
+        "weapon": {
+          "distance": 0.55,
+          "rotation": 0,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "orbit": true,
+          "behind": false
+        },
         "arms": [
           {
             "sprite": 0,
+            "socket": {
+              "x": 316.38,
+              "y": 304.38
+            },
             "hold": {
               "x": 284.12,
               "y": 210.78
             },
             "scale": 0.32,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "back"
           },
           {
             "sprite": 0,
+            "socket": {
+              "x": 316.38,
+              "y": 331.64
+            },
             "hold": {
               "x": 192.19,
               "y": 193.2
             },
             "scale": 0.32,
             "rotation": 0,
+            "stretch": false,
+            "minStretch": 0.8,
+            "maxStretch": 1.5,
             "z": "front"
           }
         ]

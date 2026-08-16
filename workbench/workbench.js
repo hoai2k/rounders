@@ -7,7 +7,8 @@
 // where you were:
 //
 //   view    a clean preview — no handles, no reference overlay. Sweep the aim,
-//           or grab a gamepad and aim with the stick the way a player would.
+//           or grab a gamepad and aim with the stick the way a player would,
+//           and pull a trigger to shoot from the rig's own muzzle.
 //   edit    pick a piece (body / weapon / hand) from the onscreen selector and
 //           move, scale or rotate it with the handles that appear. References
 //           show what the piece is being matched against.
@@ -35,11 +36,17 @@
     spin: false,
     faceLeft: false,
     showRefs: true,
+    showShots: true,
     onion: false,
     drag: null,
     built: null,
     padName: null
   };
+
+  // Preview shots: fired from the muzzle the rig reports, so a weapon that is
+  // aimed or placed wrong shows it immediately — the tracer leaves the barrel
+  // at an angle, or from the wrong end.
+  const shots = { live: [], flash: 0, cooldown: 0 };
 
   const work = new Map();   // id -> serializable rig record (also pushed into rig.js)
   const dirty = new Set();
@@ -115,7 +122,7 @@
     dirty.add(entry.id);
     rig.setCharacterRig(entry.id, work.get(entry.id));
     if (entry.id !== state.id) select(entry.id);
-    else { buildParts(); buildSelPanel(); }
+    else rebuild();
     syncJson();
     syncHistoryButtons();
   }
@@ -243,6 +250,162 @@
     y: (p.y - view.clientHeight / 2 - state.pan.y) / state.zoom + img.height / 2
   });
 
+  // --------------------------------------------------------------- shots
+
+  const FIRE_RATE = 0.14;      // seconds between shots while held
+  const SHOT_SPEED = 13;       // body radii per second
+  const SHOT_LIFE = 2.4;
+
+  // The muzzle the game would fire from. Falls back to the procedural spec
+  // (2.05 r along the aim) for a character with no composed rig.
+  function muzzlePoint(A) {
+    const ch = CHARACTERS.find((c) => c.id === state.id);
+    return rig.muzzle(ch, state.r, A.x, A.y, 0)
+      || { x: A.x * state.r * 2.05, y: A.y * state.r * 2.05 };
+  }
+
+  function fire() {
+    if (!state.showShots || state.mode === "anchor") return;
+    const A = aimVec();
+    const m = muzzlePoint(A);
+    const len = Math.hypot(A.x, A.y) || 1;
+    shots.live.push({
+      x: m.x, y: m.y,
+      vx: (A.x / len) * SHOT_SPEED * state.r,
+      vy: (A.y / len) * SHOT_SPEED * state.r,
+      life: SHOT_LIFE
+    });
+    shots.flash = 0.07;
+  }
+
+  function stepShots(dt) {
+    shots.flash = Math.max(0, shots.flash - dt);
+    shots.cooldown = Math.max(0, shots.cooldown - dt);
+    for (const s of shots.live) {
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.life -= dt;
+    }
+    shots.live = shots.live.filter((s) => s.life > 0);
+  }
+
+  function holdFire(dt) {
+    if (shots.cooldown > 0) return;
+    shots.cooldown = FIRE_RATE;
+    fire();
+    void dt;
+  }
+
+  // Drawn in the same space the character is drawn in, so a tracer that misses
+  // the barrel is a rig problem, not a drawing one.
+  function renderShots(f) {
+    if (!state.showShots) return;
+    for (const s of shots.live) {
+      const t = Math.max(0, Math.min(1, s.life / SHOT_LIFE));
+      ctx.strokeStyle = `rgba(255,214,77,${0.25 + 0.5 * t})`;
+      ctx.lineWidth = 3 / f.z;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - s.vx * 0.02, s.y - s.vy * 0.02);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(255,245,214,${0.4 + 0.6 * t})`;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 3 / f.z, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (shots.flash > 0) {
+      const A = aimVec();
+      const m = muzzlePoint(A);
+      const a = shots.flash / 0.07;
+      const r = state.r * 0.3 * a;
+      ctx.save();
+      ctx.translate(m.x, m.y);
+      ctx.rotate(Math.atan2(A.y, A.x));
+      ctx.fillStyle = `rgba(255,224,140,${0.85 * a})`;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(r * 1.6, -r * 0.5);
+      ctx.lineTo(r * 2.2, 0);
+      ctx.lineTo(r * 1.6, r * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // ------------------------------------------------------------------ arms
+
+  // How many arms this character wears. Nothing is worn until it is asked for,
+  // so a character shows arms only once they have been placed here.
+  function armCount() {
+    const rec = record(state.id);
+    return rec ? rec.rig.arms.length : 0;
+  }
+
+  function setArmCount(n) {
+    const rec = record(state.id);
+    if (!rec || n === rec.rig.arms.length) return;
+    edit(state.id, () => {
+      if (n < rec.rig.arms.length) rec.rig.arms.length = n;
+      else {
+        // Keep whatever is already placed; new arms come in on the plan.
+        const plan = rig.defaultArms(state.id, n);
+        for (let i = rec.rig.arms.length; i < n; i += 1) {
+          if (plan[i]) rec.rig.arms.push(clone(plan[i]));
+          else if (rec.rig.arms.length) rec.rig.arms.push({ ...clone(rec.rig.arms[0]), z: "front" });
+        }
+      }
+      state.arm = Math.max(0, Math.min(state.arm, rec.rig.arms.length - 1));
+    });
+    rebuild();
+  }
+
+  function buildArmPanel() {
+    const box = $("armPanel");
+    box.textContent = "";
+    const rec = record(state.id);
+    const R = rig.resolved(state.id);
+    const h = document.createElement("h2");
+    h.textContent = "Arms";
+    box.appendChild(h);
+    if (!rec) {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = "Waiting for render parts…";
+      box.appendChild(p);
+      return;
+    }
+    const row = document.createElement("label");
+    row.className = "row";
+    row.append("Show");
+    const sel = document.createElement("select");
+    for (const [v, label] of [[0, "None"], [1, "One"], [2, "Two"]]) {
+      const o = document.createElement("option");
+      o.value = String(v); o.textContent = label;
+      sel.appendChild(o);
+    }
+    sel.value = String(Math.min(2, rec.rig.arms.length));
+    sel.addEventListener("change", () => setArmCount(Number(sel.value)));
+    row.appendChild(sel);
+    box.appendChild(row);
+    const note = document.createElement("p");
+    note.className = "muted";
+    note.textContent = R && R.arm.sprites.length
+      ? "Placed on the weapon in Anchors → Arm."
+      : `No ${state.id}_arm.png — nothing to place.`;
+    box.appendChild(note);
+  }
+
+  // Every panel that depends on the current character/mode/arm, in one call, so
+  // nothing is left showing the last character's numbers.
+  function rebuild() {
+    buildParts();
+    buildArmPanel();
+    buildSelPanel();
+    syncJson();
+    state.built = `${state.id}|${state.mode}|${state.part}|${state.arm}|${armCount()}`;
+  }
+
   // ------------------------------------------------------- edit-mode piece
 
   // Edit mode has one thing to set: how far out the grip sits. The muzzle is
@@ -342,6 +505,7 @@
 
     const A = aimVec();
     drawCharacter(ctx, ch, state.r, { t: 0, aimX: A.x, aimY: A.y });
+    renderShots(f);
 
     if (state.mode === "edit" && state.showRefs) {
       // Drawn on top so the ball can be lined up against the circle it has to
@@ -611,12 +775,15 @@
     $("rosterCount").textContent = `${rigged}/${CHARACTERS.length} rigged`;
   }
 
+  // Changing character never changes what you were doing: the mode, the part
+  // tab and the handles stay exactly as they were, only pointed at the new art.
   function select(id) {
     state.id = id;
     state.pan = { x: 0, y: 0 };
     record(id);
     state.arm = 0;
-    buildSelPanel();
+    shots.live.length = 0;
+    rebuild();
     refreshTiles();
     syncHead();
     writeUrl();
@@ -644,7 +811,7 @@
           : state.part === "weapon"
             ? "Grip → muzzle is the weapon's aim line: whatever angle you set here is the direction the weapon points when the player aims, and the muzzle is where shots come from."
             : "Body: pink is the physics center the character is positioned by, green sets the ball radius that matches the collision circle.")
-        : "Preview. Aim with a gamepad stick (or the aim slider), and press Edit mode to set the weapon distance.";
+        : "Preview. Aim with a gamepad stick (or the aim slider) and pull a trigger — space on the keyboard — to shoot: the tracer leaves the muzzle the game fires from, so a weapon that sits or points wrong shows up straight away.";
   }
 
   // ---------------------------------------------- edit-mode part selector
@@ -664,8 +831,7 @@
       b.classList.toggle("on", i === state.arm);
       b.addEventListener("click", () => {
         state.arm = i;
-        buildParts();
-        buildSelPanel();
+        rebuild();
         writeUrl();
       });
       box.appendChild(b);
@@ -697,7 +863,7 @@
         b.style.marginRight = "6px";
         b.textContent = `Arm ${i + 1}`;
         b.classList.toggle("primary", i === state.arm);
-        b.addEventListener("click", () => { state.arm = i; buildSelPanel(); });
+        b.addEventListener("click", () => { state.arm = i; rebuild(); });
         list.appendChild(b);
       });
       box.appendChild(list);
@@ -713,21 +879,25 @@
         const add = document.createElement("button");
         add.className = "ghost wide";
         add.textContent = "Add arm";
-        add.addEventListener("click", () => edit(state.id, () => {
-          rec.rig.arms.push({ ...clone(arm), z: "front" });
-          state.arm = rec.rig.arms.length - 1;
-          buildSelPanel();
-        }));
+        add.addEventListener("click", () => {
+          edit(state.id, () => {
+            rec.rig.arms.push({ ...clone(arm), z: "front" });
+            state.arm = rec.rig.arms.length - 1;
+          });
+          rebuild();
+        });
         box.appendChild(add);
         if (rec.rig.arms.length > 1) {
           const rm = document.createElement("button");
           rm.className = "ghost wide";
           rm.textContent = "Remove this arm";
-          rm.addEventListener("click", () => edit(state.id, () => {
-            rec.rig.arms.splice(state.arm, 1);
-            state.arm = Math.max(0, state.arm - 1);
-            buildSelPanel();
-          }));
+          rm.addEventListener("click", () => {
+            edit(state.id, () => {
+              rec.rig.arms.splice(state.arm, 1);
+              state.arm = Math.max(0, state.arm - 1);
+            });
+            rebuild();
+          });
           box.appendChild(rm);
         }
       }
@@ -760,7 +930,7 @@
       rig.setCharacterRig(state.id, null);
       record(state.id);
       commit(state.id, before);
-      buildSelPanel();
+      rebuild();
     });
     box.appendChild(reset);
   }
@@ -1018,6 +1188,11 @@
       return;
     }
     if (typing) return;
+    if (e.code === "Space") {
+      e.preventDefault();
+      fire();
+      return;
+    }
     // Arrows walk the roster grid (3 across), the way the eye expects when the
     // grid is right there. Nudging a piece is the d-pad on a gamepad.
     const move = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 }[e.key];
@@ -1068,8 +1243,7 @@
     $("selPanel").hidden = mode === "view";
     state.pan = { x: 0, y: 0 };
     if (mode === "anchor") fitAnchorZoom(); else setZoom(2);
-    buildParts();
-    buildSelPanel();
+    rebuild();
     syncHead();
     setGizmoHint();
     writeUrl();
@@ -1084,6 +1258,8 @@
       for (const t of document.querySelectorAll("#partTabs .tab")) t.classList.toggle("on", t === tab);
       state.pan = { x: 0, y: 0 };
       fitAnchorZoom();
+      rebuild();
+      syncHead();
       writeUrl();
     });
   }
@@ -1109,6 +1285,7 @@
   bindCheck("spin", "spin");
   bindCheck("faceLeft", "faceLeft");
   bindCheck("showRefs", "showRefs");
+  bindCheck("showShots", "showShots");
   bindCheck("onion", "onion");
 
   $("resetChar").addEventListener("click", () => {
@@ -1117,8 +1294,7 @@
     rig.setCharacterRig(state.id, null);
     record(state.id);
     commit(state.id, before);
-    buildParts();
-    buildSelPanel();
+    rebuild();
     syncHead();
   });
 
@@ -1140,8 +1316,7 @@
         work.clear();
         dirty.clear();
         record(state.id);
-        buildParts();
-        buildSelPanel();
+        rebuild();
         syncHead();
       } catch (err) {
         alert(`Could not read that JSON: ${err.message}`);
@@ -1199,6 +1374,10 @@
     if (edge(5)) cycleCharacter(1);
     if (edge(0)) setMode(state.mode === "edit" ? "view" : "edit");
     if (edge(1) && state.mode !== "view") setMode("view");
+    // Preview: the triggers shoot, the way the player's do, so the muzzle can
+    // be checked through the whole aim arc.
+    if (state.mode !== "edit" && (pressed(7) || pressed(6))) holdFire(dt);
+
     if (state.mode === "edit") {
       if (edge(12)) edit(state.id, () => nudge(0, -1));
       if (edge(13)) edit(state.id, () => nudge(0, 1));
@@ -1228,8 +1407,7 @@
     const rec = record(state.id);
     if (!rec || !rec.rig.arms.length) return;
     state.arm = (state.arm + dir + rec.rig.arms.length) % rec.rig.arms.length;
-    buildParts();
-    buildSelPanel();
+    rebuild();
     writeUrl();
   }
 
@@ -1246,6 +1424,7 @@
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     pollGamepad(dt);
+    stepShots(dt);
     if (state.spin) {
       state.aim = ((state.aim + dt * 60 + 180) % 360) - 180;
       $("aim").value = state.aim;
@@ -1257,18 +1436,25 @@
   }
   requestAnimationFrame(loop);
 
-  // Assets stream in; refresh until everything has settled.
-  let ticks = 0;
+  // The rig file lands after the first records are built, so drop the ones the
+  // user has not touched and take them again from the merged anchors —
+  // otherwise the panel (and an export) would quietly carry auto values that
+  // rigs.json had already overridden.
+  rig.ready().then(() => {
+    for (const id of [...work.keys()]) if (!dirty.has(id)) work.delete(id);
+    record(state.id);
+    rebuild();
+    syncHead();
+  });
+
+  // Assets stream in one character at a time; keep refreshing until every
+  // character has settled, then stop. (Panels rebuild on every state change of
+  // their own accord — this only catches art that arrives late.)
   const poll = setInterval(() => {
     refreshTiles();
     syncHead();
-    if (state.built !== `${state.id}|${state.mode}|${state.part}|${state.arm}` && record(state.id)) {
-      state.built = `${state.id}|${state.mode}|${state.part}|${state.arm}`;
-      buildParts();
-      buildSelPanel();
-      syncJson();
-    }
-    ticks += 1;
-    if (ticks > 120) clearInterval(poll);
+    const stamp = `${state.id}|${state.mode}|${state.part}|${state.arm}|${armCount()}`;
+    if (state.built !== stamp && record(state.id)) rebuild();
+    if (CHARACTERS.every((c) => rig.assets(c.id).state !== "loading")) clearInterval(poll);
   }, 250);
 })();

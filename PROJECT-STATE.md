@@ -84,8 +84,11 @@ Pillars:
       resumes where you left off — **preview** (clean, gamepad aims it like a
       player would), **edit** (onscreen Body/Weapon/Hand selector, move/resize/
       turn handles mirrored as numbers in the panel, reference overlay, undo and
-      redo) and **anchor** (anchor points on the source images). Exports
-      `rigs.json`, which the game merges over the auto anchors
+      redo) and **anchor** (anchor points on the source images). Preview fires
+      test shots from the rig's own muzzle on the gamepad triggers (or space),
+      an **Arms** panel picks None / One / Two — arms exist only once they are
+      asked for — and the mode, part tab and handles survive a character change.
+      Exports `rigs.json`, which the game merges over the auto anchors
 - [x] **Art intake**: `npm run intake` takes delivered files from `intake/`, keys
       out solid backdrops (magenta/green/white screens) into transparent PNGs,
       files them into `characters/canonical/` or `characters/render/`, and keeps

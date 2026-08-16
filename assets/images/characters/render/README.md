@@ -103,6 +103,12 @@ And in `rig.weapon`:
 | `rotation` | extra degrees on top of the aim, normally 0 — the art's own tilt is already cancelled by the grip → muzzle line |
 | `orbit` | when true the grip swings around the body with the aim, so the barrel stays on the aim ray (how the procedural weapon behaves). Turn it off to pin the grip where the art holds it and let the weapon rotate about that point |
 
+**How many arms a character has is a decision, not a detection.** Nothing is
+placed automatically: a character with no `rig.arms` in its rig file wears no
+arms at all, however many blobs `<id>_arm.png` happens to contain. Pick
+**None / One / Two** in the workbench's Arms panel and the arms appear on the
+weapon, ready to be positioned.
+
 Rig files written before arms existed still load: a `rig.hands` entry becomes a
 rigid arm holding at the same point.
 
@@ -116,6 +122,12 @@ you back where you were. Edits themselves are transient — they leave via
 - **Preview** (default) — just the character. Sweep the aim, or plug in a
   gamepad and aim with the stick exactly as a player would: right stick (or
   left) aims and flips facing, LB/RB change character, **A** toggles edit mode.
+  Pull either **trigger** (or press space) to shoot: the tracer leaves the
+  muzzle the game itself fires from, so a weapon that sits, points or mirrors
+  wrong is obvious the moment you sweep the aim through its arc.
+- **Arms** (right panel, every mode) — **None / One / Two**. None is the
+  default; arms only exist once you ask for them. Going from one to two keeps
+  the arm already placed and drops the new one on the plan.
 - **Edit mode** — the character snaps to the default pose (facing right, level)
   and an onscreen selector appears: **Body · Weapon · Hand 1 · Hand 2**. The
   selected piece gets three handles — pink to move, green to resize, yellow to

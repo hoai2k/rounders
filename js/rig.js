@@ -21,7 +21,9 @@
 // Arms are placed in weapon-image space (a hold point, a scale and a rotation),
 // so they stay put on the weapon at every aim angle. An elongated arm sprite
 // can instead bridge from a socket on the body to its hold on the weapon,
-// stretching within limits as the weapon swings.
+// stretching within limits as the weapon swings. How many arms a character
+// wears is a decision, not a detection: none are placed until the rig file asks
+// for them (`rig.arms`), whatever the arm image contains.
 //
 // Anchors (body pivot/radius, weapon grip/muzzle, arm hold/scale/rotation) are
 // detected automatically from the alpha channel and can be overridden by a rig
@@ -551,17 +553,15 @@
     body.mount = { x: body.pivot.x + body.radius * WEAPON_REACH, y: body.pivot.y };
 
     // Arms: every blob in the arm image becomes one arm sprite with a shoulder
-    // end and a hand end. Sockets sit on the body's weapon side; holds sit on
-    // the barrel just ahead of the grip, where the procedural weapon is held.
-    // Bare nub hands are sized like the ones in the canonical art rather than
-    // at whatever scale the part was drawn.
-    const arms = [];
+    // end and a hand end. How many of them are actually *worn* is a decision,
+    // not a detection — a character holds none, one or two — so nothing is
+    // placed here. `plan` says where an arm would go if one is asked for, and
+    // the rig file (authored in /workbench) says how many there are.
     const sprites = [];
     const anchors = [];
+    const plan = [];
     if (e.arm) {
       const armComps = components(alphaMask(e.arm)).sort((p, q) => p.cx - q.cx);
-      const dx = weapon.muzzle.x - weapon.grip.x;
-      const dy = weapon.muzzle.y - weapon.grip.y;
       const specs = armComps.map((comp, i) => {
         const ax = axis(comp);
         return { comp, ax, nub: ax.elongation < MIN_ELONGATION, sprite: i };
@@ -574,39 +574,15 @@
           radius: spec.comp.radius
         });
       }
-      // One bare hand on a full-length barrel: give it the second one too, the
+      // One bare hand on a full-length barrel: plan for the second one too, the
       // way both the portraits and the procedural grips read.
       if (specs.length === 1 && specs[0].nub) specs.push({ ...specs[0] });
-
-      specs.forEach((spec, i) => {
-        const many = specs.length > 1;
-        const along = many ? 0.06 + i * 0.24 : 0.1;
-        const hold = { x: weapon.grip.x + dx * along, y: weapon.grip.y + dy * along };
-        const socket = {
-          x: body.pivot.x + (body.mount.x - body.pivot.x) * 0.5,
-          y: body.pivot.y + (body.mount.y - body.pivot.y) * 0.5 + (many ? (i === 0 ? -1 : 1) * body.radius * 0.08 : 0)
-        };
-        const rest = Math.hypot(spec.ax.hand.x - spec.ax.shoulder.x, spec.ax.hand.y - spec.ax.shoulder.y);
-        arms.push({
-          sprite: spec.sprite,
-          socket, hold,
-          rotation: 0,
-          scale: spec.nub || rest < 1
-            ? (HAND_RADIUS * body.radius) / Math.max(1, spec.comp.radius)
-            : 1,
-          stretch: !spec.nub,
-          minStretch: 0.8,
-          maxStretch: 1.5,
-          // With two arms the first is the far one: it reads better tucked
-          // behind the body and the weapon.
-          z: many && i === 0 ? "back" : "front"
-        });
-      });
+      for (const spec of specs) plan.push(spec);
     }
 
     e.auto = {
       body, weapon,
-      arm: { sprites, anchors },
+      arm: { sprites, anchors, plan },
       rig: {
         bodyScale: 1,
         bodyRotation: 0,
@@ -620,7 +596,8 @@
           orbit: true,
           behind: false
         },
-        arms
+        // No arms until a rig file asks for them: an arm is placed, not found.
+        arms: []
       },
       meta: { sameFrame, bodySize: [e.body.width, e.body.height], weaponSize: [e.weapon.width, e.weapon.height] }
     };
@@ -638,6 +615,45 @@
   };
   const Z = ["back", "mid", "front"];
 
+  // Where arms sit when a character is given some: on the barrel just ahead of
+  // the grip, where both the portraits and the procedural weapon are held, with
+  // a socket on the body's weapon side and bare nubs sized like the hands in
+  // the canonical art. `count` is how many arms are being worn, so one arm sits
+  // on the grip and two spread along it.
+  function planArms(auto, count) {
+    const plan = auto.arm.plan || [];
+    if (!plan.length) return [];
+    const { body, weapon } = auto;
+    const dx = weapon.muzzle.x - weapon.grip.x;
+    const dy = weapon.muzzle.y - weapon.grip.y;
+    const many = count > 1;
+    const out = [];
+    for (let i = 0; i < count; i += 1) {
+      const spec = plan[Math.min(i, plan.length - 1)];
+      const along = many ? 0.06 + i * 0.24 : 0.1;
+      const rest = Math.hypot(spec.ax.hand.x - spec.ax.shoulder.x, spec.ax.hand.y - spec.ax.shoulder.y);
+      out.push({
+        sprite: spec.sprite,
+        socket: {
+          x: body.pivot.x + (body.mount.x - body.pivot.x) * 0.5,
+          y: body.pivot.y + (body.mount.y - body.pivot.y) * 0.5 + (many ? (i === 0 ? -1 : 1) * body.radius * 0.08 : 0)
+        },
+        hold: { x: weapon.grip.x + dx * along, y: weapon.grip.y + dy * along },
+        rotation: 0,
+        scale: spec.nub || rest < 1
+          ? (HAND_RADIUS * body.radius) / Math.max(1, spec.comp.radius)
+          : 1,
+        stretch: !spec.nub,
+        minStretch: 0.8,
+        maxStretch: 1.5,
+        // With two arms the first is the far one: it reads better tucked
+        // behind the body and the weapon.
+        z: many && i === 0 ? "back" : "front"
+      });
+    }
+    return out;
+  }
+
   // Saved arms merge slot-by-slot over the detected ones. Rig files written
   // before arms existed carry `hands` (a sprite parented straight to the
   // weapon) — those still load, as rigid arms holding at the same point.
@@ -651,8 +667,9 @@
         }))
         : null;
     if (!saved) return auto.rig.arms;
+    const defaults = planArms(auto, saved.length);
     return saved.map((a, i) => {
-      const d = auto.rig.arms[i] || auto.rig.arms[0] || DEFAULT_ARM;
+      const d = defaults[i] || defaults[0] || DEFAULT_ARM;
       return {
         sprite: num(a.sprite, d.sprite),
         socket: pt(a.socket, d.socket),
@@ -742,13 +759,19 @@
 
   // Rigs authored in /workbench land either as a JSON file (fetched) or as a
   // plain script that sets window.ROUNDERS_RIGS (works from file:// too).
+  let loaded = null;
   function loadRigs(url = `${DIR}rigs.json`) {
     if (window.ROUNDERS_RIGS) setRigs(window.ROUNDERS_RIGS);
-    return fetch(url, { cache: "no-cache" })
+    loaded = fetch(url, { cache: "no-cache" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d) setRigs(d); return d; })
       .catch(() => null);
+    return loaded;
   }
+
+  // Resolves once the rig file has had its say, so a tool can wait rather than
+  // snapshot anchors that are about to be overridden.
+  function ready() { return loaded || Promise.resolve(null); }
 
   // ------------------------------------------------------------- rendering
 
@@ -928,6 +951,11 @@
     analyze: (id) => analyze(entry(id)),
     resolved: getResolved,
     transform, draw, muzzle, armPose, holdPoint,
+    defaultArms: (id, count) => {
+      const a = analyze(entry(id));
+      return a ? planArms(a, count) : [];
+    },
+    ready,
     setRigs, setCharacterRig, getRigFile, loadRigs, invalidate
   };
 })();

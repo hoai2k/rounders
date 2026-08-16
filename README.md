@@ -28,8 +28,13 @@ The live site redeploys automatically on every push to `main`
 | Keyboard 2 | ◀ / ▶ | ▲ | / | . |
 | Controller | Left stick | A | RT / RB | LT / LB / B |
 
-Menus are fully controller-navigable: **D-pad** moves, **A**/**Menu** confirms,
-**B**/**View** goes back, **Menu** pauses. The How to Play screen has a full
+Menus are fully controller-navigable: **D-pad** moves between controls (and
+scrolls a long panel when there is nowhere left to move), **A**/**Menu**
+confirms, **B**/**View** goes back, **Menu** pauses. Dropdowns cycle with
+**◀ ▶** (or step with **A**), sliders nudge with **◀ ▶**. **LB**/**RB** cycle
+through the corner icon row — how to play, sound, settings, fullscreen — and
+cycling past either end returns to the deselected state.
+The How to Play screen has a full
 Xbox controller diagram. `Esc`/`P` also pauses — pausing ducks the music and the
 pause menu links to Settings, How to Play, fullscreen, and quit-to-menu.
 The game opens on an arcade "PRESS START" title screen; starting from keyboard

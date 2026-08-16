@@ -140,7 +140,10 @@
       wallHtml: "Jump while touching a wall to kick off it — up and away. Wall kicks are free (they don't spend an air jump), so you can climb a wall by steering back into it and jumping again. Sliding down a wall is slowed too, giving you time to line the next kick up.",
 
       pausingTitle: "Pausing",
-      pausingHtml: "<kbd>Esc</kbd>, <kbd>P</kbd> or the <b>Menu</b> button pauses. From there you can resume, open settings, or quit to the menu."
+      pausingHtml: "<kbd>Esc</kbd>, <kbd>P</kbd> or the <b>Menu</b> button pauses. From there you can resume, open settings, or quit to the menu.",
+
+      menusTitle: "Menus",
+      menusHtml: "Every menu is controller-driven. The <b>D-pad</b> moves between controls (and scrolls a long panel), <b>A</b> confirms, <b>B</b> goes back. On a dropdown, <b>◀</b> <b>▶</b> cycle the value and <b>A</b> steps it. <b>LB</b> / <b>RB</b> cycle through the corner icons — how to play, sound, settings, fullscreen — and stepping off either end drops the selection again."
     },
 
     // ---------------------------------------------------------------- DRAFT

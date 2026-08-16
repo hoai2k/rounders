@@ -5,21 +5,19 @@
 //
 // The delivered render parts are each drawn full-frame on their own canvas:
 // the body fills 512×512, and so does the weapon, and so do the arms. Nothing
-// is in composite position and nothing shares a scale, so the "same canvas"
-// shortcut in js/rig.js can't place them.
+// is in composite position and nothing shares a scale.
 //
-// The canonical hero image is the composition those parts came from, so this
-// recovers the rig from it: each part's silhouette is matched into the
-// canonical silhouette (scale, offset, and a little rotation for the weapon),
-// and the winning placements are converted into rig anchors —
+// Body and weapon don't need the canonical to sort that out — js/rig.js sizes
+// them to the same geometry the procedural renderer uses (ball = collision
+// circle, grip 0.55r out along the aim, 1.5r of barrel), which is what keeps
+// the weapon readable as an aim indicator.
 //
-//   body.mount       where the weapon's grip sits, in body-image px
-//   weapon.scale     the weapon's size relative to the body
-//   arm socket/hold  the shoulder on the body, the grip point on the weapon
-//
-// The result is written to assets/images/characters/render/rigs.json, which
-// the game merges over its own auto-detection. Values can be adjusted
-// afterwards in /workbench without re-running this.
+// The hands are the exception: how big a character's hands are is a drawing
+// decision, and the only place it is recorded is the canonical hero image. So
+// this matches the arm art into the canonical silhouette and writes just the
+// measured hand size and grip position per character to
+// assets/images/characters/render/rigs.json, which the game merges over its
+// auto-detection. Everything else stays automatic. Tune in /workbench.
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -111,6 +109,90 @@ function slabY(comp, from, to) {
     sum += (p / w) | 0; n += 1;
   }
   return n ? ((sum / n) + 0.5) * sy : comp.cy;
+}
+
+// Largest circle that fits inside a silhouette — the body's ball, ignoring
+// horns, ears and antennae. Mirrors ball() in js/rig.js.
+function ball(comp, m) {
+  const { w, h } = m;
+  const inside = new Uint8Array(w * h);
+  for (const p of comp.pixels) inside[p] = 1;
+  const D = new Float32Array(w * h);
+  const d1 = 1, d2 = Math.SQRT2, BIG = 1e6;
+  for (let i = 0; i < w * h; i += 1) D[i] = inside[i] ? BIG : 0;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const i = y * w + x;
+      if (!inside[i]) continue;
+      let v = D[i];
+      if (x > 0) v = Math.min(v, D[i - 1] + d1);
+      if (y > 0) v = Math.min(v, D[i - w] + d1);
+      if (x > 0 && y > 0) v = Math.min(v, D[i - w - 1] + d2);
+      if (x < w - 1 && y > 0) v = Math.min(v, D[i - w + 1] + d2);
+      D[i] = Math.min(v, Math.min(x, y) + d1);
+    }
+  }
+  let best = 0;
+  for (let y = h - 1; y >= 0; y -= 1) {
+    for (let x = w - 1; x >= 0; x -= 1) {
+      const i = y * w + x;
+      if (!inside[i]) continue;
+      let v = D[i];
+      if (x < w - 1) v = Math.min(v, D[i + 1] + d1);
+      if (y < h - 1) v = Math.min(v, D[i + w] + d1);
+      if (x < w - 1 && y < h - 1) v = Math.min(v, D[i + w + 1] + d2);
+      if (x > 0 && y < h - 1) v = Math.min(v, D[i + w - 1] + d2);
+      v = Math.min(v, Math.min(w - 1 - x, h - 1 - y) + d1);
+      D[i] = v;
+      if (v > best) best = v;
+    }
+  }
+  let n = 0, mx = 0, my = 0;
+  for (let i = 0; i < w * h; i += 1) {
+    if (D[i] < best * 0.96) continue;
+    n += 1; mx += i % w; my += (i / w) | 0;
+  }
+  return {
+    center: n ? { x: (mx / n + 0.5) * m.sx, y: (my / n + 0.5) * m.sy } : { x: comp.cx, y: comp.cy },
+    radius: best * (m.sx + m.sy) / 2
+  };
+}
+
+// Grip and muzzle on the weapon's long axis, plus how far off level the barrel
+// is drawn. Mirrors barrel() in js/rig.js.
+function barrel(comp) {
+  const { pixels, w, sx, sy, cx, cy } = comp;
+  const ax = axis(comp);
+  let ux = ax.hand.x - ax.shoulder.x, uy = ax.hand.y - ax.shoulder.y;
+  const ulen = Math.hypot(ux, uy);
+  if (ulen < 1e-6) { ux = 1; uy = 0; } else { ux /= ulen; uy /= ulen; }
+  const proj = new Float32Array(pixels.length);
+  let lo = Infinity, hi = -Infinity, perp = 0;
+  for (let i = 0; i < pixels.length; i += 1) {
+    const p = pixels[i];
+    const dx = ((p % w) + 0.5) * sx - cx, dy = (((p / w) | 0) + 0.5) * sy - cy;
+    const a = dx * ux + dy * uy;
+    proj[i] = a;
+    if (a < lo) lo = a;
+    if (a > hi) hi = a;
+    perp = Math.max(perp, Math.abs(-dx * uy + dy * ux));
+  }
+  const span = Math.max(1e-3, hi - lo);
+  const end = (from, to) => {
+    let n = 0, mx = 0, my = 0;
+    for (let i = 0; i < pixels.length; i += 1) {
+      const t = (proj[i] - lo) / span;
+      if (t < from || t > to) continue;
+      const p = pixels[i];
+      n += 1; mx += ((p % w) + 0.5) * sx; my += (((p / w) | 0) + 0.5) * sy;
+    }
+    return n ? { x: mx / n, y: my / n } : { x: cx, y: cy };
+  };
+  const grip = end(0.02, 0.12), muzzle = end(0.94, 1);
+  return {
+    grip, muzzle, thickness: perp * 2,
+    angle: Math.atan2(muzzle.y - grip.y, muzzle.x - grip.x)
+  };
 }
 
 // Principal axis, oriented rightwards (shoulder trailing, hand leading).
@@ -235,6 +317,7 @@ function stamp(target, P, place, grow = 1) {
   }
 }
 
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const seq = (from, to, step) => {
   const out = [];
   for (let v = from; v <= to + 1e-9; v += step) out.push(v);
@@ -267,14 +350,14 @@ async function fitCharacter(id) {
   try { armImg = await img(join(RENDER, `${id}_arm.png`)); } catch { /* optional */ }
 
   // Anchors inside each part, at the same resolution js/rig.js uses.
-  const bodyComp = components(mask(bodyImg, MAX_DIM, 0.5))[0];
+  const bodyAnalysis = mask(bodyImg, MAX_DIM, 0.5);
+  const bodyComp = components(bodyAnalysis)[0];
   const weaponComp = components(mask(weaponImg, MAX_DIM, 0.5))[0];
   if (!bodyComp || !weaponComp) return { id, error: "no body or weapon silhouette" };
-  const body = { pivot: { x: bodyComp.cx, y: bodyComp.cy }, radius: bodyComp.radius };
-  const weapon = {
-    grip: { x: weaponComp.x0 + (weaponComp.x1 - weaponComp.x0) * 0.06, y: slabY(weaponComp, 0, 0.2) },
-    muzzle: { x: weaponComp.x1 - (weaponComp.x1 - weaponComp.x0) * 0.02, y: slabY(weaponComp, 0.82, 1) }
-  };
+  const bodyBall = ball(bodyComp, bodyAnalysis);
+  const body = { pivot: bodyBall.center, radius: bodyBall.radius };
+  const bar = barrel(weaponComp);
+  const weapon = { grip: bar.grip, muzzle: bar.muzzle };
   const armComps = armImg ? components(mask(armImg, MAX_DIM, 0.5)).sort((a, b) => a.cx - b.cx) : [];
 
   // Silhouettes at matching resolution.
@@ -311,106 +394,55 @@ async function fitCharacter(id) {
     });
   }
 
-  // ---- convert placements into rig anchors
+  // ---- what the canonical says about the hands
   const srcB = { cx: Pb.cx, cy: Pb.cy };
   const srcW = { cx: Pw.cx, cy: Pw.cy };
   const srcA = Pa ? { cx: Pa.cx, cy: Pa.cy } : null;
 
-  const gripCanon = toCanon(weapon.grip, weaponPlace, srcW, fitScale);
-  const fitted = fromCanon(gripCanon, bodyPlace, srcB, fitScale);
-  const weaponScale = weaponPlace.s / bodyPlace.s;
-
-  // The canonical pose is a portrait: plenty of characters hold the weapon
-  // across the chest, over a shoulder, or behind the back. In the game the
-  // weapon swings from this mount to wherever the player aims, so it has to sit
-  // on the forward side of the body. Keep the reach the artwork implies, mirror
-  // it to the front, and keep it inside a sane band around the body's middle.
-  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-  const R = body.radius;
-  // Mirror the reach to the front, keep the height the portrait used (that is
-  // what puts the barrel at chin level instead of across the eyes), and stay
-  // within a band around the body's middle.
-  const dx = clamp(Math.abs(fitted.x - body.pivot.x), R * 0.08, R * 0.6);
-  const dy = clamp(fitted.y - body.pivot.y, -R * 0.35, R * 0.5);
-  const mount = { x: body.pivot.x + dx, y: body.pivot.y + dy };
-
-  // How much of the weapon's own region it managed to cover — low means the
-  // canonical hides the weapon (or the parts don't correspond) and the numbers
-  // should be treated as a starting point, not gospel.
   const conf = (p) => round(p ? p.cover / Math.max(1, p.hit + p.miss) : 0, 3);
   const confidence = { body: conf(bodyPlace), weapon: conf(weaponPlace), arm: armPlace ? conf(armPlace) : null };
 
-  // Arms follow the mount rather than the portrait: a shoulder on the body's
-  // forward side and a hand on the weapon just past the grip. The arm then
-  // bridges the two and swings with the weapon, which is the whole point of
-  // splitting it out — matching the portrait would freeze it in a pose that
-  // only reads at one aim angle.
-  //
-  // The arm art is drawn full-frame like everything else, so a "hand" arrives
-  // as a ball half the size of the body. Its real size comes from the fit
-  // against the canonical, falling back to a fraction of the body radius.
-  const weaponLength = Math.hypot(weapon.muzzle.x - weapon.grip.x, weapon.muzzle.y - weapon.grip.y) * weaponScale;
-  const armFitScale = armPlace && confidence.arm >= 0.5 ? armPlace.s / bodyPlace.s : null;
-
+  const R = body.radius;
+  const gripToMuzzle = {
+    x: weapon.muzzle.x - weapon.grip.x,
+    y: weapon.muzzle.y - weapon.grip.y
+  };
+  const barrelLen = Math.max(1, Math.hypot(gripToMuzzle.x, gripToMuzzle.y));
   const holdAt = (t) => ({
-    x: weapon.grip.x + (weapon.muzzle.x - weapon.grip.x) * t,
-    y: weapon.grip.y + (weapon.muzzle.y - weapon.grip.y) * t
-  });
-  const socketAt = (lift) => ({
-    x: body.pivot.x + (mount.x - body.pivot.x) * 0.5,
-    y: body.pivot.y + (mount.y - body.pivot.y) * 0.5 + lift * R
+    x: weapon.grip.x + gripToMuzzle.x * t,
+    y: weapon.grip.y + gripToMuzzle.y * t
   });
 
-  const specs = [];
-  armComps.forEach((comp, i) => {
+  // Hand size relative to the body, as drawn in the canonical. The arm part is
+  // drawn full-frame, so its own radius says nothing; the fit against the
+  // canonical is what pins the real proportion down.
+  const armFit = armPlace && confidence.arm >= 0.45 ? armPlace.s / bodyPlace.s : null;
+
+  const specs = armComps.map((comp, i) => {
     const ax = axis(comp);
-    const nub = ax.elongation < MIN_ELONGATION;
-    specs.push({ comp, ax, nub, sprite: i });
+    return { comp, ax, nub: ax.elongation < MIN_ELONGATION, sprite: i };
   });
-  // One bare hand and a weapon long enough for two: give it both, the way the
-  // portraits hold them.
-  if (specs.length === 1 && specs[0].nub && weaponLength > R * 0.8) {
-    specs.push({ ...specs[0] });
-  }
+  if (specs.length === 1 && specs[0].nub) specs.push({ ...specs[0] });
 
   const arms = specs.map((spec, i) => {
     const { comp, ax, nub } = spec;
-    const many = specs.length > 1;
-    const socket = socketAt(many ? (i === 0 ? -0.08 : 0.1) : 0);
-    const hold = holdAt(many ? 0.08 + i * 0.26 : 0.12);
-    const reachPx = Math.hypot(
-      (hold.x - weapon.grip.x) * weaponScale + mount.x - socket.x,
-      (hold.y - weapon.grip.y) * weaponScale + mount.y - socket.y
-    );
-    const restPx = Math.hypot(ax.hand.x - ax.shoulder.x, ax.hand.y - ax.shoulder.y);
-    const scale = nub || restPx < 1
-      ? round(clamp(armFitScale ?? (R * 0.15) / Math.max(1, comp.radius), 0.08, 0.6), 3)
-      : round(clamp(reachPx / restPx, 0.15, 1.2), 3);
-    return {
-      sprite: spec.sprite,
-      socket: pt(socket),
-      hold: pt(hold),
-      scale,
-      stretch: !nub,
-      minStretch: 0.75,
-      maxStretch: 1.6,
-      z: many && i === 0 ? "back" : "front"
-    };
+    // Where the canonical puts this hand along the barrel, if it could be
+    // found there; otherwise the grip and the fore-grip.
+    let t = specs.length > 1 ? 0.06 + i * 0.24 : 0.1;
+    if (armPlace && confidence.arm >= 0.45 && i < armComps.length) {
+      const hand = nub ? { x: comp.cx, y: comp.cy } : ax.hand;
+      const inWeapon = fromCanon(toCanon(hand, armPlace, srcA, fitScale), weaponPlace, srcW, fitScale);
+      const along = ((inWeapon.x - weapon.grip.x) * gripToMuzzle.x
+        + (inWeapon.y - weapon.grip.y) * gripToMuzzle.y) / (barrelLen * barrelLen);
+      if (along > -0.1 && along < 0.7) t = clamp(along, 0.02, 0.55);
+    }
+    const scale = nub
+      ? round(clamp(armFit ?? (0.16 * R) / Math.max(1, comp.radius), 0.06, 0.5), 3)
+      : round(clamp(armFit ?? 1, 0.15, 1.2), 3);
+    return { sprite: spec.sprite, hold: pt(holdAt(t)), scale };
   });
 
-  return {
-    id,
-    confidence,
-    rig: {
-      body: { pivot: pt(body.pivot), radius: round(body.radius), mount: pt(mount) },
-      weapon: { grip: pt(weapon.grip), muzzle: pt(weapon.muzzle) },
-      rig: {
-        bodyScale: 1,
-        weapon: { scale: round(weaponScale, 4), rotation: 0, offset: { x: 0, y: 0 }, behind: false },
-        arms
-      }
-    }
-  };
+  return { id, confidence, rig: arms.length ? { rig: { arms } } : {} };
 }
 
 // ----------------------------------------------------------------- main
@@ -426,7 +458,11 @@ try {
   if (!existing.characters) existing.characters = {};
 } catch { /* first run */ }
 
-const out = { version: 1, note: "Fitted against the canonical art by tools/fitrig.mjs; tune in /workbench.", characters: { ...existing.characters } };
+const out = {
+  version: 1,
+  note: "Hand size and grip position measured against the canonical art by tools/fitrig.mjs. Everything else is auto-detected by js/rig.js. Tune in /workbench.",
+  characters: { ...existing.characters }
+};
 const report = [];
 for (const id of ids) {
   const started = process.hrtime.bigint();
@@ -434,24 +470,26 @@ for (const id of ids) {
   try {
     res = await fitCharacter(id);
   } catch (e) {
-    report.push([id, "error", e.message]);
+    report.push([id, "error", `${e.message}\n${e.stack.split("\n")[1] || ""}`]);
     continue;
   }
   if (res.error) { report.push([id, "error", res.error]); continue; }
-  out.characters[id] = res.rig;
+  if (Object.keys(res.rig).length) out.characters[id] = res.rig;
+  else delete out.characters[id];
   const ms = Number(process.hrtime.bigint() - started) / 1e6;
+  const hands = res.rig.rig ? res.rig.rig.arms : [];
   report.push([
     id,
-    `body ${res.confidence.body} weapon ${res.confidence.weapon}${res.confidence.arm != null ? ` arm ${res.confidence.arm}` : ""}`,
-    `wscale ${res.rig.rig.weapon.scale} · ${ms.toFixed(0)}ms`
+    `arm fit ${res.confidence.arm ?? "—"}`,
+    `${hands.length} hand(s) · size ${hands.map((h) => h.scale).join("/") || "—"} · ${ms.toFixed(0)}ms`
   ]);
   if (!quiet) console.log(`${id.padEnd(10)} ${report.at(-1)[1].padEnd(42)} ${report.at(-1)[2]}`);
 }
 
 await writeFile(OUT, `${JSON.stringify(out, null, 2)}\n`);
 console.log(`\nwrote ${OUT.replace(`${ROOT}/`, "")} (${Object.keys(out.characters).length} characters)`);
-const weak = report.filter((r) => r[1].includes("error") || /(?:body|weapon) 0\.[0-5]/.test(r[1]));
+const weak = report.filter((r) => r[1].includes("error") || /arm (?:—|0\.[0-3])/.test(r[1]));
 if (weak.length) {
   console.log(`\n${weak.length} worth checking in /workbench:`);
-  for (const r of weak) console.log(`  ! ${r[0]} — ${r[1]}`);
+  for (const r of weak) console.log(`  ! ${r[0]} — ${r[1]} ${r[2] || ""}`);
 }

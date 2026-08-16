@@ -83,6 +83,15 @@
   const MIN_AREA = 0.0006; // component smaller than this fraction of the frame is noise
   const MIN_ELONGATION = 1.45; // below this an arm blob is treated as a bare hand
 
+  // Geometry shared with the procedural renderer in characters.js, so a
+  // composed character reads exactly like a drawn one: the body's ball is the
+  // collision circle, the grip sits this far out along the aim, and the barrel
+  // is this long. The weapon is the player's aim indicator, so it is sized and
+  // placed to that spec rather than to whatever the source art happened to do.
+  const WEAPON_REACH = 0.55;  // grip distance from the body center, in body radii
+  const WEAPON_LENGTH = 1.5;  // grip → muzzle length, in body radii
+  const HAND_RADIUS = 0.16;   // bare nub hand, in body radii
+
   function alphaMask(img) {
     const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
     const w = Math.max(1, Math.round(img.width * scale));
@@ -201,6 +210,98 @@
     };
   }
 
+  // The body's ball, as the largest circle that fits inside its silhouette.
+  // Area or bounding box both get dragged around by horns, ears, hair and
+  // antennae; the inscribed circle is the round part the collision circle is
+  // supposed to line up with, and everything else can stick out past it.
+  function ball(comp, m) {
+    const { w, h } = m;
+    const inside = new Uint8Array(w * h);
+    for (const p of comp.pixels) inside[p] = 1;
+    const D = new Float32Array(w * h);
+    const BIG = 1e6;
+    const d1 = 1, d2 = Math.SQRT2;
+    for (let i = 0; i < w * h; i += 1) D[i] = inside[i] ? BIG : 0;
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const i = y * w + x;
+        if (!inside[i]) continue;
+        let v = D[i];
+        if (x > 0) v = Math.min(v, D[i - 1] + d1);
+        if (y > 0) v = Math.min(v, D[i - w] + d1);
+        if (x > 0 && y > 0) v = Math.min(v, D[i - w - 1] + d2);
+        if (x < w - 1 && y > 0) v = Math.min(v, D[i - w + 1] + d2);
+        D[i] = Math.min(v, Math.min(x, y) + d1); // the frame edge counts as outside
+      }
+    }
+    let best = 0;
+    for (let y = h - 1; y >= 0; y -= 1) {
+      for (let x = w - 1; x >= 0; x -= 1) {
+        const i = y * w + x;
+        if (!inside[i]) continue;
+        let v = D[i];
+        if (x < w - 1) v = Math.min(v, D[i + 1] + d1);
+        if (y < h - 1) v = Math.min(v, D[i + w] + d1);
+        if (x < w - 1 && y < h - 1) v = Math.min(v, D[i + w + 1] + d2);
+        if (x > 0 && y < h - 1) v = Math.min(v, D[i + w - 1] + d2);
+        v = Math.min(v, Math.min(w - 1 - x, h - 1 - y) + d1);
+        D[i] = v;
+        if (v > best) best = v;
+      }
+    }
+    // Average the deepest points so a flat-bottomed ball doesn't jitter.
+    let n = 0, mx = 0, my = 0;
+    for (let i = 0; i < w * h; i += 1) {
+      if (D[i] < best * 0.96) continue;
+      n += 1; mx += i % w; my += (i / w) | 0;
+    }
+    const sx = m.sx, sy = m.sy;
+    return {
+      center: n ? { x: (mx / n + 0.5) * sx, y: (my / n + 0.5) * sy } : { x: comp.cx, y: comp.cy },
+      radius: best * (sx + sy) / 2
+    };
+  }
+
+  // Grip and muzzle for a weapon, taken along its long axis. Each end is the
+  // average of the ink in a slab at that end, so both points land on the
+  // barrel's center line even when the art is drawn at a tilt or the weapon has
+  // a heavy stock. `angle` is how far the barrel is off level in the source
+  // image — the rig cancels it so the weapon points exactly where the aim does.
+  function barrel(comp) {
+    const { pixels, w, sx, sy, cx, cy } = comp;
+    const ax = axis(comp);
+    let ux = ax.hand.x - ax.shoulder.x, uy = ax.hand.y - ax.shoulder.y;
+    const ulen = Math.hypot(ux, uy);
+    if (ulen < 1e-6) { ux = 1; uy = 0; } else { ux /= ulen; uy /= ulen; }
+
+    let lo = Infinity, hi = -Infinity;
+    const proj = new Float32Array(pixels.length);
+    for (let i = 0; i < pixels.length; i += 1) {
+      const p = pixels[i];
+      const dx = ((p % w) + 0.5) * sx - cx, dy = (((p / w) | 0) + 0.5) * sy - cy;
+      const a = dx * ux + dy * uy;
+      proj[i] = a;
+      if (a < lo) lo = a;
+      if (a > hi) hi = a;
+    }
+    const span = Math.max(1e-3, hi - lo);
+    const end = (from, to) => {
+      let n = 0, mx = 0, my = 0;
+      for (let i = 0; i < pixels.length; i += 1) {
+        const t = (proj[i] - lo) / span;
+        if (t < from || t > to) continue;
+        const p = pixels[i];
+        n += 1;
+        mx += ((p % w) + 0.5) * sx;
+        my += (((p / w) | 0) + 0.5) * sy;
+      }
+      return n ? { x: mx / n, y: my / n } : { x: cx, y: cy };
+    };
+    const grip = end(0.02, 0.12);
+    const muzzle = end(0.94, 1);
+    return { grip, muzzle, angle: Math.atan2(muzzle.y - grip.y, muzzle.x - grip.x), elongation: ax.elongation };
+  }
+
   // Crop a component out of the source image into its own canvas sprite.
   function cropSprite(img, comp) {
     const pad = 2;
@@ -220,73 +321,82 @@
     e.analyzed = true;
     if (e.state !== "ready") { e.auto = null; return null; }
 
-    const bodyComps = components(alphaMask(e.body));
+    const bodyMask = alphaMask(e.body);
+    const bodyComps = components(bodyMask);
     const weaponComps = components(alphaMask(e.weapon));
     const b = bodyComps[0];
     const wc = weaponComps[0];
     if (!b || !wc) { e.auto = null; return null; }
 
     const sameFrame = e.body.width === e.weapon.width && e.body.height === e.weapon.height;
+    const bodyBall = ball(b, bodyMask);
 
     const body = {
-      pivot: { x: b.cx, y: b.cy },
-      radius: b.radius,
+      pivot: bodyBall.center,
+      radius: bodyBall.radius,
       mount: null // filled below
     };
-    const weapon = {
-      grip: { x: wc.x0 + (wc.x1 - wc.x0) * 0.06, y: slabY(wc, 0, 0.2) },
-      muzzle: { x: wc.x1 - (wc.x1 - wc.x0) * 0.02, y: slabY(wc, 0.82, 1) }
-    };
+    // Grip and muzzle sit on the weapon's long axis, not on its bounding box:
+    // art is rarely drawn perfectly level, and the grip→muzzle line is what the
+    // aim is matched to, so it has to run down the barrel.
+    const wa = barrel(wc);
+    const weapon = { grip: wa.grip, muzzle: wa.muzzle };
 
-    // If the weapon was exported on the same canvas as the body, the grip is
-    // already in the right place relative to the body — use it directly.
-    body.mount = sameFrame
-      ? { x: weapon.grip.x, y: weapon.grip.y }
-      : { x: body.pivot.x + body.radius * 0.5, y: body.pivot.y + body.radius * 0.2 };
+    // The grip rides the aim at a fixed reach, like the procedural weapon, so
+    // the barrel always lies along the aim ray out of the body's center.
+    body.mount = { x: body.pivot.x + body.radius * WEAPON_REACH, y: body.pivot.y };
+    const weaponLenPx = Math.hypot(weapon.muzzle.x - weapon.grip.x, weapon.muzzle.y - weapon.grip.y);
+    const weaponScale = (WEAPON_LENGTH * body.radius) / Math.max(1, weaponLenPx);
 
     // Arms: every blob in the arm image becomes one arm sprite with a shoulder
-    // end and a hand end. Same-frame exports place themselves (the shoulder is
-    // already touching the body and the hand already on the weapon); otherwise
-    // sockets sit on the body's mount side and holds spread along the barrel.
+    // end and a hand end. Sockets sit on the body's weapon side; holds sit on
+    // the barrel just ahead of the grip, where the procedural weapon is held.
+    // Bare nub hands are sized like the ones in the canonical art rather than
+    // at whatever scale the part was drawn.
     const arms = [];
     const sprites = [];
     const anchors = [];
     if (e.arm) {
       const armComps = components(alphaMask(e.arm)).sort((p, q) => p.cx - q.cx);
-      const armSame = e.arm.width === e.weapon.width && e.arm.height === e.weapon.height;
       const dx = weapon.muzzle.x - weapon.grip.x;
       const dy = weapon.muzzle.y - weapon.grip.y;
-      armComps.forEach((comp, i) => {
-        const sprite = cropSprite(e.arm, comp);
+      const specs = armComps.map((comp, i) => {
         const ax = axis(comp);
-        // A round nub has no direction worth trusting: collapse it to a hand.
-        const nub = ax.elongation < MIN_ELONGATION;
-        sprites.push(sprite);
+        return { comp, ax, nub: ax.elongation < MIN_ELONGATION, sprite: i };
+      });
+      for (const spec of specs) {
+        sprites.push(cropSprite(e.arm, spec.comp));
         anchors.push({
-          shoulder: nub ? { x: comp.cx, y: comp.cy } : ax.shoulder,
-          hand: nub ? { x: comp.cx, y: comp.cy } : ax.hand,
-          radius: comp.radius
+          shoulder: spec.nub ? { x: spec.comp.cx, y: spec.comp.cy } : spec.ax.shoulder,
+          hand: spec.nub ? { x: spec.comp.cx, y: spec.comp.cy } : spec.ax.hand,
+          radius: spec.comp.radius
         });
-        const along = armComps.length > 1 ? 0.12 + i * 0.3 : 0.18;
-        const hold = armSame
-          ? { x: nub ? comp.cx : ax.hand.x, y: nub ? comp.cy : ax.hand.y }
-          : { x: weapon.grip.x + dx * along, y: weapon.grip.y + dy * along };
-        const socket = armSame && !nub
-          ? { x: ax.shoulder.x, y: ax.shoulder.y }
-          : {
-            x: body.pivot.x + (body.mount.x - body.pivot.x) * 0.55,
-            y: body.pivot.y + (body.mount.y - body.pivot.y) * 0.55
-          };
+      }
+      // One bare hand on a full-length barrel: give it the second one too, the
+      // way both the portraits and the procedural grips read.
+      if (specs.length === 1 && specs[0].nub) specs.push({ ...specs[0] });
+
+      specs.forEach((spec, i) => {
+        const many = specs.length > 1;
+        const along = many ? 0.06 + i * 0.24 : 0.1;
+        const hold = { x: weapon.grip.x + dx * along, y: weapon.grip.y + dy * along };
+        const socket = {
+          x: body.pivot.x + (body.mount.x - body.pivot.x) * 0.5,
+          y: body.pivot.y + (body.mount.y - body.pivot.y) * 0.5 + (many ? (i === 0 ? -1 : 1) * body.radius * 0.08 : 0)
+        };
+        const rest = Math.hypot(spec.ax.hand.x - spec.ax.shoulder.x, spec.ax.hand.y - spec.ax.shoulder.y);
         arms.push({
-          sprite: i,
+          sprite: spec.sprite,
           socket, hold,
-          scale: 1,
-          stretch: !nub,
+          scale: spec.nub || rest < 1
+            ? (HAND_RADIUS * body.radius) / Math.max(1, spec.comp.radius)
+            : 1,
+          stretch: !spec.nub,
           minStretch: 0.8,
           maxStretch: 1.5,
-          // With two arms the left-hand blob is the far one: it reads better
-          // tucked behind the body and the weapon.
-          z: armComps.length > 1 && i === 0 ? "back" : "front"
+          // With two arms the first is the far one: it reads better tucked
+          // behind the body and the weapon.
+          z: many && i === 0 ? "back" : "front"
         });
       });
     }
@@ -296,7 +406,16 @@
       arm: { sprites, anchors },
       rig: {
         bodyScale: 1,
-        weapon: { scale: 1, rotation: 0, offset: { x: 0, y: 0 }, behind: false },
+        weapon: {
+          // Scaled to the procedural barrel length, and rotated to cancel
+          // whatever tilt the source art was drawn with, so the weapon points
+          // exactly where the stick does.
+          scale: weaponScale,
+          rotation: -(wa.angle * 180) / Math.PI,
+          offset: { x: 0, y: 0 },
+          orbit: true,
+          behind: false
+        },
         arms
       },
       meta: { sameFrame, bodySize: [e.body.width, e.body.height], weaponSize: [e.weapon.width, e.weapon.height] }
@@ -378,6 +497,7 @@
           scale: num(srw.scale, auto.rig.weapon.scale),
           rotation: num(srw.rotation, auto.rig.weapon.rotation),
           offset: pt(srw.offset, auto.rig.weapon.offset),
+          orbit: srw.orbit ?? auto.rig.weapon.orbit,
           behind: srw.behind ?? auto.rig.weapon.behind
         },
         arms: mergeArms(auto, sr)
@@ -434,11 +554,19 @@
     const facing = aimX < 0 ? -1 : 1;
     const k = (r / Math.max(1e-3, R.body.radius)) * R.rig.bodyScale;
     // In the mirrored frame the aim vector flips back on x.
-    const angle = Math.atan2(aimY, aimX * facing) + (R.rig.weapon.rotation * Math.PI) / 180;
-    const mount = {
+    const aimAngle = Math.atan2(aimY, aimX * facing);
+    const angle = aimAngle + (R.rig.weapon.rotation * Math.PI) / 180;
+    const off = {
       x: (R.body.mount.x - R.body.pivot.x) * k + R.rig.weapon.offset.x * r,
-      y: (R.body.mount.y - R.body.pivot.y) * k + R.rig.weapon.offset.y * r + wob
+      y: (R.body.mount.y - R.body.pivot.y) * k + R.rig.weapon.offset.y * r
     };
+    // Orbiting grips swing around the body with the aim (how the procedural
+    // weapon is drawn), which puts the whole barrel on the aim ray. A pinned
+    // grip stays where the art holds it and the weapon just rotates about it.
+    const reach = Math.hypot(off.x, off.y);
+    const mount = R.rig.weapon.orbit
+      ? { x: Math.cos(aimAngle) * reach, y: Math.sin(aimAngle) * reach + wob }
+      : { x: off.x, y: off.y + wob };
     return {
       R, facing, k, kw: k * R.rig.weapon.scale, angle, mount, wob,
       bodyImg: entry(id).body, weaponImg: entry(id).weapon

@@ -70,8 +70,8 @@ Pillars:
       `_weapon.png` (+ optional `_arm.png`) exist, the character is drawn from parts —
       body mirrors with facing, weapon rotates to the aim, bullets spawn at the
       real muzzle. Anchors (body pivot/radius/mount, weapon grip/muzzle, arm
-      shoulder/hand) are auto-detected from the alpha channel; parts exported on
-      the same canvas as the original render need no tuning at all
+      shoulder/hand) are auto-detected from the alpha channel, whatever framing
+      the parts were delivered in
 - [x] **Arm attachment**: each arm sprite (drawn facing right like the weapon)
       keeps its shoulder pinned to a socket on the body and its hand on a hold
       point that rides the weapon, swinging and stretching within limits as the
@@ -87,7 +87,7 @@ Pillars:
 - [x] **Art intake**: `npm run intake` takes delivered files from `intake/`, keys
       out solid backdrops (magenta/green/white screens) into transparent PNGs,
       files them into `characters/canonical/` or `characters/render/`, and keeps
-      the delivered originals in `art-source/characters/`. Interior color matching
+      the delivered originals in `characters/archive/`. Interior color matching
       the screen survives (only backdrop connected to the border is cut) and
       already-transparent art passes through untouched. `/workbench/intake.html`
       is the visual version for stubborn cutouts; `js/chroma.js` is shared by
@@ -97,11 +97,17 @@ Pillars:
       22 of the 96 delivered files arrived opaque on magenta/green/grey screens
       and were keyed at intake; the delivered originals are kept in
       `characters/archive/`
+- [x] **Composed characters match the procedural geometry**: the body's ball is
+      the largest circle inside its silhouette (so it lines up with the collision
+      circle), the weapon is scaled to a 1.5-radius barrel with the grip riding
+      0.55 radii out along the aim, and the barrel's tilt in the source art is
+      cancelled — the weapon points exactly where the stick does (verified at
+      0.00° off-axis across all 24 characters and eight aim angles)
 - [x] **`npm run fitrig`**: the delivered parts are each drawn full-frame on
-      their own canvas, so nothing shares a position or scale. The fitter
-      matches each part's silhouette into the canonical hero image to recover
-      the composition (mount, weapon scale, arm anchors) and writes
-      `render/rigs.json`, which the game merges over its auto-detection
+      their own canvas, so a hand arrives as a ball half the size of the body.
+      The fitter matches the arm art into the canonical hero image to recover the
+      hand size and grip position, and writes those to `render/rigs.json`;
+      everything else stays automatic
 - [x] Settings → Visuals → **Use Procedural Characters** (default off) draws the
       whole roster with the built-in vector art instead of the sprites
 - [x] Files: `js/characters.js`, `js/rig.js`, `js/chroma.js`, `tools/`, `workbench/`

@@ -59,6 +59,7 @@
           scale: R.rig.weapon.scale,
           rotation: R.rig.weapon.rotation,
           offset: clone(R.rig.weapon.offset),
+          orbit: !!R.rig.weapon.orbit,
           behind: !!R.rig.weapon.behind
         },
         arms: R.rig.arms.map((a) => clone(a))
@@ -636,6 +637,7 @@
       box.appendChild(fieldRow("Rotation°", "rig.weapon.rotation", { range: true, min: -180, max: 180, step: 0.5 }));
       box.appendChild(fieldRow("Offset X (r)", "rig.weapon.offset.x", { step: 0.01 }));
       box.appendChild(fieldRow("Offset Y (r)", "rig.weapon.offset.y", { step: 0.01 }));
+      box.appendChild(checkRow("Grip rides the aim", "rig.weapon.orbit"));
       box.appendChild(checkRow("Draw behind body", "rig.weapon.behind"));
 
       rec.rig.arms.forEach((a, i) => {

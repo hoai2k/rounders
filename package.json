@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "intake": "node tools/intake.mjs"
+    "intake": "node tools/intake.mjs",
+    "mock-parts": "node tools/mock-parts.mjs"
   }
 }

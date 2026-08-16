@@ -3,7 +3,7 @@
 // Left: the character roster. Right: an interactive viewer over the same rig
 // code the game uses (js/rig.js), so what you see here is what ships.
 //
-//   character mode — place / orient / size the weapon and hands on the body
+//   character mode — place / orient / size the weapon and arms on the body
 //   anchor mode    — set the anchor points inside each source image
 //
 // Export writes assets/images/characters/render/rigs.json, which the game
@@ -52,7 +52,7 @@
     const rec = {
       body: { pivot: clone(R.body.pivot), radius: R.body.radius, mount: clone(R.body.mount) },
       weapon: { grip: clone(R.weapon.grip), muzzle: clone(R.weapon.muzzle) },
-      arm: { pivots: R.arm.pivots.map((p) => clone(p)) },
+      arm: { anchors: R.arm.anchors.map((a) => clone(a)) },
       rig: {
         bodyScale: R.rig.bodyScale,
         weapon: {
@@ -61,7 +61,7 @@
           offset: clone(R.rig.weapon.offset),
           behind: !!R.rig.weapon.behind
         },
-        hands: R.rig.hands.map((h) => clone(h))
+        arms: R.rig.arms.map((a) => clone(a))
       }
     };
     work.set(id, rec);
@@ -154,6 +154,16 @@
     };
   }
 
+  // body-image px <-> mirrored rig space (the frame arms' sockets live in)
+  function bodyToRig(f, p) {
+    const R = f.T.R;
+    return { x: (p.x - R.body.pivot.x) * f.T.k, y: (p.y - R.body.pivot.y) * f.T.k };
+  }
+  function rigToBody(f, p) {
+    const R = f.T.R;
+    return { x: p.x / f.T.k + R.body.pivot.x, y: p.y / f.T.k + R.body.pivot.y };
+  }
+
   // anchor mode: image px <-> screen
   function anchorImage() {
     const a = rig.assets(state.id);
@@ -185,8 +195,9 @@
       out.push({ key: "mount", label: "weapon", at: toScreen(f, f.T.mount), color: "#ff4d8f" });
       const muz = weaponToRig(f, f.T.R.weapon.muzzle.x, f.T.R.weapon.muzzle.y);
       out.push({ key: "rot", label: "rotate", at: toScreen(f, muz), color: "#ffd24d", ring: true });
-      rec.rig.hands.forEach((h, i) => {
-        out.push({ key: `hand:${i}`, label: `hand ${i + 1}`, at: toScreen(f, weaponToRig(f, h.x, h.y)), color: "#29d7ff" });
+      rec.rig.arms.forEach((a, i) => {
+        out.push({ key: `hold:${i}`, label: `arm ${i + 1} hand`, at: toScreen(f, weaponToRig(f, a.hold.x, a.hold.y)), color: "#29d7ff" });
+        out.push({ key: `socket:${i}`, label: `arm ${i + 1} shoulder`, at: toScreen(f, bodyToRig(f, a.socket)), color: "#b98cff" });
       });
     } else {
       const img = anchorImage();
@@ -200,9 +211,9 @@
         out.push({ key: "weapon.grip", label: "grip", at: imgToScreen(img, rec.weapon.grip), color: "#ff4d8f" });
         out.push({ key: "weapon.muzzle", label: "muzzle", at: imgToScreen(img, rec.weapon.muzzle), color: "#29d7ff" });
       } else {
-        rec.arm.pivots.forEach((p, i) => {
-          out.push({ key: `arm.${i}`, label: `hand ${i + 1} pivot`, at: imgToScreen(img, p), color: "#29d7ff" });
-          out.push({ key: `armr.${i}`, label: `hand ${i + 1} radius`, at: imgToScreen(img, { x: p.x + p.radius, y: p.y }), color: "#6ee787" });
+        rec.arm.anchors.forEach((a, i) => {
+          out.push({ key: `armS.${i}`, label: `arm ${i + 1} shoulder`, at: imgToScreen(img, a.shoulder), color: "#b98cff" });
+          out.push({ key: `armH.${i}`, label: `arm ${i + 1} hand`, at: imgToScreen(img, a.hand), color: "#29d7ff" });
         });
       }
     }
@@ -240,11 +251,12 @@
         if (d > 180) d -= 360;
         if (d < -180) d += 360;
         rec.rig.weapon.rotation = d;
-      } else if (key.startsWith("hand:")) {
+      } else if (key.startsWith("hold:")) {
         const i = Number(key.slice(5));
-        const w = rigToWeapon(f, p);
-        rec.rig.hands[i].x = w.x;
-        rec.rig.hands[i].y = w.y;
+        rec.rig.arms[i].hold = rigToWeapon(f, p);
+      } else if (key.startsWith("socket:")) {
+        const i = Number(key.slice(7));
+        rec.rig.arms[i].socket = rigToBody(f, p);
       }
     } else {
       const img = anchorImage();
@@ -255,14 +267,8 @@
       else if (key === "body.radius") rec.body.radius = Math.max(4, Math.hypot(p.x - rec.body.pivot.x, p.y - rec.body.pivot.y));
       else if (key === "weapon.grip") rec.weapon.grip = { x: p.x, y: p.y };
       else if (key === "weapon.muzzle") rec.weapon.muzzle = { x: p.x, y: p.y };
-      else if (key.startsWith("armr.")) {
-        const i = Number(key.slice(5));
-        rec.arm.pivots[i].radius = Math.max(2, Math.hypot(p.x - rec.arm.pivots[i].x, p.y - rec.arm.pivots[i].y));
-      } else if (key.startsWith("arm.")) {
-        const i = Number(key.slice(4));
-        rec.arm.pivots[i].x = p.x;
-        rec.arm.pivots[i].y = p.y;
-      }
+      else if (key.startsWith("armS.")) rec.arm.anchors[Number(key.slice(5))].shoulder = { x: p.x, y: p.y };
+      else if (key.startsWith("armH.")) rec.arm.anchors[Number(key.slice(5))].hand = { x: p.x, y: p.y };
     }
     touch(state.id);
   }
@@ -345,6 +351,26 @@
       ctx.stroke();
       ctx.setLineDash([]);
     }
+
+    // shoulder → hand bridge per arm, with the current stretch called out
+    const rec = record(state.id);
+    if (rec) {
+      ctx.save();
+      ctx.scale(f.T.facing, 1);
+      for (const a of rec.rig.arms) {
+        const P = rig.armPose(f.T, a);
+        if (!P) continue;
+        ctx.strokeStyle = P.stretch === a.minStretch || P.stretch === a.maxStretch
+          ? "rgba(255,77,143,0.75)" // clamped: the hand no longer reaches
+          : "rgba(185,140,255,0.6)";
+        ctx.lineWidth = 1.5 / f.z;
+        ctx.beginPath();
+        ctx.moveTo(P.socket.x, P.socket.y);
+        ctx.lineTo(P.hold.x, P.hold.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     ctx.restore();
   }
 
@@ -396,12 +422,16 @@
         ctx.stroke();
         ctx.setLineDash([]);
       } else {
-        ctx.strokeStyle = "rgba(110,231,135,0.85)";
-        for (const p of rec.arm.pivots) {
+        // shoulder → hand: the axis the arm is posed along
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.setLineDash([5 / state.zoom, 4 / state.zoom]);
+        for (const a of rec.arm.anchors) {
           ctx.beginPath();
-          ctx.arc(off.x + p.x, off.y + p.y, p.radius, 0, Math.PI * 2);
+          ctx.moveTo(off.x + a.shoulder.x, off.y + a.shoulder.y);
+          ctx.lineTo(off.x + a.hand.x, off.y + a.hand.y);
           ctx.stroke();
         }
+        ctx.setLineDash([]);
       }
     }
     ctx.restore();
@@ -510,13 +540,13 @@
       bits.push(`body ${R.meta.bodySize.join("×")}`);
       bits.push(`weapon ${R.meta.weaponSize.join("×")}`);
       bits.push(R.meta.sameFrame ? "same frame (auto-placed)" : "different frames (manual placement)");
-      bits.push(`${R.arm.sprites.length} hand sprite(s)`);
+      bits.push(`${R.arm.sprites.length} arm sprite(s)`);
     } else if (a.state === "loading") bits.push("loading…");
     else bits.push("no render parts");
     $("charInfo").textContent = bits.join(" · ");
     $("hint").textContent = state.mode === "character"
-      ? "Drag the pink dot to move the weapon, the yellow dot to rotate it, blue dots to place hands. Drag empty space to pan, scroll to zoom, arrow keys nudge the selection."
-      : "Drag anchors on the source image: body pivot (pink) is the physics center, mount (yellow) is where the weapon grip sits, green sets the body radius. Weapon: grip → muzzle.";
+      ? "Drag the pink dot to move the weapon, the yellow dot to rotate it. Per arm: the purple dot is the shoulder socket on the body, the blue dot is where its hand grips the weapon — the line between them turns pink when the arm has stretched as far as it may. Drag empty space to pan, scroll to zoom, arrow keys nudge the selection."
+      : "Drag anchors on the source image: body pivot (pink) is the physics center, mount (yellow) is where the weapon grip sits, green sets the body radius. Weapon: grip → muzzle. Arm: shoulder (purple) → hand (blue), the axis the arm is posed and stretched along.";
   }
 
   // ----------------------------------------------------------- inspector
@@ -568,6 +598,22 @@
     return row;
   }
 
+  function selectRow(label, path, options) {
+    const row = document.createElement("label");
+    row.className = "row";
+    row.append(label);
+    const sel = document.createElement("select");
+    for (const [value, text] of options) {
+      const o = document.createElement("option");
+      o.value = value; o.textContent = text;
+      sel.appendChild(o);
+    }
+    sel.value = get(path);
+    sel.addEventListener("change", () => set(path, sel.value));
+    row.appendChild(sel);
+    return row;
+  }
+
   function buildInspector() {
     const box = $("inspect");
     box.textContent = "";
@@ -592,37 +638,50 @@
       box.appendChild(fieldRow("Offset Y (r)", "rig.weapon.offset.y", { step: 0.01 }));
       box.appendChild(checkRow("Draw behind body", "rig.weapon.behind"));
 
-      rec.rig.hands.forEach((h, i) => {
+      rec.rig.arms.forEach((a, i) => {
         const hh = document.createElement("h3");
-        hh.textContent = `Hand ${i + 1}`;
+        hh.textContent = `Arm ${i + 1}`;
         box.appendChild(hh);
-        box.appendChild(fieldRow("Sprite #", `rig.hands.${i}.sprite`, { min: 0, max: Math.max(0, rec.arm.pivots.length - 1) }));
-        box.appendChild(fieldRow("X (weapon px)", `rig.hands.${i}.x`, { step: 0.5 }));
-        box.appendChild(fieldRow("Y (weapon px)", `rig.hands.${i}.y`, { step: 0.5 }));
-        box.appendChild(fieldRow("Scale", `rig.hands.${i}.scale`, { range: true, min: 0.2, max: 3, step: 0.01 }));
-        box.appendChild(checkRow("Behind weapon", `rig.hands.${i}.behind`));
+        box.appendChild(fieldRow("Sprite #", `rig.arms.${i}.sprite`, { min: 0, max: Math.max(0, rec.arm.anchors.length - 1) }));
+        box.appendChild(fieldRow("Shoulder X (body px)", `rig.arms.${i}.socket.x`, { step: 0.5 }));
+        box.appendChild(fieldRow("Shoulder Y (body px)", `rig.arms.${i}.socket.y`, { step: 0.5 }));
+        box.appendChild(fieldRow("Hand X (weapon px)", `rig.arms.${i}.hold.x`, { step: 0.5 }));
+        box.appendChild(fieldRow("Hand Y (weapon px)", `rig.arms.${i}.hold.y`, { step: 0.5 }));
+        box.appendChild(fieldRow("Scale", `rig.arms.${i}.scale`, { range: true, min: 0.2, max: 3, step: 0.01 }));
+        box.appendChild(checkRow("Reach for the weapon (stretch)", `rig.arms.${i}.stretch`));
+        box.appendChild(fieldRow("Min stretch", `rig.arms.${i}.minStretch`, { range: true, min: 0.3, max: 1, step: 0.01 }));
+        box.appendChild(fieldRow("Max stretch", `rig.arms.${i}.maxStretch`, { range: true, min: 1, max: 3, step: 0.01 }));
+        box.appendChild(selectRow("Layer", `rig.arms.${i}.z`, [
+          ["back", "behind body"], ["mid", "behind weapon"], ["front", "in front"]
+        ]));
       });
 
       const add = document.createElement("button");
       add.className = "ghost wide";
-      add.textContent = "Add hand";
+      add.textContent = "Add arm";
       add.addEventListener("click", () => {
         const R = rig.resolved(state.id);
-        rec.rig.hands.push({
+        rec.rig.arms.push({
           sprite: 0,
-          x: R.weapon.grip.x + (R.weapon.muzzle.x - R.weapon.grip.x) * 0.3,
-          y: R.weapon.grip.y + (R.weapon.muzzle.y - R.weapon.grip.y) * 0.3,
-          scale: 1, behind: false
+          socket: {
+            x: R.body.pivot.x + (R.body.mount.x - R.body.pivot.x) * 0.55,
+            y: R.body.pivot.y + (R.body.mount.y - R.body.pivot.y) * 0.55
+          },
+          hold: {
+            x: R.weapon.grip.x + (R.weapon.muzzle.x - R.weapon.grip.x) * 0.3,
+            y: R.weapon.grip.y + (R.weapon.muzzle.y - R.weapon.grip.y) * 0.3
+          },
+          scale: 1, stretch: true, minStretch: 0.8, maxStretch: 1.5, z: "front"
         });
         touch(state.id);
         buildInspector();
       });
       box.appendChild(add);
-      if (rec.rig.hands.length) {
+      if (rec.rig.arms.length) {
         const rm = document.createElement("button");
         rm.className = "ghost wide";
-        rm.textContent = "Remove last hand";
-        rm.addEventListener("click", () => { rec.rig.hands.pop(); touch(state.id); buildInspector(); });
+        rm.textContent = "Remove last arm";
+        rm.addEventListener("click", () => { rec.rig.arms.pop(); touch(state.id); buildInspector(); });
         box.appendChild(rm);
       }
     } else if (state.part === "body") {
@@ -637,19 +696,20 @@
       box.appendChild(fieldRow("Muzzle X", "weapon.muzzle.x", { step: 0.5 }));
       box.appendChild(fieldRow("Muzzle Y", "weapon.muzzle.y", { step: 0.5 }));
     } else {
-      if (!rec.arm.pivots.length) {
+      if (!rec.arm.anchors.length) {
         const p = document.createElement("p");
         p.className = "muted";
         p.textContent = "No arm blobs detected (no <id>_arm.png, or it is empty).";
         box.appendChild(p);
       }
-      rec.arm.pivots.forEach((_, i) => {
+      rec.arm.anchors.forEach((_, i) => {
         const hh = document.createElement("h3");
         hh.textContent = `Sprite ${i}`;
         box.appendChild(hh);
-        box.appendChild(fieldRow("Pivot X", `arm.pivots.${i}.x`, { step: 0.5 }));
-        box.appendChild(fieldRow("Pivot Y", `arm.pivots.${i}.y`, { step: 0.5 }));
-        box.appendChild(fieldRow("Radius", `arm.pivots.${i}.radius`, { step: 0.5 }));
+        box.appendChild(fieldRow("Shoulder X", `arm.anchors.${i}.shoulder.x`, { step: 0.5 }));
+        box.appendChild(fieldRow("Shoulder Y", `arm.anchors.${i}.shoulder.y`, { step: 0.5 }));
+        box.appendChild(fieldRow("Hand X", `arm.anchors.${i}.hand.x`, { step: 0.5 }));
+        box.appendChild(fieldRow("Hand Y", `arm.anchors.${i}.hand.y`, { step: 0.5 }));
       });
     }
     syncJson();
@@ -710,9 +770,9 @@
       const f = -Math.sign(e.deltaY) * 0.02;
       if (state.sel === "mount" || state.sel === "rot") {
         rec.rig.weapon.scale = Math.max(0.05, rec.rig.weapon.scale * (1 + f));
-      } else if (state.sel.startsWith("hand:")) {
-        const i = Number(state.sel.slice(5));
-        rec.rig.hands[i].scale = Math.max(0.05, rec.rig.hands[i].scale * (1 + f));
+      } else if (state.sel.startsWith("hold:") || state.sel.startsWith("socket:")) {
+        const i = Number(state.sel.split(":")[1]);
+        rec.rig.arms[i].scale = Math.max(0.05, rec.rig.arms[i].scale * (1 + f));
       }
       touch(state.id);
       return;

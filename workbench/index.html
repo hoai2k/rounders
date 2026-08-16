@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rounders — Sprite Workbench</title>
+    <link rel="stylesheet" href="workbench.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1>Sprite Workbench</h1>
+      <button id="editBtn" class="toggle">Edit mode</button>
+      <button id="anchorBtn" class="toggle">Anchors</button>
+      <span id="partTabs" class="tabs" hidden>
+        <button data-part="body" class="tab on">Body</button>
+        <button data-part="weapon" class="tab">Weapon</button>
+        <button data-part="arm" class="tab">Arm</button>
+      </span>
+      <label class="check" id="refWrap"><input id="showRefs" type="checkbox" checked /> Show references</label>
+      <span class="spacer"></span>
+      <span id="pad" class="muted pad">no gamepad</span>
+      <button id="undoBtn" class="ghost" title="Undo (Ctrl+Z)" disabled>↶</button>
+      <button id="redoBtn" class="ghost" title="Redo (Ctrl+Shift+Z)" disabled>↷</button>
+      <button id="resetChar" class="ghost">Reset to auto</button>
+      <label class="ghost file">Import JSON<input id="importFile" type="file" accept="application/json" hidden /></label>
+      <button id="exportJson" class="primary">Export rigs.json</button>
+      <a class="ghost" href="intake.html">Art intake →</a>
+    </header>
+
+    <main class="layout">
+      <aside class="roster">
+        <div class="rosterHead">
+          <strong>Characters</strong>
+          <span id="rosterCount" class="muted"></span>
+        </div>
+        <div id="grid" class="grid"></div>
+        <p class="muted legend">
+          Badges show which files exist in
+          <code>assets/images/characters/render/</code>:
+          <b>B</b>ody, <b>W</b>eapon, <b>A</b>rm.
+        </p>
+      </aside>
+
+      <section class="stage">
+        <div class="stageHead">
+          <strong id="charName">—</strong>
+          <span id="charInfo" class="muted"></span>
+        </div>
+        <div class="canvasWrap">
+          <canvas id="view"></canvas>
+          <div id="parts" class="parts" hidden></div>
+          <div id="gizmoHint" class="gizmoHint" hidden></div>
+          <div id="empty" class="empty" hidden></div>
+        </div>
+        <div class="hint" id="hint"></div>
+      </section>
+
+      <aside class="inspector">
+        <div class="panel">
+          <h2>View</h2>
+          <label class="row">Zoom <input id="zoom" type="range" min="0.4" max="6" step="0.05" value="2" /><output id="zoomOut"></output></label>
+          <label class="row">Radius <input id="radius" type="range" min="16" max="120" step="1" value="52" /><output id="radiusOut"></output></label>
+          <label class="row">Aim <input id="aim" type="range" min="-180" max="180" step="1" value="0" /><output id="aimOut"></output></label>
+          <label class="check"><input id="spin" type="checkbox" /> Sweep aim</label>
+          <label class="check"><input id="faceLeft" type="checkbox" /> Face left (mirrored)</label>
+          <label class="check"><input id="onion" type="checkbox" /> Onion-skin other parts (anchors)</label>
+        </div>
+        <div id="selPanel" class="panel" hidden></div>
+        <div class="panel">
+          <h2>JSON</h2>
+          <textarea id="jsonOut" spellcheck="false" readonly></textarea>
+          <button id="copyJson" class="ghost wide">Copy this character</button>
+        </div>
+      </aside>
+    </main>
+
+    <script>window.ROUNDERS_ASSET_BASE = "../";</script>
+    <script src="../js/chroma.js"></script>
+    <script src="../js/rig.js"></script>
+    <script src="../js/characters.js"></script>
+    <script src="workbench.js"></script>
+  </body>
+</html>

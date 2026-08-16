@@ -3,68 +3,124 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Rounder</title>
-    <link rel="stylesheet" href="styles.css?v=17">
+    <title>Rounders</title>
+    <link rel="icon" href="assets/favicon/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon/favicon-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon/favicon-64.png">
+    <link rel="icon" type="image/png" sizes="256x256" href="assets/favicon/favicon-256.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="assets/favicon/favicon-512.png">
+    <link rel="stylesheet" href="styles.css?v=22">
   </head>
   <body>
-    <canvas id="game" aria-label="Rounder game canvas"></canvas>
+    <canvas id="game" aria-label="Rounders game canvas"></canvas>
 
-    <section id="menu" class="panel menu-panel">
-      <div>
-        <p class="eyebrow">Local arena roguelite</p>
-        <h1>Rounder</h1>
-        <p class="tagline">Four-player physics duels with loser drafts, volatile cards, controller rumble, and fast rematches.</p>
-      </div>
+    <section id="title" class="title-screen">
+      <p class="eyebrow">1–4 player arena brawler</p>
+      <h1 class="logo title-logo">R<span>O</span>UNDERS</h1>
+      <p class="title-tagline">Round fighters. Absurd power cards. 25 arenas with attitude.</p>
+      <p class="press-start">PRESS START</p>
+      <p class="title-hint">Any key · any controller button · or click to begin</p>
+    </section>
 
-      <div class="menu-grid">
-        <button id="startBtn" class="primary">Start Match</button>
-        <button id="createOnlineBtn">Create Online Game</button>
-        <button id="fullscreenBtn">Fullscreen</button>
-        <button id="musicBtn">Music: On</button>
-        <button id="settingsBtn">Settings</button>
-        <button id="howBtn">Controls</button>
-      </div>
-
-      <div id="onlineGames" class="online-games"></div>
+    <section id="menu" class="panel menu-panel hidden">
+      <header class="menu-header">
+        <p class="eyebrow">1–4 player arena brawler</p>
+        <h1 class="logo">R<span>O</span>UNDERS</h1>
+        <p class="tagline">Losers draft, winners sweat. Last one standing takes the round.</p>
+      </header>
 
       <div id="joinSlots" class="join-slots"></div>
 
+      <div class="menu-grid">
+        <button id="startBtn" class="primary">Start Match</button>
+        <button id="addBotBtn">+ Add Bot</button>
+        <button id="settingsBtn">Settings</button>
+        <button id="howBtn">How to Play</button>
+        <button id="fullscreenBtn">Fullscreen</button>
+        <button id="musicBtn">Music: On</button>
+      </div>
+
       <div class="quick-card">
-        <strong>Join:</strong> press any controller button. Start uses joined players only.
+        <strong>Join:</strong> press <kbd>F</kbd> (keyboard 1), <kbd>/</kbd> (keyboard 2), or any controller button —
+        then <kbd>◀</kbd> <kbd>▶</kbd> to choose your fighter and shoot to lock in.
+        <br>
+        <strong>Navigate:</strong> <kbd>▲</kbd> <kbd>▼</kbd> or D-pad moves · <kbd>Enter</kbd>, <b>A</b> or <b>Menu</b> confirms · <kbd>Esc</kbd> or <b>B</b> goes back.
       </div>
     </section>
 
     <section id="settings" class="panel settings-panel hidden">
       <h2>Settings</h2>
+
+      <h3 class="settings-group">Match</h3>
+      <label>
+        Arena
+        <select id="levelSelect"></select>
+      </label>
       <label>
         Max Players
         <input id="playerCount" type="range" min="2" max="4" value="4">
         <span id="playerCountValue">4</span>
       </label>
       <label>
-        Bots
-        <input id="botCount" type="range" min="0" max="3" value="0">
-        <span id="botCountValue">0</span>
-      </label>
-      <label>
-        Bot Difficulty
-        <input id="botDifficulty" type="range" min="1" max="3" value="1">
-        <span id="botDifficultyValue">Easy</span>
-      </label>
-      <label>
         Score to Win
-        <input id="scoreLimit" type="range" min="3" max="8" value="5">
+        <input id="scoreLimit" type="range" min="3" max="10" value="5">
         <span id="scoreLimitValue">5</span>
       </label>
       <label>
         Cards Per Draft
-        <input id="draftCount" type="range" min="3" max="5" value="5">
-        <span id="draftCountValue">5</span>
+        <input id="draftCount" type="range" min="3" max="5" value="4">
+        <span id="draftCountValue">4</span>
+      </label>
+      <label>
+        Bot Difficulty
+        <input id="botDifficulty" type="range" min="1" max="3" value="2">
+        <span id="botDifficultyValue">Normal</span>
       </label>
       <label>
         Arena Hazards
         <input id="hazards" type="checkbox" checked>
       </label>
+
+      <h3 class="settings-group">Card Rarity Rates</h3>
+      <label class="r-common">
+        Common
+        <input id="commonWeight" type="range" min="0" max="20" value="9">
+        <span id="commonWeightValue">9</span>
+      </label>
+      <label class="r-uncommon">
+        Uncommon
+        <input id="uncommonWeight" type="range" min="0" max="20" value="6">
+        <span id="uncommonWeightValue">6</span>
+      </label>
+      <label class="r-rare">
+        Rare
+        <input id="rareWeight" type="range" min="0" max="20" value="4">
+        <span id="rareWeightValue">4</span>
+      </label>
+      <label class="r-epic">
+        Epic
+        <input id="epicWeight" type="range" min="0" max="20" value="3">
+        <span id="epicWeightValue">3</span>
+      </label>
+      <label class="r-legendary">
+        Legendary
+        <input id="legendaryWeight" type="range" min="0" max="20" value="2">
+        <span id="legendaryWeightValue">2</span>
+      </label>
+      <label class="r-mythic">
+        Mythic
+        <input id="mythicWeight" type="range" min="0" max="20" value="1">
+        <span id="mythicWeightValue">1</span>
+      </label>
+
+      <h3 class="settings-group">Visuals</h3>
+      <label>
+        Use Procedural Characters
+        <input id="proceduralCharacters" type="checkbox">
+      </label>
+
+      <h3 class="settings-group">Feel</h3>
       <label>
         Controller Haptics
         <input id="haptics" type="checkbox" checked>
@@ -78,59 +134,117 @@
         <input id="musicVolume" type="range" min="0" max="100" value="20">
         <span id="musicVolumeValue">20</span>
       </label>
-      <label>
-        Common Rate
-        <input id="commonWeight" type="range" min="0" max="20" value="9">
-        <span id="commonWeightValue">9</span>
-      </label>
-      <label>
-        Uncommon Rate
-        <input id="uncommonWeight" type="range" min="0" max="20" value="6">
-        <span id="uncommonWeightValue">6</span>
-      </label>
-      <label>
-        Rare Rate
-        <input id="rareWeight" type="range" min="0" max="20" value="4">
-        <span id="rareWeightValue">4</span>
-      </label>
-      <label>
-        Epic Rate
-        <input id="epicWeight" type="range" min="0" max="20" value="3">
-        <span id="epicWeightValue">3</span>
-      </label>
-      <label>
-        Legendary Rate
-        <input id="legendaryWeight" type="range" min="0" max="20" value="2">
-        <span id="legendaryWeightValue">2</span>
-      </label>
-      <label>
-        Mythical Rate
-        <input id="mythicalWeight" type="range" min="0" max="20" value="1">
-        <span id="mythicalWeightValue">1</span>
-      </label>
+
       <div class="menu-grid">
         <button id="settingsBack">Back</button>
       </div>
     </section>
 
     <section id="how" class="panel how-panel hidden">
-      <h2>Controls</h2>
+      <h2>How to Play</h2>
+
+      <div class="pad-diagram">
+        <svg viewBox="-60 0 1040 520" role="img" aria-labelledby="padTitle padDesc">
+          <title id="padTitle">Xbox controller layout for Rounders</title>
+          <desc id="padDesc">Left stick moves, right stick aims, A jumps and confirms, RT or RB shoots,
+            LT, LB or B blocks and triggers Mythic abilities, the D-pad navigates menus,
+            the Menu button pauses and confirms, and the View button goes back.</desc>
+
+          <!-- triggers -->
+          <rect class="pad-part f-block" x="272" y="84" width="90" height="34" rx="14"></rect>
+          <rect class="pad-part f-shoot" x="558" y="84" width="90" height="34" rx="14"></rect>
+          <text class="pad-glyph" x="317" y="107">LT</text>
+          <text class="pad-glyph" x="603" y="107">RT</text>
+
+          <!-- bumpers -->
+          <rect class="pad-part f-block" x="258" y="120" width="118" height="28" rx="13"></rect>
+          <rect class="pad-part f-shoot" x="544" y="120" width="118" height="28" rx="13"></rect>
+          <text class="pad-glyph" x="317" y="141">LB</text>
+          <text class="pad-glyph" x="603" y="141">RB</text>
+
+          <!-- body -->
+          <path class="pad-body" d="M 300 148 H 620 Q 676 148 692 192 L 726 336 Q 744 424 692 448
+            Q 642 466 606 416 L 552 350 H 368 L 314 416 Q 278 466 228 448 Q 176 424 194 336
+            L 228 192 Q 244 148 300 148 Z"></path>
+
+          <!-- left stick -->
+          <circle class="pad-well" cx="330" cy="212" r="40"></circle>
+          <circle class="pad-stick f-move" cx="330" cy="212" r="27"></circle>
+          <circle class="pad-stick-top" cx="330" cy="212" r="14"></circle>
+
+          <!-- right stick -->
+          <circle class="pad-well" cx="525" cy="302" r="40"></circle>
+          <circle class="pad-stick f-move" cx="525" cy="302" r="27"></circle>
+          <circle class="pad-stick-top" cx="525" cy="302" r="14"></circle>
+
+          <!-- d-pad -->
+          <path class="pad-part f-menu" d="M 382 262 h 26 v 27 h 27 v 26 h -27 v 27 h -26 v -27 h -27 v -26 h 27 z"></path>
+
+          <!-- face buttons -->
+          <circle class="pad-face" cx="590" cy="172" r="19"></circle>
+          <text class="pad-letter" x="590" y="179">Y</text>
+          <circle class="pad-face" cx="550" cy="212" r="19"></circle>
+          <text class="pad-letter" x="550" y="219">X</text>
+          <circle class="pad-face f-block" cx="630" cy="212" r="19"></circle>
+          <text class="pad-letter dark" x="630" y="219">B</text>
+          <circle class="pad-face f-jump" cx="590" cy="252" r="19"></circle>
+          <text class="pad-letter dark" x="590" y="259">A</text>
+
+          <!-- centre buttons -->
+          <circle class="pad-face f-menu" cx="424" cy="206" r="12"></circle>
+          <circle class="pad-guide" cx="461" cy="190" r="15"></circle>
+          <circle class="pad-face f-menu" cx="498" cy="206" r="12"></circle>
+
+          <!-- leaders -->
+          <path class="pad-lead" d="M 200 101 H 250"></path>
+          <path class="pad-lead" d="M 200 212 H 286"></path>
+          <path class="pad-lead" d="M 200 330 H 300 L 352 306"></path>
+          <path class="pad-lead" d="M 720 101 H 664"></path>
+          <path class="pad-lead" d="M 720 186 H 690 L 652 204"></path>
+          <path class="pad-lead" d="M 720 252 H 680 L 612 252"></path>
+          <path class="pad-lead" d="M 720 330 H 640 L 568 308"></path>
+          <path class="pad-lead" d="M 414 68 L 424 192"></path>
+          <path class="pad-lead" d="M 506 68 L 498 192"></path>
+
+          <!-- labels -->
+          <text class="pad-label end f-block" x="196" y="107"><tspan class="k">LT / LB</tspan> — Block</text>
+          <text class="pad-label end f-move" x="196" y="218"><tspan class="k">Left stick</tspan> — Move</text>
+          <text class="pad-label end f-menu" x="196" y="336"><tspan class="k">D-pad</tspan> — Navigate</text>
+          <text class="pad-label f-shoot" x="724" y="107"><tspan class="k">RT / RB</tspan> — Shoot</text>
+          <text class="pad-label f-block" x="724" y="192"><tspan class="k">B</tspan> — Block · Back</text>
+          <text class="pad-label f-jump" x="724" y="258"><tspan class="k">A</tspan> — Jump · Confirm</text>
+          <text class="pad-label f-move" x="724" y="336"><tspan class="k">Right stick</tspan> — Aim</text>
+          <text class="pad-label end f-menu" x="408" y="62"><tspan class="k">⧉ View</tspan> — Back</text>
+          <text class="pad-label f-menu" x="512" y="62"><tspan class="k">☰ Menu</tspan> — Pause · Confirm</text>
+
+          <text class="pad-note" x="460" y="500">Hold <tspan class="k">LT / LB / B</tspan> to block — it also fires your Mythic ability when the pink ring is spinning</text>
+        </svg>
+      </div>
+
       <div class="controls-grid">
         <div>
-          <h3>Keyboard P1</h3>
-          <p>A/D move, W jump, F shoot, G block</p>
+          <h3>Keyboard 1</h3>
+          <p><kbd>A</kbd><kbd>D</kbd> move · <kbd>W</kbd> jump · <kbd>F</kbd> shoot · <kbd>G</kbd> block</p>
         </div>
         <div>
-          <h3>Keyboard P2</h3>
-          <p>Left/Right move, Up jump, / shoot, . block</p>
+          <h3>Keyboard 2</h3>
+          <p><kbd>◀</kbd><kbd>▶</kbd> move · <kbd>▲</kbd> jump · <kbd>/</kbd> shoot · <kbd>.</kbd> block</p>
         </div>
         <div>
-          <h3>Controller</h3>
-          <p>Left stick/D-pad move, A jump, RT/RB shoot, LT/LB block</p>
+          <h3>Joining</h3>
+          <p>Press any controller button (or a shoot key) to take a slot. <kbd>◀</kbd> <kbd>▶</kbd> picks your fighter, shoot or <b>A</b> locks in, <b>B</b> un-readies.</p>
         </div>
         <div>
-          <h3>Draft</h3>
-          <p>Move left/right and press shoot/jump to pick a card. Mythical cards activate with G or LB.</p>
+          <h3>The Loop</h3>
+          <p>Last one standing wins the round. Everyone who lost drafts a power card — all at once. First to the score limit takes the match.</p>
+        </div>
+        <div>
+          <h3>Blocking</h3>
+          <p>A well-timed block reflects bullets back at the shooter. Cards can make blocks dash, teleport, echo, or explode.</p>
+        </div>
+        <div>
+          <h3>Pausing</h3>
+          <p><kbd>Esc</kbd>, <kbd>P</kbd> or the <b>Menu</b> button pauses. From there you can reach settings, controls, fullscreen, or quit to the main menu.</p>
         </div>
       </div>
       <div class="menu-grid">
@@ -140,9 +254,9 @@
 
     <section id="draft" class="draft hidden" aria-live="polite">
       <div class="draft-header">
-        <p id="draftPrompt"></p>
+        <p id="draftTitle"></p>
       </div>
-      <div id="draftCards" class="draft-cards"></div>
+      <div id="draftGrid" class="draft-grid"></div>
     </section>
 
     <section id="battleSplash" class="splash hidden" aria-live="polite">
@@ -151,20 +265,39 @@
       <p id="battleSub"></p>
     </section>
 
+    <section id="arenaBanner" class="arena-banner hidden" aria-live="polite">
+      <h2 id="arenaName"></h2>
+      <p id="arenaTag"></p>
+    </section>
+
     <section id="pausePanel" class="panel pause-panel hidden">
       <h2>Paused</h2>
+      <p class="pause-hint">Music ducked. Nothing moves until you say so.</p>
       <div class="menu-grid">
         <button id="resumeBtn" class="primary">Resume</button>
+        <button id="pauseSettingsBtn">Settings</button>
+        <button id="pauseHowBtn">How to Play</button>
         <button id="pauseFullscreenBtn">Fullscreen</button>
         <button id="pauseMusicBtn">Music: On</button>
-        <button id="pauseMenuBtn">Main Menu</button>
+        <button id="pauseMenuBtn">Quit to Main Menu</button>
       </div>
     </section>
 
     <section id="hud" class="hud"></section>
     <section id="toast" class="toast hidden"></section>
 
-    <script src="https://www.unpkg.com/@instantdb/core@latest/dist/standalone/index.umd.cjs"></script>
-    <script src="game.js?v=17"></script>
+    <section id="nowPlaying" class="now-playing" aria-label="Music">
+      <button id="musicPrev" type="button" class="np-btn" title="Previous track" aria-label="Previous track">◀</button>
+      <span id="nowPlayingName" class="np-name">—</span>
+      <button id="musicNext" type="button" class="np-btn" title="Next track" aria-label="Next track">▶</button>
+    </section>
+
+    <script src="js/cards.js?v=22"></script>
+    <script src="js/chroma.js?v=22"></script>
+    <script src="js/rig.js?v=22"></script>
+    <script src="js/characters.js?v=22"></script>
+    <script src="js/levels.js?v=22"></script>
+    <script src="js/music.js?v=22"></script>
+    <script src="game.js?v=22"></script>
   </body>
 </html>

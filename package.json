@@ -1,9 +1,12 @@
 {
-  "name": "rounder",
-  "version": "0.1.0",
+  "name": "rounders",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "intake": "node tools/intake.mjs",
+    "mock-parts": "node tools/mock-parts.mjs",
+    "fitrig": "node tools/fitrig.mjs"
   }
 }

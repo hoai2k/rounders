@@ -339,31 +339,45 @@
       p => { p.stats.active = "chronoshift"; p.stats.activeCooldown = 10; p.stats.speed *= 1.08; })
   ];
 
-  // Card emblems: assets/images/cards/<id>.png, 256×256. Loaded on demand and
-  // cached; a card with no art simply draws without one, the way it always has.
+  // Card art comes in two shapes, and the card uses whichever fits the space:
+  //   emblem — assets/images/cards/<id>.png, 256×256 transparent cutout. Reads
+  //            at any size, so it drives the tiny HUD chips and stands in for a
+  //            missing scene.
+  //   scene  — assets/images/cards/art/<id>.png, 512×384 full-bleed painting.
+  //            The panel across the top of a full card face, so a draft hand is
+  //            recognised at a glance instead of read.
+  // Both load on demand and cache; a card with neither simply draws the tinted
+  // panel, the way it always has.
   const ART = `${window.ROUNDERS_ASSET_BASE || ""}assets/images/cards/`;
   const art = new Map();
+  const scenes = new Map();
 
   function cardArtUrl(id) { return `${ART}${id}.png`; }
+  function cardSceneUrl(id) { return `${ART}art/${id}.png`; }
 
-  // Returns the loaded image, or null until it is ready (or forever, if the
-  // file is missing). Callers draw the card either way.
-  function cardArt(id) {
-    let entry = art.get(id);
+  function load(cache, id, url) {
+    let entry = cache.get(id);
     if (!entry) {
       const img = new Image();
       entry = { img, ok: false };
-      art.set(id, entry);
+      cache.set(id, entry);
       img.onload = () => { entry.ok = true; };
       img.onerror = () => { entry.ok = false; entry.failed = true; };
-      img.src = cardArtUrl(id);
+      img.src = url;
     }
     return entry.ok ? entry.img : null;
   }
+
+  // Return the loaded image, or null until it is ready (or forever, if the file
+  // is missing). Callers draw the card either way.
+  function cardArt(id) { return load(art, id, cardArtUrl(id)); }
+  function cardScene(id) { return load(scenes, id, cardSceneUrl(id)); }
 
   window.ROUNDERS.RARITIES = RARITIES;
   window.ROUNDERS.RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
   window.ROUNDERS.CARDS = CARDS;
   window.ROUNDERS.cardArt = cardArt;
   window.ROUNDERS.cardArtUrl = cardArtUrl;
+  window.ROUNDERS.cardScene = cardScene;
+  window.ROUNDERS.cardSceneUrl = cardSceneUrl;
 })();

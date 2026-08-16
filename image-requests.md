@@ -34,8 +34,17 @@ any missing file is fine and simply falls back.
 | Rarity frames | *(not wired — the card face is drawn in CSS)* |
 | Characters | the composed rig (`js/rig.js`), portraits, the lobby, victory |
 | Arenas | arena backdrops, behind the procedural platforms |
-| Card emblems | the draft hand, the HUD card chips, and the card a bot is shown taking |
+| Card emblems | the HUD card chips, and a stand-in wherever a scene is missing |
+| Card art panels | the panel across the top of a full card face — the draft hand, and the card a bot is shown taking |
 
-If a card is ever added to `js/cards.js`, it wants an emblem at
-`assets/images/cards/<id>.png` — 256×256, transparent, single centered subject —
-or it simply draws with an empty art panel.
+A card can have two images, and the card uses whichever fits the space:
+
+- **Emblem** — `assets/images/cards/<id>.png`, 256×256, transparent, single
+  centered subject. Reads at any size, so it drives the tiny HUD chips.
+- **Art panel** — `assets/images/cards/art/<id>.png`, 512×384, full-bleed
+  painted scene, no frame of its own (the card supplies the border). Drawn
+  across the top of a full card face, centre-cropped, so keep the important
+  shape inside the middle 80%.
+
+If a card is ever added to `js/cards.js` it wants both; with only an emblem the
+card face falls back to it, and with neither it simply draws a tinted panel.

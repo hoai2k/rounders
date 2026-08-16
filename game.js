@@ -3,7 +3,7 @@
   "use strict";
 
   const { CARDS, RARITIES, CHARACTERS, LEVELS, drawCharacter, setProceduralCharacters, arenaImage } = window.ROUNDERS;
-  const { cardArt, cardArtUrl } = window.ROUNDERS;
+  const { cardArt, cardArtUrl, cardScene, cardSceneUrl } = window.ROUNDERS;
   const str = window.ROUNDERS.str;
 
   // Fills every [data-str] / [data-str-html] node from js/strings.js so all UI
@@ -818,7 +818,7 @@
         el.innerHTML = `
           <span class="card-pip">${rar.name[0]}</span>
           <span class="rarity">${rar.name}</span>
-          <span class="card-art" style="background-image:url('${cardArtUrl(c.id)}')"></span>
+          <span class="card-art" style="--scene:url('${cardSceneUrl(c.id)}');--emblem:url('${cardArtUrl(c.id)}')"></span>
           <strong class="card-name">${c.name}</strong>
           <em class="card-tagline">${c.tagline}</em>
           <p class="card-desc">${c.description}</p>
@@ -2709,16 +2709,30 @@
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // art panel
-    const art = cardArt(c.id);
+    // art panel: the painted scene fills it edge to edge (centre-cropped), and
+    // the emblem cutout stands in until the scene loads or if it is missing
+    const scene = cardScene(c.id);
+    const art = scene || cardArt(c.id);
     const pad = 12, artH = 120;
+    const ax = pad, ay = pad + 16, aw = w - pad * 2;
     ctx.fillStyle = hexAlpha(rar.color, 0.14);
     ctx.beginPath();
-    ctx.roundRect(pad, pad + 16, w - pad * 2, artH, 10);
+    ctx.roundRect(ax, ay, aw, artH, 10);
     ctx.fill();
     if (art) {
-      const size = Math.min(w - pad * 2 - 8, artH - 8);
-      ctx.drawImage(art, w / 2 - size / 2, pad + 16 + artH / 2 - size / 2, size, size);
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(ax, ay, aw, artH, 10);
+      ctx.clip();
+      if (scene) {
+        const s = Math.max(aw / art.width, artH / art.height);   // cover
+        const dw = art.width * s, dh = art.height * s;
+        ctx.drawImage(art, ax + (aw - dw) / 2, ay + (artH - dh) / 2, dw, dh);
+      } else {
+        const size = Math.min(aw - 8, artH - 8);                  // contain
+        ctx.drawImage(art, w / 2 - size / 2, ay + artH / 2 - size / 2, size, size);
+      }
+      ctx.restore();
     }
 
     ctx.fillStyle = rar.color;

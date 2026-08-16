@@ -493,26 +493,32 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   100% { transform: rotate(calc(var(--tilt) * 0.35)) translateY(-34px) scale(1.05); }
 }
 
-/* the card's emblem — the thing you actually recognise a card by, so it sits
-   above the name and takes the top third of the face. A card with no art file
-   just shows the tinted panel. */
+/* the card's art panel — the thing you actually recognise a card by, so it
+   sits above the name and takes the top of the face. Three layers, first one
+   that exists wins: the painted 512×384 scene (full-bleed, cropped to the
+   panel), the 256×256 emblem cutout as a stand-in, then the tinted panel for a
+   card with no art at all. */
 .card-art {
   display: block;
+  flex: none;
   width: 100%;
-  aspect-ratio: 1 / 1;
-  max-height: 36%;
+  height: 37%;
   border-radius: 10px;
-  margin: 2px 0 1px;
-  background:
-    radial-gradient(ellipse at 50% 38%, color-mix(in srgb, var(--rcol) 30%, transparent), transparent 70%),
-    rgba(0, 0, 0, 0.25);
+  margin: 2px 0 3px;
+  background-image:
+    var(--scene, none),
+    var(--emblem, none),
+    radial-gradient(ellipse at 50% 38%, color-mix(in srgb, var(--rcol) 30%, transparent), transparent 70%);
+  background-color: rgba(0, 0, 0, 0.25);
   background-repeat: no-repeat;
   background-position: center;
-  background-size: contain, auto, auto;
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.55));
+  background-size: cover, contain, auto;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 -18px 26px -18px rgba(0, 0, 0, 0.9);
 }
 
-.card.selected .card-art { filter: drop-shadow(0 4px 10px var(--rglow)); }
+.card.selected .card-art { box-shadow: inset 0 0 0 1px var(--rcol), inset 0 -18px 26px -18px rgba(0, 0, 0, 0.9); }
 
 /* corner pips, like the index of a playing card */
 .card-pip {
@@ -570,10 +576,12 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 3;
 }
 
-.stat-list { display: flex; flex-wrap: wrap; gap: 4px; }
+/* the effect pills are the part you must not lose, so they keep their space
+   and the description clamps around them */
+.stat-list { display: flex; flex-wrap: wrap; gap: 4px; flex: none; }
 
 .stat-list span {
   font-size: 9.5px;

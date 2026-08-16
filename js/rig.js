@@ -9,16 +9,23 @@
 //                    hand end right) — a round nub hand works too
 //
 // When those exist the character is drawn as a composition: the body mirrors
-// with facing, and the weapon rotates to the aim direction. Each arm bridges
-// the two: its shoulder end stays pinned to a socket on the *body* and its
-// hand end rides a hold point on the *weapon*, so the arm swings (and stretches
-// a little, within limits) as the weapon tracks the aim. A stubby blob with no
-// direction to it degrades to the old behaviour — a hand rigidly parented to
-// the weapon.
+// with facing and the weapon swings to the aim, with the arms riding on the
+// weapon so they follow it and mirror with it.
 //
-// Anchors (body pivot/radius/mount/sockets, weapon grip/muzzle, arm
-// shoulder/hand) are detected automatically from the alpha channel and can be
-// overridden by a rig file authored in /workbench.
+// The weapon's grip → muzzle line is the whole specification of how it aims:
+// its angle in the source art is cancelled so the barrel lands exactly on the
+// aim, and its length is scaled so the muzzle sits at a fixed radius from the
+// body. One number places and sizes the weapon — `distance`, how far the grip
+// is held from the body centre — because the muzzle end is pinned.
+//
+// Arms are placed in weapon-image space (a hold point, a scale and a rotation),
+// so they stay put on the weapon at every aim angle. An elongated arm sprite
+// can instead bridge from a socket on the body to its hold on the weapon,
+// stretching within limits as the weapon swings.
+//
+// Anchors (body pivot/radius, weapon grip/muzzle, arm hold/scale/rotation) are
+// detected automatically from the alpha channel and can be overridden by a rig
+// file authored in /workbench.
 //
 // Everything degrades: no rig images -> the single canonical character PNG,
 // no PNG at all -> the procedural drawing in characters.js.
@@ -88,8 +95,12 @@
   // collision circle, the grip sits this far out along the aim, and the barrel
   // is this long. The weapon is the player's aim indicator, so it is sized and
   // placed to that spec rather than to whatever the source art happened to do.
-  const WEAPON_REACH = 0.55;  // grip distance from the body center, in body radii
-  const WEAPON_LENGTH = 1.5;  // grip → muzzle length, in body radii
+  const WEAPON_REACH = 0.55;  // default grip distance from the body center, in body radii
+  const MUZZLE_REACH = 2.05;  // the muzzle always ends up this far out — the
+                              // procedural weapon's 0.55 grip + 1.5 of barrel.
+                              // Pulling the grip in therefore lengthens the
+                              // weapon and pushing it out shortens it, so one
+                              // number places and sizes it at once.
   const HAND_RADIUS = 0.16;   // bare nub hand, in body radii
 
   function alphaMask(img) {
@@ -446,6 +457,15 @@
     };
   }
 
+  // The weapon's own axis: where grip → muzzle points in the source image, and
+  // how long it is. Everything about how the weapon is drawn comes from this
+  // pair of anchors, so moving them in /workbench re-aims and re-sizes it.
+  function barrelVector(weapon) {
+    const dx = weapon.muzzle.x - weapon.grip.x;
+    const dy = weapon.muzzle.y - weapon.grip.y;
+    return { angle: Math.atan2(dy, dx), len: Math.max(1, Math.hypot(dx, dy)) };
+  }
+
   // Grip and muzzle for a weapon, taken along its long axis. Each end is the
   // average of the ink in a slab at that end, so both points land on the
   // barrel's center line even when the art is drawn at a tilt or the weapon has
@@ -529,8 +549,6 @@
     // The grip rides the aim at a fixed reach, like the procedural weapon, so
     // the barrel always lies along the aim ray out of the body's center.
     body.mount = { x: body.pivot.x + body.radius * WEAPON_REACH, y: body.pivot.y };
-    const weaponLenPx = Math.hypot(weapon.muzzle.x - weapon.grip.x, weapon.muzzle.y - weapon.grip.y);
-    const weaponScale = (WEAPON_LENGTH * body.radius) / Math.max(1, weaponLenPx);
 
     // Arms: every blob in the arm image becomes one arm sprite with a shoulder
     // end and a hand end. Sockets sit on the body's weapon side; holds sit on
@@ -593,11 +611,11 @@
         bodyScale: 1,
         bodyRotation: 0,
         weapon: {
-          // Scaled to the procedural barrel length, and rotated to cancel
-          // whatever tilt the source art was drawn with, so the weapon points
-          // exactly where the stick does.
-          scale: weaponScale,
-          rotation: -(wa.angle * 180) / Math.PI,
+          // Placed and sized to the procedural weapon's geometry: the grip sits
+          // `distance` radii out along the aim and the muzzle lands at
+          // MUZZLE_REACH. Direction comes from the grip/muzzle anchors.
+          distance: WEAPON_REACH,
+          rotation: 0,
           offset: { x: 0, y: 0 },
           orbit: true,
           behind: false
@@ -682,7 +700,7 @@
         bodyScale: num(sr.bodyScale, auto.rig.bodyScale),
         bodyRotation: num(sr.bodyRotation, auto.rig.bodyRotation),
         weapon: {
-          scale: num(srw.scale, auto.rig.weapon.scale),
+          distance: num(srw.distance, auto.rig.weapon.distance),
           rotation: num(srw.rotation, auto.rig.weapon.rotation),
           offset: pt(srw.offset, auto.rig.weapon.offset),
           orbit: srw.orbit ?? auto.rig.weapon.orbit,
@@ -743,22 +761,36 @@
     const k = (r / Math.max(1e-3, R.body.radius)) * R.rig.bodyScale;
     // In the mirrored frame the aim vector flips back on x.
     const aimAngle = Math.atan2(aimY, aimX * facing);
-    const angle = aimAngle + (R.rig.weapon.rotation * Math.PI) / 180;
-    const off = {
-      x: (R.body.mount.x - R.body.pivot.x) * k + R.rig.weapon.offset.x * r,
-      y: (R.body.mount.y - R.body.pivot.y) * k + R.rig.weapon.offset.y * r
-    };
-    // An orbiting grip swings around the body with the aim (how the procedural
-    // weapon is drawn): the whole offset turns, so a placement dialled in at one
-    // aim angle holds at every other one, and a grip left on the aim axis keeps
-    // the barrel on the aim ray. A pinned grip stays where the art holds it and
-    // the weapon just rotates about it.
+
+    // grip → muzzle *is* the weapon's direction: whatever angle that line is
+    // drawn at in the source image is cancelled here, so the barrel lands on
+    // the aim. `rotation` is an extra nudge on top, normally zero.
+    const bar = barrelVector(R.weapon);
+    const angle = aimAngle - bar.angle + (R.rig.weapon.rotation * Math.PI) / 180;
+
+    // ...and grip → muzzle is also the weapon's length, so the same line sets
+    // the scale. The muzzle is pinned at MUZZLE_REACH, so the barrel is however
+    // much room is left between the grip and there.
+    const barrelR = Math.max(0.1, MUZZLE_REACH - R.rig.weapon.distance);
+    const kw = (barrelR * R.body.radius * k) / bar.len;
+
+    // The grip sits `distance` radii out along the aim (how the procedural
+    // weapon is drawn), so the whole barrel lies on the aim ray. A pinned grip
+    // instead stays where the body's mount anchor puts it.
+    const reach = R.rig.weapon.distance * r;
     const ca = Math.cos(aimAngle), sa = Math.sin(aimAngle);
+    const off = {
+      x: reach + R.rig.weapon.offset.x * r,
+      y: R.rig.weapon.offset.y * r
+    };
     const mount = R.rig.weapon.orbit
       ? { x: off.x * ca - off.y * sa, y: off.x * sa + off.y * ca + wob }
-      : { x: off.x, y: off.y + wob };
+      : {
+        x: (R.body.mount.x - R.body.pivot.x) * k + R.rig.weapon.offset.x * r,
+        y: (R.body.mount.y - R.body.pivot.y) * k + R.rig.weapon.offset.y * r + wob
+      };
     return {
-      R, facing, k, kw: k * R.rig.weapon.scale, angle, mount, wob,
+      R, facing, k, kw, angle, mount, wob,
       bodyImg: entry(id).body, weaponImg: entry(id).weapon
     };
   }

@@ -27,7 +27,7 @@
     id: CHARACTERS[0].id,
     mode: "view",          // view | edit | anchor
     part: "body",          // anchor mode: which source image
-    sel: "weapon",         // edit mode: which piece — body | weapon | hand:N
+    arm: 0,                // anchor/arm mode: which arm is being placed
     zoom: 2,
     pan: { x: 0, y: 0 },
     r: 52,
@@ -70,7 +70,7 @@
         bodyScale: R.rig.bodyScale,
         bodyRotation: R.rig.bodyRotation || 0,
         weapon: {
-          scale: R.rig.weapon.scale,
+          distance: R.rig.weapon.distance,
           rotation: R.rig.weapon.rotation,
           offset: clone(R.rig.weapon.offset),
           orbit: !!R.rig.weapon.orbit,
@@ -168,8 +168,8 @@
     if (["view", "edit", "anchor"].includes(m)) state.mode = m;
     const p = q.get("part");
     if (["body", "weapon", "arm"].includes(p)) state.part = p;
-    const s = q.get("sel");
-    if (s) state.sel = s;
+    const a = Number(q.get("arm"));
+    if (Number.isInteger(a) && a >= 0) state.arm = a;
   }
 
   function writeUrl() {
@@ -177,7 +177,7 @@
     q.set("c", state.id);
     q.set("mode", state.mode);
     if (state.mode === "anchor") q.set("part", state.part);
-    if (state.mode === "edit") q.set("sel", state.sel);
+    if (state.mode === "anchor" && state.part === "arm") q.set("arm", String(state.arm));
     history.replaceState(null, "", `${location.pathname}?${q}`);
   }
 
@@ -227,9 +227,12 @@
   const rigToBody = (f, p) => ({ x: p.x / f.T.k + f.T.R.body.pivot.x, y: p.y / f.T.k + f.T.R.body.pivot.y });
 
   // anchor mode: image px <-> screen
+  // Arms are placed against the weapon they hold, so the arm tab shows the
+  // weapon image and draws the arm sprites on top of it — the same relationship
+  // the game renders, just standing still.
   function anchorImage() {
     const a = rig.assets(state.id);
-    return state.part === "body" ? a.body : state.part === "weapon" ? a.weapon : a.arm;
+    return state.part === "body" ? a.body : a.weapon;
   }
   const imgToScreen = (img, p) => ({
     x: view.clientWidth / 2 + state.pan.x + (p.x - img.width / 2) * state.zoom,
@@ -240,115 +243,21 @@
     y: (p.y - view.clientHeight / 2 - state.pan.y) / state.zoom + img.height / 2
   });
 
-  // ------------------------------------------------------- edit-mode pieces
+  // ------------------------------------------------------- edit-mode piece
 
-  // Every editable piece exposes the same three operations, so one gizmo drives
-  // all of them: where it sits, how big it is, and how it is turned.
-  function pieces() {
-    const rec = record(state.id);
-    if (!rec) return [];
-    const list = [
-      { key: "body", label: "Body" },
-      { key: "weapon", label: "Weapon" }
-    ];
-    rec.rig.arms.forEach((_, i) => list.push({ key: `hand:${i}`, label: `Hand ${i + 1}` }));
-    return list;
-  }
-
-  // The selected piece's gizmo frame, in mirrored rig space.
-  function pieceFrame(f, key) {
-    const rec = record(state.id);
-    if (!rec) return null;
-    if (key === "body") {
-      return { origin: { x: 0, y: 0 }, angle: rad(rec.rig.bodyRotation), size: state.r, scale: rec.rig.bodyScale };
-    }
-    if (key === "weapon") {
-      const len = Math.hypot(rec.weapon.muzzle.x - rec.weapon.grip.x, rec.weapon.muzzle.y - rec.weapon.grip.y);
-      return { origin: f.T.mount, angle: f.T.angle, size: Math.max(24, len * f.T.kw), scale: rec.rig.weapon.scale };
-    }
-    const i = Number(key.slice(5));
-    const arm = rec.rig.arms[i];
-    if (!arm) return null;
-    const anchor = rec.arm.anchors[arm.sprite];
-    const radius = (anchor ? anchor.radius : 20) * f.T.k * arm.scale;
-    return {
-      origin: weaponToRig(f, arm.hold.x, arm.hold.y),
-      angle: f.T.angle + rad(arm.rotation || 0),
-      size: Math.max(16, radius),
-      scale: arm.scale
-    };
-  }
-
-  // Handles are placed in screen space around the piece frame.
-  function gizmo(f) {
+  // Edit mode has one thing to set: how far out the grip sits. The muzzle is
+  // pinned at a fixed radius, so that one number places the weapon *and* sizes
+  // it — pull the grip in and the weapon grows to reach, push it out and it
+  // shrinks. Everything else about the weapon comes from its anchors.
+  function gripHandle(f) {
     if (state.mode !== "edit") return null;
-    const pf = pieceFrame(f, state.sel);
-    if (!pf) return null;
-    const o = toScreen(f, pf.origin);
-    const a = pf.angle * f.T.facing;   // screen-space angle
-    const d = Math.max(46, pf.size * f.z + 26);
-    return {
-      pf,
-      origin: o,
-      move: o,
-      scale: { x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d },
-      rotate: { x: o.x + Math.cos(a + Math.PI / 2) * d * 0.78, y: o.y + Math.sin(a + Math.PI / 2) * d * 0.78 },
-      angle: a, dist: d
-    };
+    return { at: toScreen(f, f.T.mount) };
   }
 
-  function applyPiece(key, op, drag, pos, f) {
+  function setDistance(v) {
     const rec = record(state.id);
     if (!rec) return;
-    const g = drag.gizmo;
-    if (op === "move") {
-      const from = toRigSpace(f, { x: drag.start.x, y: drag.start.y });
-      const to = toRigSpace(f, pos);
-      const dx = to.x - from.x, dy = to.y - from.y;
-      if (key === "body") {
-        // Moving the body art moves it under the physics center, which is the
-        // pivot inside the body image.
-        rec.body.pivot = { x: drag.base.pivot.x - dx / f.T.k, y: drag.base.pivot.y - dy / f.T.k };
-      } else if (key === "weapon") {
-        // Offsets are stored relative to the aim while the grip orbits, so a
-        // placement made at one aim angle holds at all of them.
-        const aimAngle = Math.atan2(f.A.y, f.A.x * f.T.facing);
-        const c = Math.cos(-aimAngle), s = Math.sin(-aimAngle);
-        const lx = rec.rig.weapon.orbit ? dx * c - dy * s : dx;
-        const ly = rec.rig.weapon.orbit ? dx * s + dy * c : dy;
-        rec.rig.weapon.offset = {
-          x: drag.base.offset.x + lx / state.r,
-          y: drag.base.offset.y + ly / state.r
-        };
-      } else {
-        const i = Number(key.slice(5));
-        rec.rig.arms[i].hold = rigToWeapon(f, toRigSpace(f, pos));
-      }
-    } else if (op === "scale") {
-      const d0 = Math.max(8, Math.hypot(drag.start.x - g.origin.x, drag.start.y - g.origin.y));
-      const d1 = Math.hypot(pos.x - g.origin.x, pos.y - g.origin.y);
-      const factor = clamp(d1 / d0, 0.1, 8);
-      if (key === "body") rec.rig.bodyScale = clamp(drag.base.scale * factor, 0.2, 4);
-      else if (key === "weapon") rec.rig.weapon.scale = clamp(drag.base.scale * factor, 0.05, 6);
-      else rec.rig.arms[Number(key.slice(5))].scale = clamp(drag.base.scale * factor, 0.02, 4);
-    } else if (op === "rotate") {
-      const a0 = Math.atan2(drag.start.y - g.origin.y, drag.start.x - g.origin.x);
-      const a1 = Math.atan2(pos.y - g.origin.y, pos.x - g.origin.x);
-      const d = deg(a1 - a0) * f.T.facing;
-      const wrap = (v) => ((v + 540) % 360) - 180;
-      if (key === "body") rec.rig.bodyRotation = wrap(drag.base.rotation + d);
-      else if (key === "weapon") rec.rig.weapon.rotation = wrap(drag.base.rotation + d);
-      else rec.rig.arms[Number(key.slice(5))].rotation = wrap(drag.base.rotation + d);
-    }
-    touch(state.id);
-  }
-
-  function pieceBase(key) {
-    const rec = record(state.id);
-    if (key === "body") return { pivot: clone(rec.body.pivot), scale: rec.rig.bodyScale, rotation: rec.rig.bodyRotation };
-    if (key === "weapon") return { offset: clone(rec.rig.weapon.offset), scale: rec.rig.weapon.scale, rotation: rec.rig.weapon.rotation };
-    const arm = rec.rig.arms[Number(key.slice(5))];
-    return { hold: clone(arm.hold), scale: arm.scale, rotation: arm.rotation || 0 };
+    rec.rig.weapon.distance = clamp(v, 0.05, 1.9);
   }
 
   // --------------------------------------------------------- anchor handles
@@ -360,16 +269,10 @@
     const out = [];
     if (state.part === "body") {
       out.push({ key: "body.pivot", label: "pivot", at: imgToScreen(img, rec.body.pivot), color: "#ff4d8f" });
-      out.push({ key: "body.mount", label: "mount", at: imgToScreen(img, rec.body.mount), color: "#ffd24d" });
       out.push({ key: "body.radius", label: "radius", at: imgToScreen(img, { x: rec.body.pivot.x + rec.body.radius, y: rec.body.pivot.y }), color: "#6ee787" });
     } else if (state.part === "weapon") {
       out.push({ key: "weapon.grip", label: "grip", at: imgToScreen(img, rec.weapon.grip), color: "#ff4d8f" });
       out.push({ key: "weapon.muzzle", label: "muzzle", at: imgToScreen(img, rec.weapon.muzzle), color: "#29d7ff" });
-    } else {
-      rec.arm.anchors.forEach((a, i) => {
-        out.push({ key: `armS.${i}`, label: `arm ${i + 1} shoulder`, at: imgToScreen(img, a.shoulder), color: "#b98cff" });
-        out.push({ key: `armH.${i}`, label: `arm ${i + 1} hand`, at: imgToScreen(img, a.hand), color: "#29d7ff" });
-      });
     }
     return out;
   }
@@ -384,8 +287,6 @@
     else if (key === "body.radius") rec.body.radius = Math.max(4, Math.hypot(p.x - rec.body.pivot.x, p.y - rec.body.pivot.y));
     else if (key === "weapon.grip") rec.weapon.grip = { x: p.x, y: p.y };
     else if (key === "weapon.muzzle") rec.weapon.muzzle = { x: p.x, y: p.y };
-    else if (key.startsWith("armS.")) rec.arm.anchors[Number(key.slice(5))].shoulder = { x: p.x, y: p.y };
-    else if (key.startsWith("armH.")) rec.arm.anchors[Number(key.slice(5))].hand = { x: p.x, y: p.y };
     touch(state.id);
   }
 
@@ -415,11 +316,12 @@
     record(state.id);
     if (state.mode === "anchor") {
       renderAnchor();
-      renderHandles(anchorHandles());
+      if (state.part === "arm") renderArmGizmo();
+      else renderHandles(anchorHandles());
       return;
     }
     renderCharacter(ch);
-    if (state.mode === "edit") renderGizmo();
+    if (state.mode === "edit") renderGrip();
   }
 
   function renderCharacter(ch) {
@@ -496,6 +398,29 @@
       ctx.globalAlpha = 1;
     }
     ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+    // Arm tab: the arms ride on the weapon, drawn exactly as the rig draws them.
+    if (state.part === "arm") {
+      const rec0 = record(state.id);
+      const R0 = rig.resolved(state.id);
+      if (rec0 && R0) {
+        const kArm = rec0.body.radius / Math.max(1, R0.body.radius);
+        rec0.rig.arms.forEach((arm, i) => {
+          const sprite = R0.arm.sprites[arm.sprite];
+          if (!sprite) return;
+          const anchor = rec0.arm.anchors[arm.sprite] || { x: sprite.cx, y: sprite.cy };
+          const sc = arm.scale * kArm;
+          ctx.save();
+          ctx.globalAlpha = i === state.arm ? 1 : 0.55;
+          ctx.translate(-img.width / 2 + arm.hold.x, -img.height / 2 + arm.hold.y);
+          ctx.rotate(((arm.rotation || 0) * Math.PI) / 180);
+          ctx.translate(-anchor.hand.x * sc, -anchor.hand.y * sc);
+          ctx.drawImage(sprite.canvas, sprite.frame.x * sc, sprite.frame.y * sc, sprite.frame.w * sc, sprite.frame.h * sc);
+          ctx.restore();
+        });
+      }
+    }
+
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 1 / state.zoom;
     ctx.strokeRect(-img.width / 2, -img.height / 2, img.width, img.height);
@@ -517,55 +442,92 @@
         ctx.lineTo(off.x + rec.weapon.muzzle.x, off.y + rec.weapon.muzzle.y);
         ctx.stroke();
         ctx.setLineDash([]);
-      } else {
-        ctx.strokeStyle = "rgba(185,140,255,0.8)";
-        for (const an of rec.arm.anchors) {
-          ctx.beginPath();
-          ctx.moveTo(off.x + an.shoulder.x, off.y + an.shoulder.y);
-          ctx.lineTo(off.x + an.hand.x, off.y + an.hand.y);
-          ctx.stroke();
-        }
       }
     }
     ctx.restore();
   }
 
-  function renderGizmo() {
+  // Edit mode's only handle: the grip, draggable along the aim axis.
+  function renderGrip() {
     const f = frame();
     if (!f) return;
-    const g = gizmo(f);
+    const g = gripHandle(f);
     if (!g) return;
+    const rec = record(state.id);
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,77,143,0.5)";
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(f.cx, f.cy);
+    ctx.lineTo(g.at.x, g.at.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(g.at.x, g.at.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = "#ff4d8f";
+    ctx.fill();
+    ctx.strokeStyle = "#14121c";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = "#efe9ff";
+    ctx.font = "11px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(`grip ${round(rec.rig.weapon.distance, 2)} r`, g.at.x, g.at.y - 14);
+    ctx.restore();
+  }
 
+  // Anchor/arm mode: the arm sprites sit on the weapon, so each gets a
+  // move / size / turn gizmo in weapon-image space.
+  function armGizmo() {
+    const rec = record(state.id);
+    const img = anchorImage();
+    const R = rig.resolved(state.id);
+    if (!rec || !img || !R) return null;
+    const arm = rec.rig.arms[state.arm];
+    if (!arm) return null;
+    const sprite = R.arm.sprites[arm.sprite];
+    const anchor = rec.arm.anchors[arm.sprite];
+    const o = imgToScreen(img, arm.hold);
+    // The arm's on-screen size follows the same ratio the game draws it at:
+    // hand radius in body radii, mapped through the weapon's own scale.
+    const radiusPx = (anchor ? anchor.radius : 20) * arm.scale * (rec.body.radius / Math.max(1, R.body.radius));
+    const d = Math.max(44, radiusPx * state.zoom + 26);
+    const a = rad(arm.rotation || 0);
+    return {
+      sprite, anchor, arm,
+      origin: o,
+      radiusPx,
+      move: o,
+      scale: { x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d },
+      rotate: { x: o.x + Math.cos(a + Math.PI / 2) * d * 0.78, y: o.y + Math.sin(a + Math.PI / 2) * d * 0.78 }
+    };
+  }
+
+  function renderArmGizmo() {
+    const g = armGizmo();
+    if (!g) return;
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.35)";
-    ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(g.origin.x, g.origin.y); ctx.lineTo(g.scale.x, g.scale.y);
     ctx.moveTo(g.origin.x, g.origin.y); ctx.lineTo(g.rotate.x, g.rotate.y);
     ctx.stroke();
     ctx.setLineDash([]);
-
-    // outline of the piece's extent
-    ctx.strokeStyle = "rgba(41,215,255,0.55)";
-    ctx.beginPath();
-    ctx.arc(g.origin.x, g.origin.y, g.pf.size * f.z, 0, Math.PI * 2);
-    ctx.stroke();
-
-    const dot = (p, color, shape) => {
+    const dot = (p, color, square) => {
       ctx.fillStyle = color;
       ctx.strokeStyle = "#14121c";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      if (shape === "square") ctx.rect(p.x - 6, p.y - 6, 12, 12);
-      else ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+      if (square) ctx.rect(p.x - 6, p.y - 6, 12, 12); else ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     };
     dot(g.move, "#ff4d8f");
-    dot(g.scale, "#6ee787", "square");
+    dot(g.scale, "#6ee787", true);
     dot(g.rotate, "#ffd24d");
-
     ctx.fillStyle = "#efe9ff";
     ctx.font = "11px system-ui";
     ctx.textAlign = "center";
@@ -653,8 +615,7 @@
     state.id = id;
     state.pan = { x: 0, y: 0 };
     record(id);
-    if (!pieces().some((p) => p.key === state.sel)) state.sel = "weapon";
-    buildParts();
+    state.arm = 0;
     buildSelPanel();
     refreshTiles();
     syncHead();
@@ -676,86 +637,114 @@
     $("charInfo").textContent = bits.join(" · ");
 
     $("hint").textContent = state.mode === "edit"
-      ? "Pick a piece above the viewer, then drag the pink dot to move it, the green square to resize, the yellow dot to turn it. Arrow keys change character; on a gamepad the d-pad nudges the piece and the triggers resize it."
+      ? "Drag the pink grip along the aim to set how far the weapon is held from the body. The muzzle stays put at 2.05 r, so pulling the grip in lengthens the weapon and pushing it out shortens it."
       : state.mode === "anchor"
-        ? "Drag the anchors on the source image: body pivot (pink) is the physics center, mount (yellow) is the grip's reach, green sets the ball radius. Weapon: grip → muzzle. Arm: shoulder → hand."
-        : "Preview. Aim with a gamepad stick (or the aim slider), and press Edit mode to place the pieces.";
+        ? (state.part === "arm"
+          ? "The arms sit on the weapon: drag the pink dot to place this arm, the green square to size it, the yellow dot to turn it. Pick which arm above the viewer."
+          : state.part === "weapon"
+            ? "Grip → muzzle is the weapon's aim line: whatever angle you set here is the direction the weapon points when the player aims, and the muzzle is where shots come from."
+            : "Body: pink is the physics center the character is positioned by, green sets the ball radius that matches the collision circle.")
+        : "Preview. Aim with a gamepad stick (or the aim slider), and press Edit mode to set the weapon distance.";
   }
 
   // ---------------------------------------------- edit-mode part selector
 
+  // Onscreen chips: in the arm anchor tab they pick which arm you are placing.
   function buildParts() {
     const box = $("parts");
     box.textContent = "";
-    for (const p of pieces()) {
+    const armMode = state.mode === "anchor" && state.part === "arm";
+    box.hidden = !armMode;
+    if (!armMode) return;
+    const rec = record(state.id);
+    if (!rec) return;
+    rec.rig.arms.forEach((_, i) => {
       const b = document.createElement("button");
-      b.textContent = p.label;
-      b.classList.toggle("on", p.key === state.sel);
+      b.textContent = `Arm ${i + 1}`;
+      b.classList.toggle("on", i === state.arm);
       b.addEventListener("click", () => {
-        state.sel = p.key;
+        state.arm = i;
         buildParts();
         buildSelPanel();
         writeUrl();
       });
       box.appendChild(b);
-    }
+    });
   }
 
   function buildSelPanel() {
     const box = $("selPanel");
-    box.hidden = state.mode !== "edit";
+    box.hidden = state.mode === "view";
     if (box.hidden) return;
     const rec = record(state.id);
     if (!rec) return;
     box.textContent = "";
     const h = document.createElement("h2");
-    h.textContent = pieces().find((p) => p.key === state.sel)?.label || "Selection";
+    h.textContent = state.mode === "edit" ? "Weapon" : `Anchors — ${state.part}`;
     box.appendChild(h);
 
-    // The same three operations the handles do, as numbers — handy for typing
-    // in an exact value or reading one back off a piece.
-    const fields = [];
-    if (state.sel === "body") {
-      fields.push(
-        num("Position X (px)", () => rec.body.pivot.x, (v) => { rec.body.pivot.x = v; }, { step: 1, invert: true }),
-        num("Position Y (px)", () => rec.body.pivot.y, (v) => { rec.body.pivot.y = v; }, { step: 1, invert: true }),
-        slider("Scale", () => rec.rig.bodyScale, (v) => { rec.rig.bodyScale = v; }, 0.2, 3, 0.005),
-        slider("Rotation°", () => rec.rig.bodyRotation, (v) => { rec.rig.bodyRotation = v; }, -180, 180, 0.5),
-        num("Ball radius (px)", () => rec.body.radius, (v) => { rec.body.radius = Math.max(4, v); }, { step: 1 })
+    if (state.mode === "edit") {
+      box.append(
+        slider("Distance (r)", () => rec.rig.weapon.distance, (v) => setDistance(v), 0.05, 1.6, 0.005),
+        slider("Extra rotation°", () => rec.rig.weapon.rotation, (v) => { rec.rig.weapon.rotation = v; }, -180, 180, 0.5),
+        toggleRow("Draw behind body", () => rec.rig.weapon.behind, (v) => { rec.rig.weapon.behind = v; })
       );
-    } else if (state.sel === "weapon") {
-      fields.push(
-        num("Offset X (r)", () => rec.rig.weapon.offset.x, (v) => { rec.rig.weapon.offset.x = v; }, { step: 0.01 }),
-        num("Offset Y (r)", () => rec.rig.weapon.offset.y, (v) => { rec.rig.weapon.offset.y = v; }, { step: 0.01 }),
-        slider("Scale", () => rec.rig.weapon.scale, (v) => { rec.rig.weapon.scale = v; }, 0.05, 3, 0.005),
-        slider("Rotation°", () => rec.rig.weapon.rotation, (v) => { rec.rig.weapon.rotation = v; }, -180, 180, 0.5)
-      );
-    } else {
-      const arm = rec.rig.arms[Number(state.sel.slice(5))];
+    } else if (state.part === "arm") {
+      const list = document.createElement("div");
+      rec.rig.arms.forEach((arm, i) => {
+        const b = document.createElement("button");
+        b.className = "ghost";
+        b.style.marginRight = "6px";
+        b.textContent = `Arm ${i + 1}`;
+        b.classList.toggle("primary", i === state.arm);
+        b.addEventListener("click", () => { state.arm = i; buildSelPanel(); });
+        list.appendChild(b);
+      });
+      box.appendChild(list);
+      const arm = rec.rig.arms[state.arm];
       if (arm) {
-        fields.push(
+        box.append(
           num("Hold X (weapon px)", () => arm.hold.x, (v) => { arm.hold.x = v; }, { step: 1 }),
           num("Hold Y (weapon px)", () => arm.hold.y, (v) => { arm.hold.y = v; }, { step: 1 }),
           slider("Scale", () => arm.scale, (v) => { arm.scale = v; }, 0.02, 2, 0.005),
-          slider("Rotation°", () => arm.rotation || 0, (v) => { arm.rotation = v; }, -180, 180, 0.5)
-        );
-      }
-    }
-    for (const f of fields) box.appendChild(f);
-
-    if (state.sel === "weapon") {
-      box.append(
-        toggleRow("Grip rides the aim", () => rec.rig.weapon.orbit, (v) => { rec.rig.weapon.orbit = v; }),
-        toggleRow("Draw behind body", () => rec.rig.weapon.behind, (v) => { rec.rig.weapon.behind = v; })
-      );
-    } else if (state.sel.startsWith("hand:")) {
-      const arm = rec.rig.arms[Number(state.sel.slice(5))];
-      if (arm) {
-        box.append(
-          toggleRow("Reach for the weapon (stretch)", () => arm.stretch, (v) => { arm.stretch = v; }),
+          slider("Rotation°", () => arm.rotation || 0, (v) => { arm.rotation = v; }, -180, 180, 0.5),
           layerRow(arm)
         );
+        const add = document.createElement("button");
+        add.className = "ghost wide";
+        add.textContent = "Add arm";
+        add.addEventListener("click", () => edit(state.id, () => {
+          rec.rig.arms.push({ ...clone(arm), z: "front" });
+          state.arm = rec.rig.arms.length - 1;
+          buildSelPanel();
+        }));
+        box.appendChild(add);
+        if (rec.rig.arms.length > 1) {
+          const rm = document.createElement("button");
+          rm.className = "ghost wide";
+          rm.textContent = "Remove this arm";
+          rm.addEventListener("click", () => edit(state.id, () => {
+            rec.rig.arms.splice(state.arm, 1);
+            state.arm = Math.max(0, state.arm - 1);
+            buildSelPanel();
+          }));
+          box.appendChild(rm);
+        }
       }
+    } else if (state.part === "weapon") {
+      box.append(
+        num("Grip X", () => rec.weapon.grip.x, (v) => { rec.weapon.grip.x = v; }, { step: 1 }),
+        num("Grip Y", () => rec.weapon.grip.y, (v) => { rec.weapon.grip.y = v; }, { step: 1 }),
+        num("Muzzle X", () => rec.weapon.muzzle.x, (v) => { rec.weapon.muzzle.x = v; }, { step: 1 }),
+        num("Muzzle Y", () => rec.weapon.muzzle.y, (v) => { rec.weapon.muzzle.y = v; }, { step: 1 })
+      );
+    } else {
+      box.append(
+        num("Pivot X", () => rec.body.pivot.x, (v) => { rec.body.pivot.x = v; }, { step: 1 }),
+        num("Pivot Y", () => rec.body.pivot.y, (v) => { rec.body.pivot.y = v; }, { step: 1 }),
+        num("Ball radius", () => rec.body.radius, (v) => { rec.body.radius = Math.max(4, v); }, { step: 1 }),
+        slider("Body scale", () => rec.rig.bodyScale, (v) => { rec.rig.bodyScale = v; }, 0.2, 3, 0.005)
+      );
     }
 
     const readout = document.createElement("div");
@@ -764,8 +753,15 @@
 
     const reset = document.createElement("button");
     reset.className = "ghost wide";
-    reset.textContent = "Reset this piece";
-    reset.addEventListener("click", () => resetPiece());
+    reset.textContent = "Reset to auto";
+    reset.addEventListener("click", () => {
+      const before = clone(record(state.id));
+      work.delete(state.id);
+      rig.setCharacterRig(state.id, null);
+      record(state.id);
+      commit(state.id, before);
+      buildSelPanel();
+    });
     box.appendChild(reset);
   }
 
@@ -850,10 +846,10 @@
     return row;
   }
 
-  // Keeps the panel in step with the handles: inputs follow a drag, and the
-  // read-only rows underneath show what the numbers mean in body radii.
+  // Keeps the panel in step with the handles, and shows what the numbers come
+  // out as in body radii — the units the geometry is actually specified in.
   function syncSelPanel() {
-    if (state.mode !== "edit") return;
+    if (state.mode === "view") return;
     const rec = record(state.id);
     if (!rec) return;
     for (const input of $("selPanel").querySelectorAll("input[data-bound]")) {
@@ -867,22 +863,22 @@
     }
     const box = $("selRows");
     if (!box) return;
-    let rows;
-    if (state.sel === "body") {
-      rows = [["ball vs collision", `${round((rec.body.radius * rec.rig.bodyScale) / rec.body.radius, 3)}×`]];
-    } else if (state.sel === "weapon") {
-      const len = Math.hypot(rec.weapon.muzzle.x - rec.weapon.grip.x, rec.weapon.muzzle.y - rec.weapon.grip.y);
-      const reach = Math.hypot(rec.body.mount.x - rec.body.pivot.x, rec.body.mount.y - rec.body.pivot.y) / rec.body.radius;
+    let rows = [];
+    if (state.mode === "edit") {
+      const d = rec.rig.weapon.distance;
       rows = [
-        ["reach", `${round(reach + rec.rig.weapon.offset.x, 2)} r`],
-        ["barrel", `${round((len * rec.rig.weapon.scale) / rec.body.radius, 2)} r`],
-        ["muzzle", `${round(reach + rec.rig.weapon.offset.x + (len * rec.rig.weapon.scale) / rec.body.radius, 2)} r`]
+        ["grip at", `${round(d, 2)} r`],
+        ["barrel", `${round(2.05 - d, 2)} r`],
+        ["muzzle at", "2.05 r"]
       ];
-    } else {
-      const arm = rec.rig.arms[Number(state.sel.slice(5))];
-      if (!arm) return;
-      const anchor = rec.arm.anchors[arm.sprite];
-      rows = [["hand size", `${round(((anchor ? anchor.radius : 0) * arm.scale) / rec.body.radius, 3)} r`]];
+    } else if (state.part === "arm") {
+      const arm = rec.rig.arms[state.arm];
+      const anchor = arm && rec.arm.anchors[arm.sprite];
+      if (arm) rows = [["hand size", `${round(((anchor ? anchor.radius : 0) * arm.scale) / rec.body.radius, 3)} r`]];
+    } else if (state.part === "weapon") {
+      const dx = rec.weapon.muzzle.x - rec.weapon.grip.x;
+      const dy = rec.weapon.muzzle.y - rec.weapon.grip.y;
+      rows = [["aim line", `${round((Math.atan2(dy, dx) * 180) / Math.PI, 1)}° in the art`]];
     }
     box.textContent = "";
     for (const [k, v] of rows) {
@@ -897,35 +893,6 @@
     }
   }
 
-  function resetPiece() {
-    const rec = record(state.id);
-    // Re-derive this character from auto, then keep the other pieces as edited.
-    const before = clone(rec);
-    work.delete(state.id);
-    rig.setCharacterRig(state.id, null);
-    const fresh = record(state.id);
-    if (state.sel === "body") {
-      fresh.weapon = before.weapon;
-      fresh.rig.weapon = before.rig.weapon;
-      fresh.rig.arms = before.rig.arms;
-    } else if (state.sel === "weapon") {
-      fresh.body = before.body;
-      fresh.rig.bodyScale = before.rig.bodyScale;
-      fresh.rig.bodyRotation = before.rig.bodyRotation;
-      fresh.rig.arms = before.rig.arms;
-    } else {
-      const i = Number(state.sel.slice(5));
-      const keep = clone(fresh.rig.arms[i]);
-      Object.assign(fresh, { body: before.body, weapon: before.weapon });
-      fresh.rig.bodyScale = before.rig.bodyScale;
-      fresh.rig.bodyRotation = before.rig.bodyRotation;
-      fresh.rig.weapon = before.rig.weapon;
-      fresh.rig.arms = before.rig.arms.map((a, j) => (j === i ? keep : a));
-    }
-    commit(state.id, before);
-    buildSelPanel();
-  }
-
   function syncJson() {
     const rec = work.get(state.id);
     $("jsonOut").value = rec ? JSON.stringify({ [state.id]: tidy(rec) }, null, 2) : "";
@@ -933,40 +900,71 @@
 
   // --------------------------------------------------------------- events
 
-  function hitGizmo(pos, f) {
-    const g = gizmo(f);
-    if (!g) return null;
-    const near = (p) => (p.x - pos.x) ** 2 + (p.y - pos.y) ** 2 < 14 * 14;
-    if (near(g.scale)) return { op: "scale", gizmo: g };
-    if (near(g.rotate)) return { op: "rotate", gizmo: g };
-    if (near(g.move)) return { op: "move", gizmo: g };
-    return null;
-  }
+  function nearBy(p, q, r = 14) { return (p.x - q.x) ** 2 + (p.y - q.y) ** 2 < r * r; }
 
   view.addEventListener("pointerdown", (e) => {
     view.setPointerCapture(e.pointerId);
     const pos = { x: e.offsetX, y: e.offsetY };
-    if (state.mode === "anchor") {
+    const before = () => clone(record(state.id));
+
+    if (state.mode === "edit") {
+      const f = frame();
+      const g = f && gripHandle(f);
+      if (g && nearBy(pos, g.at)) {
+        state.drag = { grip: true, before: before() };
+        return;
+      }
+    } else if (state.mode === "anchor" && state.part === "arm") {
+      const g = armGizmo();
+      if (g) {
+        for (const op of ["scale", "rotate", "move"]) {
+          if (nearBy(pos, g[op])) {
+            state.drag = { arm: op, start: pos, base: { hold: clone(g.arm.hold), scale: g.arm.scale, rotation: g.arm.rotation || 0 }, origin: g.origin, before: before() };
+            return;
+          }
+        }
+      }
+    } else if (state.mode === "anchor") {
       let best = null, bestD = 12 * 12;
       for (const h of anchorHandles()) {
         const d = (h.at.x - pos.x) ** 2 + (h.at.y - pos.y) ** 2;
         if (d < bestD) { bestD = d; best = h; }
       }
-      state.drag = best
-        ? { anchor: best.key, before: clone(record(state.id)) }
-        : { pan: { x: e.offsetX - state.pan.x, y: e.offsetY - state.pan.y } };
-      return;
-    }
-    if (state.mode === "edit") {
-      const f = frame();
-      const hit = f && hitGizmo(pos, f);
-      if (hit) {
-        state.drag = { ...hit, start: pos, base: pieceBase(state.sel), key: state.sel, before: clone(record(state.id)) };
+      if (best) {
+        state.drag = { anchor: best.key, before: before() };
         return;
       }
     }
     state.drag = { pan: { x: e.offsetX - state.pan.x, y: e.offsetY - state.pan.y } };
   });
+
+  // Dragging the grip slides it along the aim: the distance from the body
+  // centre is the whole parameter.
+  function dragGrip(pos, f) {
+    const p = toRigSpace(f, pos);
+    setDistance(Math.hypot(p.x, p.y) / state.r);
+    touch(state.id);
+  }
+
+  function dragArm(pos) {
+    const rec = record(state.id);
+    const img = anchorImage();
+    const arm = rec && rec.rig.arms[state.arm];
+    if (!arm || !img) return;
+    const d = state.drag;
+    if (d.arm === "move") {
+      arm.hold = screenToImg(img, pos);
+    } else if (d.arm === "scale") {
+      const d0 = Math.max(8, Math.hypot(d.start.x - d.origin.x, d.start.y - d.origin.y));
+      const d1 = Math.hypot(pos.x - d.origin.x, pos.y - d.origin.y);
+      arm.scale = clamp(d.base.scale * (d1 / d0), 0.02, 3);
+    } else {
+      const a0 = Math.atan2(d.start.y - d.origin.y, d.start.x - d.origin.x);
+      const a1 = Math.atan2(pos.y - d.origin.y, pos.x - d.origin.x);
+      arm.rotation = ((d.base.rotation + deg(a1 - a0) + 540) % 360) - 180;
+    }
+    touch(state.id);
+  }
 
   view.addEventListener("pointermove", (e) => {
     if (!state.drag) return;
@@ -975,9 +973,11 @@
       state.pan = { x: pos.x - state.drag.pan.x, y: pos.y - state.drag.pan.y };
     } else if (state.drag.anchor) {
       applyAnchorDrag(state.drag.anchor, pos);
-    } else if (state.drag.op) {
+    } else if (state.drag.arm) {
+      dragArm(pos);
+    } else if (state.drag.grip) {
       const f = frame();
-      if (f) applyPiece(state.drag.key, state.drag.op, state.drag, pos, f);
+      if (f) dragGrip(pos, f);
     }
   });
 
@@ -1026,23 +1026,33 @@
     cycleCharacter(move);
   });
 
-  // Move the selected piece by a screen-space delta (arrow keys, d-pad).
+  // Gamepad d-pad and triggers, acting on whatever the mode is editing.
   function nudge(dx, dy) {
-    const f = frame();
-    if (!f) return;
-    const g = gizmo(f);
-    if (!g) return;
-    const drag = { op: "move", gizmo: g, start: g.origin, base: pieceBase(state.sel), key: state.sel };
-    applyPiece(state.sel, "move", drag, { x: g.origin.x + dx, y: g.origin.y + dy }, f);
+    const rec = record(state.id);
+    if (!rec) return;
+    if (state.mode === "edit") {
+      setDistance(rec.rig.weapon.distance + dx * 0.01);
+    } else if (state.mode === "anchor" && state.part === "arm") {
+      const arm = rec.rig.arms[state.arm];
+      if (arm) arm.hold = { x: arm.hold.x + dx / state.zoom, y: arm.hold.y + dy / state.zoom };
+    }
+    touch(state.id);
   }
 
   function scaleBy(factor) {
-    const f = frame();
-    if (!f) return;
-    const g = gizmo(f);
-    if (!g) return;
-    const drag = { op: "scale", gizmo: g, start: { x: g.origin.x + 100, y: g.origin.y }, base: pieceBase(state.sel), key: state.sel };
-    applyPiece(state.sel, "scale", drag, { x: g.origin.x + 100 * factor, y: g.origin.y }, f);
+    const rec = record(state.id);
+    if (!rec) return;
+    if (state.mode === "anchor" && state.part === "arm") {
+      const arm = rec.rig.arms[state.arm];
+      if (arm) arm.scale = clamp(arm.scale * factor, 0.02, 3);
+      touch(state.id);
+    }
+  }
+
+  function setGizmoHint() {
+    $("gizmoHint").textContent = state.mode === "edit"
+      ? "drag the grip along the aim — arrow keys change character"
+      : "drag: pink = move · green = size · yellow = turn — arrow keys change character";
   }
 
   // ---------------------------------------------------------------- modes
@@ -1053,15 +1063,15 @@
     $("editBtn").classList.toggle("on", mode === "edit");
     $("anchorBtn").classList.toggle("on", mode === "anchor");
     $("partTabs").hidden = mode !== "anchor";
-    $("parts").hidden = mode !== "edit";
-    $("gizmoHint").hidden = mode !== "edit";
+    $("gizmoHint").hidden = mode === "view";
     $("refWrap").hidden = mode !== "edit";
-    $("selPanel").hidden = mode !== "edit";
+    $("selPanel").hidden = mode === "view";
     state.pan = { x: 0, y: 0 };
     if (mode === "anchor") fitAnchorZoom(); else setZoom(2);
     buildParts();
     buildSelPanel();
     syncHead();
+    setGizmoHint();
     writeUrl();
   }
 
@@ -1213,10 +1223,11 @@
     select(next.id);
     document.querySelector(`.tile[data-id="${next.id}"]`)?.scrollIntoView({ block: "nearest" });
   }
+  // In the arm tab, Y walks between the arms.
   function cyclePiece(dir) {
-    const list = pieces();
-    const i = Math.max(0, list.findIndex((p) => p.key === state.sel));
-    state.sel = list[(i + dir + list.length) % list.length].key;
+    const rec = record(state.id);
+    if (!rec || !rec.rig.arms.length) return;
+    state.arm = (state.arm + dir + rec.rig.arms.length) % rec.rig.arms.length;
     buildParts();
     buildSelPanel();
     writeUrl();
@@ -1228,7 +1239,7 @@
   buildRoster();
   select(state.id);
   setMode(state.mode);
-  $("gizmoHint").textContent = "drag: pink = move · green = size · yellow = turn — arrow keys change character";
+
 
   let last = performance.now();
   function loop(now) {
@@ -1251,8 +1262,8 @@
   const poll = setInterval(() => {
     refreshTiles();
     syncHead();
-    if (state.built !== `${state.id}|${state.mode}|${state.sel}` && record(state.id)) {
-      state.built = `${state.id}|${state.mode}|${state.sel}`;
+    if (state.built !== `${state.id}|${state.mode}|${state.part}|${state.arm}` && record(state.id)) {
+      state.built = `${state.id}|${state.mode}|${state.part}|${state.arm}`;
       buildParts();
       buildSelPanel();
       syncJson();

@@ -66,7 +66,17 @@ Pillars:
 - [x] Image prompts for each character in `image-requests.md`; game auto-loads
       `assets/images/characters/<id>.png` when present, falls back to procedural
 - [x] Character select in the lobby: each player joins, cycles characters, locks in
-- [x] File: `js/characters.js`
+- [x] **Composed sprites**: when `assets/images/characters/render/<id>_body.png` +
+      `_weapon.png` (+ optional `_arm.png`) exist, the character is drawn from parts —
+      body mirrors with facing, weapon rotates to the aim, hands ride the weapon,
+      bullets spawn at the real muzzle. Anchors (body pivot/radius/mount, weapon
+      grip/muzzle, hand pivots) are auto-detected from the alpha channel; parts
+      exported on the same canvas as the original render need no tuning at all
+- [x] `/workbench` UI for hand-tuning: character grid on the left, interactive viewer
+      on the right, **character** mode (place/orient/size weapon + hands) and
+      **anchor** mode (anchor points on body/weapon/arm), exports `rigs.json`
+      (or `rigs.js` for `file://`) which the game merges over the auto anchors
+- [x] Files: `js/characters.js`, `js/rig.js`, `workbench/`
 
 ### 5. Game flow redesign
 - [x] Random arena every round (no immediate repeats)

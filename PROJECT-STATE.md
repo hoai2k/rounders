@@ -107,8 +107,13 @@ Pillars:
 - [x] Files: `index.html`, `styles.css`
 
 ### 7. Audio & FX polish
-- [x] Kept: 2-track soundtrack, synth SFX, rumble
+- [x] Kept: synth SFX, rumble
 - [x] New: per-mechanic SFX hooks (burn, chain, teleport, bounce pad), weather particles
+- [x] Soundtrack: 16 tracks in `assets/music/` (manifest in `js/music.js`).
+      "Rounders Jazz 1" is the title/selection theme; every match rolls a random
+      non-title track. Streamed via byte-range requests (`server.mjs` serves 206),
+      with the next track warmed in the background so skips start instantly.
+- [x] Now-playing readout bottom-right with ◀ / ▶ skip buttons
 
 ### 8. Audit (agent pass)
 - [x] Card balance & variety audit

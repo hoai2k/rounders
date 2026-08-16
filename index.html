@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Rounders</title>
-    <link rel="stylesheet" href="styles.css?v=21">
+    <link rel="stylesheet" href="styles.css?v=22">
   </head>
   <body>
     <canvas id="game" aria-label="Rounders game canvas"></canvas>
@@ -274,11 +274,18 @@
     <section id="hud" class="hud"></section>
     <section id="toast" class="toast hidden"></section>
 
-    <script src="js/cards.js?v=21"></script>
-    <script src="js/chroma.js?v=21"></script>
-    <script src="js/rig.js?v=21"></script>
-    <script src="js/characters.js?v=21"></script>
-    <script src="js/levels.js?v=21"></script>
-    <script src="game.js?v=21"></script>
+    <section id="nowPlaying" class="now-playing" aria-label="Music">
+      <button id="musicPrev" type="button" class="np-btn" title="Previous track" aria-label="Previous track">◀</button>
+      <span id="nowPlayingName" class="np-name">—</span>
+      <button id="musicNext" type="button" class="np-btn" title="Next track" aria-label="Next track">▶</button>
+    </section>
+
+    <script src="js/cards.js?v=22"></script>
+    <script src="js/chroma.js?v=22"></script>
+    <script src="js/rig.js?v=22"></script>
+    <script src="js/characters.js?v=22"></script>
+    <script src="js/levels.js?v=22"></script>
+    <script src="js/music.js?v=22"></script>
+    <script src="game.js?v=22"></script>
   </body>
 </html>

@@ -474,8 +474,16 @@ for (const id of ids) {
     continue;
   }
   if (res.error) { report.push([id, "error", res.error]); continue; }
-  if (Object.keys(res.rig).length) out.characters[id] = res.rig;
-  else delete out.characters[id];
+  // Never clobber authored values: the aim line and any hand placement in the
+  // rig file were set by a person, and this only supplies a starting point.
+  const prev = out.characters[id] || {};
+  if (prev.rig && Array.isArray(prev.rig.arms) && prev.rig.arms.length) {
+    report.push([id, "kept", "arms already authored in rigs.json"]);
+    continue;
+  }
+  if (Object.keys(res.rig).length) {
+    out.characters[id] = { ...prev, rig: { ...(prev.rig || {}), ...res.rig.rig } };
+  }
   const ms = Number(process.hrtime.bigint() - started) / 1e6;
   const hands = res.rig.rig ? res.rig.rig.arms : [];
   report.push([

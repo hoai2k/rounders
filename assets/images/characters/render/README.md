@@ -34,8 +34,8 @@ art happened to do:
 | | |
 |---|---|
 | body | a circle is **fitted to the body's outline** (RANSAC, then least squares, then a hug-the-outline polish) and used as the collision circle. Every character is a ball with things stuck on it, so the horns, hat, flames and wings fall out as outliers while the round base decides the fit. Candidates must also be **solid body** — 90% of the disc inside the silhouette — which is what stops a mohawk or a hood from reading as a bigger, rounder ball than the head underneath it |
-| weapon | scaled so **grip → muzzle is 1.5 body radii**, with the grip riding **0.55 radii out along the aim** — the same numbers as the procedural weapon, so the muzzle sits 2.05 radii out and the whole barrel lies on the aim ray |
-| aim | the barrel's tilt in the source image is measured and cancelled, so the weapon points exactly where the stick does at every angle, not approximately |
+| weapon | the **grip → muzzle line is the weapon**: its angle in the art is cancelled so the barrel lands on the aim, and its length is scaled so the **muzzle always ends up 2.05 radii out** — the procedural weapon's reach. The grip is held `distance` radii from the body centre (0.55 by default), so that one number both places the weapon and sizes it: pull the grip in and the weapon lengthens to reach the muzzle radius, push it out and it shortens |
+| aim | grip → muzzle *is* the aim line, so the weapon points exactly where the stick does at every angle, and shots leave from the muzzle on that line |
 | hands | bare nub hands are sized to a fraction of the body radius and placed at the grip and fore-grip |
 
 That is all automatic and needs no rig file. The one thing the art can't tell
@@ -79,18 +79,18 @@ needs to contain what you want to override.
 |---|---|---|
 | body | `pivot` | the physics center — the point the game positions the character by |
 | body | `radius` | the body's visual radius in image px; maps to the player's collision radius |
-| body | `mount` | where the weapon's grip sits; only its distance from the pivot is used while `orbit` is on |
-| weapon | `grip` | the point that lands on the body's mount and the weapon rotates around |
-| weapon | `muzzle` | the barrel tip — bullets and the aim ray originate here |
-| arm | `anchors[i].shoulder` | the end of arm sprite *i* that meets the body |
-| arm | `anchors[i].hand` | the end of arm sprite *i* that grips the weapon |
+| weapon | `grip` | the end held; it sits `distance` radii out along the aim and the weapon turns about it |
+| weapon | `muzzle` | the business end; lands at 2.05 radii and is where shots come from. Together with `grip` it defines the weapon's direction and length |
+| arm | `anchors[i].hand` | the point on arm sprite *i* that lands on its hold |
+| arm | `anchors[i].shoulder` | only used by stretching arms — the end that meets the body |
 
 Placement then lives in `rig.arms[i]`:
 
 | Field | Space | Meaning |
 |---|---|---|
-| `socket` | body px | where this arm's shoulder is pinned on the body |
-| `hold` | weapon px | where this arm's hand grips the weapon; it rides along as the weapon aims |
+| `hold` | weapon px | where this arm sits **on the weapon**; it rides along as the weapon aims and mirrors with facing |
+| `rotation` | — | degrees the arm sprite is turned, relative to the weapon |
+| `socket` | body px | only used by stretching arms — where the shoulder is pinned on the body |
 | `stretch` | — | when true the arm swings from the socket and stretches along its own axis to reach the hold; when false it is rigidly parented to the weapon (the old hand behaviour) |
 | `minStretch` / `maxStretch` | — | how far the arm may squash or reach before it stops following, so it never turns into a noodle |
 | `z` | — | `back` (behind the body), `mid` (behind the weapon) or `front` |
@@ -99,8 +99,8 @@ And in `rig.weapon`:
 
 | Field | Meaning |
 |---|---|
-| `scale` | multiplies the body's px→world scale; the default makes the barrel 1.5 radii |
-| `rotation` | degrees added to the aim angle; the default cancels the barrel's tilt in the art |
+| `distance` | how far the grip is held from the body centre, in body radii (0.55 default). The muzzle is pinned at 2.05, so this sets the weapon's size too |
+| `rotation` | extra degrees on top of the aim, normally 0 — the art's own tilt is already cancelled by the grip → muzzle line |
 | `orbit` | when true the grip swings around the body with the aim, so the barrel stays on the aim ray (how the procedural weapon behaves). Turn it off to pin the grip where the art holds it and let the weapon rotate about that point |
 
 Rig files written before arms existed still load: a `rig.hands` entry becomes a

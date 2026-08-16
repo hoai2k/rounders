@@ -7,6 +7,7 @@
     "start": "node server.mjs",
     "intake": "node tools/intake.mjs",
     "mock-parts": "node tools/mock-parts.mjs",
+    "audit-keys": "node tools/audit-keys.mjs",
     "fitrig": "node tools/fitrig.mjs"
   }
 }

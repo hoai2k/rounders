@@ -86,9 +86,17 @@ Pillars:
       turn handles mirrored as numbers in the panel, reference overlay, undo and
       redo) and **anchor** (anchor points on the source images). Preview fires
       test shots from the rig's own muzzle on the gamepad triggers (or space),
-      an **Arms** panel picks None / One / Two — arms exist only once they are
-      asked for — and the mode, part tab and handles survive a character change.
-      Exports `rigs.json`, which the game merges over the auto anchors
+      Anchors → Arm picks None / One / Two — arms exist only once they are asked
+      for — and the mode, part tab and handles survive a character change.
+      Exports `rigs.json` — overrides only, so a character nobody has touched is
+      absent from the file and keeps improving with the detector
+- [x] **Backdrop audit**: `npm run audit-keys` finds screen colour that survived
+      keying — the pockets keying can't reach, enclosed by a pipe loop, a chain
+      link, a topknot. Delivered originals in `characters/archive/` make the
+      call factual where they exist (`--fix` cuts those); everything else is
+      reported as a colour-only suspect for eyeballing, since plenty of art is
+      legitimately neon green or magenta. Seven weapons/bodies cleaned this way
+      (diesel, fang, saber, blitz, havoc, luna, riot)
 - [x] **Art intake**: `npm run intake` takes delivered files from `intake/`, keys
       out solid backdrops (magenta/green/white screens) into transparent PNGs,
       files them into `characters/canonical/` or `characters/render/`, and keeps

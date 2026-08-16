@@ -146,14 +146,93 @@
     return r2;
   }
 
+  // The rig file is a set of *overrides*: rig.js detects everything from the
+  // alpha channel and merges the file on top. So only what has actually been
+  // changed is written — a value that merely matches today's detection would
+  // silently freeze it, and a character that has been left alone is left out of
+  // the file entirely.
+  const EPS = 0.01;
+  const sameNum = (a, b) => typeof a === "number" && typeof b === "number" && Math.abs(a - b) <= EPS;
+  const samePt = (a, b) => !!a && !!b && sameNum(a.x, b.x) && sameNum(a.y, b.y);
+  const some = (o) => (Object.keys(o).length ? o : null);
+
+  function diffRecord(id, rec) {
+    const auto = rig.analyze(id);
+    if (!auto || !rec) return null;
+    const out = {};
+
+    const body = {};
+    if (!samePt(rec.body.pivot, auto.body.pivot)) body.pivot = rec.body.pivot;
+    if (!sameNum(rec.body.radius, auto.body.radius)) body.radius = rec.body.radius;
+    if (!samePt(rec.body.mount, auto.body.mount)) body.mount = rec.body.mount;
+    if (some(body)) out.body = body;
+
+    const weapon = {};
+    if (!samePt(rec.weapon.grip, auto.weapon.grip)) weapon.grip = rec.weapon.grip;
+    if (!samePt(rec.weapon.muzzle, auto.weapon.muzzle)) weapon.muzzle = rec.weapon.muzzle;
+    if (some(weapon)) out.weapon = weapon;
+
+    // Anchors are per sprite, so the array stays dense (index = sprite) even
+    // when only one of them moved.
+    const anchors = rec.arm.anchors.map((a, i) => {
+      const d = auto.arm.anchors[i];
+      const e = {};
+      if (!samePt(a.shoulder, d && d.shoulder)) e.shoulder = a.shoulder;
+      if (!samePt(a.hand, d && d.hand)) e.hand = a.hand;
+      if (d && !sameNum(a.radius, d.radius)) e.radius = a.radius;
+      return e;
+    });
+    if (anchors.some((e) => Object.keys(e).length)) out.arm = { anchors };
+
+    const r = {};
+    const ar = auto.rig;
+    if (!sameNum(rec.rig.bodyScale, ar.bodyScale)) r.bodyScale = rec.rig.bodyScale;
+    if (!sameNum(rec.rig.bodyRotation, ar.bodyRotation)) r.bodyRotation = rec.rig.bodyRotation;
+
+    const w = {};
+    const aw = ar.weapon;
+    if (!sameNum(rec.rig.weapon.distance, aw.distance)) w.distance = rec.rig.weapon.distance;
+    if (!sameNum(rec.rig.weapon.rotation, aw.rotation)) w.rotation = rec.rig.weapon.rotation;
+    if (!samePt(rec.rig.weapon.offset, aw.offset)) w.offset = rec.rig.weapon.offset;
+    if (!!rec.rig.weapon.orbit !== !!aw.orbit) w.orbit = !!rec.rig.weapon.orbit;
+    if (!!rec.rig.weapon.behind !== !!aw.behind) w.behind = !!rec.rig.weapon.behind;
+    if (some(w)) r.weapon = w;
+
+    // Arms exist only when asked for, so any arm at all is a change. Each one
+    // still gets trimmed against where it would have been placed.
+    if (rec.rig.arms.length) {
+      const plan = rig.defaultArms(id, rec.rig.arms.length);
+      r.arms = rec.rig.arms.map((a, i) => {
+        const d = plan[i] || {};
+        const e = { sprite: a.sprite };
+        if (!samePt(a.hold, d.hold)) e.hold = a.hold;
+        if (!samePt(a.socket, d.socket)) e.socket = a.socket;
+        if (!sameNum(a.scale, d.scale)) e.scale = a.scale;
+        if (!sameNum(a.rotation || 0, d.rotation || 0)) e.rotation = a.rotation || 0;
+        if (!!a.stretch !== !!d.stretch) e.stretch = !!a.stretch;
+        if (!sameNum(a.minStretch, d.minStretch)) e.minStretch = a.minStretch;
+        if (!sameNum(a.maxStretch, d.maxStretch)) e.maxStretch = a.maxStretch;
+        if (a.z !== d.z) e.z = a.z;
+        return e;
+      });
+    }
+    if (some(r)) out.rig = r;
+
+    return some(out) ? tidy(out) : null;
+  }
+
   function exportData() {
     const characters = {};
     for (const ch of CHARACTERS) {
       if (!rig.hasRig(ch.id)) continue;
-      const rec = record(ch.id);
-      if (rec) characters[ch.id] = tidy(rec);
+      const d = diffRecord(ch.id, record(ch.id));
+      if (d) characters[ch.id] = d;
     }
-    return { version: 1, note: "Authored in /workbench. Values are source-image pixels unless noted.", characters };
+    return {
+      version: 1,
+      note: "Authored in /workbench. Overrides only — anything not listed here is detected from the art. Values are source-image pixels unless noted.",
+      characters
+    };
   }
 
   function download(name, text, type) {
@@ -360,47 +439,29 @@
     rebuild();
   }
 
-  function buildArmPanel() {
-    const box = $("armPanel");
-    box.textContent = "";
+  // The count lives with the arm anchors, next to the arm being placed —
+  // it is part of rigging the arms, not a global view option.
+  function armCountRow() {
     const rec = record(state.id);
-    const R = rig.resolved(state.id);
-    const h = document.createElement("h2");
-    h.textContent = "Arms";
-    box.appendChild(h);
-    if (!rec) {
-      const p = document.createElement("p");
-      p.className = "muted";
-      p.textContent = "Waiting for render parts…";
-      box.appendChild(p);
-      return;
-    }
     const row = document.createElement("label");
     row.className = "row";
-    row.append("Show");
+    row.append("Arms");
     const sel = document.createElement("select");
     for (const [v, label] of [[0, "None"], [1, "One"], [2, "Two"]]) {
       const o = document.createElement("option");
       o.value = String(v); o.textContent = label;
       sel.appendChild(o);
     }
-    sel.value = String(Math.min(2, rec.rig.arms.length));
+    sel.value = String(Math.min(2, rec ? rec.rig.arms.length : 0));
     sel.addEventListener("change", () => setArmCount(Number(sel.value)));
     row.appendChild(sel);
-    box.appendChild(row);
-    const note = document.createElement("p");
-    note.className = "muted";
-    note.textContent = R && R.arm.sprites.length
-      ? "Placed on the weapon in Anchors → Arm."
-      : `No ${state.id}_arm.png — nothing to place.`;
-    box.appendChild(note);
+    return row;
   }
 
   // Every panel that depends on the current character/mode/arm, in one call, so
   // nothing is left showing the last character's numbers.
   function rebuild() {
     buildParts();
-    buildArmPanel();
     buildSelPanel();
     syncJson();
     state.built = `${state.id}|${state.mode}|${state.part}|${state.arm}|${armCount()}`;
@@ -856,6 +917,15 @@
         toggleRow("Draw behind body", () => rec.rig.weapon.behind, (v) => { rec.rig.weapon.behind = v; })
       );
     } else if (state.part === "arm") {
+      box.appendChild(armCountRow());
+      if (!rec.rig.arms.length) {
+        const p = document.createElement("p");
+        p.className = "muted";
+        p.textContent = rig.resolved(state.id) && rig.resolved(state.id).arm.sprites.length
+          ? "No arms on this character. Pick One or Two to place them on the weapon."
+          : `No ${state.id}_arm.png — nothing to place.`;
+        box.appendChild(p);
+      }
       const list = document.createElement("div");
       rec.rig.arms.forEach((arm, i) => {
         const b = document.createElement("button");
@@ -876,30 +946,6 @@
           slider("Rotation°", () => arm.rotation || 0, (v) => { arm.rotation = v; }, -180, 180, 0.5),
           layerRow(arm)
         );
-        const add = document.createElement("button");
-        add.className = "ghost wide";
-        add.textContent = "Add arm";
-        add.addEventListener("click", () => {
-          edit(state.id, () => {
-            rec.rig.arms.push({ ...clone(arm), z: "front" });
-            state.arm = rec.rig.arms.length - 1;
-          });
-          rebuild();
-        });
-        box.appendChild(add);
-        if (rec.rig.arms.length > 1) {
-          const rm = document.createElement("button");
-          rm.className = "ghost wide";
-          rm.textContent = "Remove this arm";
-          rm.addEventListener("click", () => {
-            edit(state.id, () => {
-              rec.rig.arms.splice(state.arm, 1);
-              state.arm = Math.max(0, state.arm - 1);
-            });
-            rebuild();
-          });
-          box.appendChild(rm);
-        }
       }
     } else if (state.part === "weapon") {
       box.append(
@@ -1063,9 +1109,14 @@
     }
   }
 
+  // Shows exactly what this character would contribute to rigs.json, which is
+  // nothing at all until something has been changed.
   function syncJson() {
     const rec = work.get(state.id);
-    $("jsonOut").value = rec ? JSON.stringify({ [state.id]: tidy(rec) }, null, 2) : "";
+    const d = rec && diffRecord(state.id, rec);
+    $("jsonOut").value = d
+      ? JSON.stringify({ [state.id]: d }, null, 2)
+      : "// nothing overridden — everything on this character is detected from the art";
   }
 
   // --------------------------------------------------------------- events

@@ -106,8 +106,8 @@ And in `rig.weapon`:
 **How many arms a character has is a decision, not a detection.** Nothing is
 placed automatically: a character with no `rig.arms` in its rig file wears no
 arms at all, however many blobs `<id>_arm.png` happens to contain. Pick
-**None / One / Two** in the workbench's Arms panel and the arms appear on the
-weapon, ready to be positioned.
+**None / One / Two** (Anchors → Arm, top of the right-hand panel) and the arms
+appear on the weapon, ready to be positioned.
 
 Rig files written before arms existed still load: a `rig.hands` entry becomes a
 rigid arm holding at the same point.
@@ -125,9 +125,9 @@ you back where you were. Edits themselves are transient — they leave via
   Pull either **trigger** (or press space) to shoot: the tracer leaves the
   muzzle the game itself fires from, so a weapon that sits, points or mirrors
   wrong is obvious the moment you sweep the aim through its arc.
-- **Arms** (right panel, every mode) — **None / One / Two**. None is the
-  default; arms only exist once you ask for them. Going from one to two keeps
-  the arm already placed and drops the new one on the plan.
+- **Anchors → Arm** — starts with **None / One / Two**. None is the default;
+  arms only exist once you ask for them. Going from one to two keeps the arm
+  already placed and drops the new one on the plan.
 - **Edit mode** — the character snaps to the default pose (facing right, level)
   and an onscreen selector appears: **Body · Weapon · Hand 1 · Hand 2**. The
   selected piece gets three handles — pink to move, green to resize, yellow to
@@ -140,6 +140,13 @@ you back where you were. Edits themselves are transient — they leave via
   Ctrl+Z / Ctrl+Shift+Z undo and redo, one step per drag.
 - **Anchors** — drag the anchor points on each source image.
 
+**The file holds overrides only.** Everything is detected from the art and the
+file is merged on top, so the export writes just the values that differ from
+what was detected — a character you have not touched does not appear at all.
+That keeps a change visible for what it is, and lets a better detector improve
+art nobody has hand-tuned. The JSON panel shows exactly what the current
+character contributes, which is nothing until you change something.
+
 Hit **Export rigs.json** and save the file into this folder. The game merges it
 over the auto-detected anchors on boot.
 
@@ -149,3 +156,18 @@ over the auto-detected anchors on boot.
 (body facing right, weapon aimed right, two arms reaching for it) so the rig and
 the workbench can be exercised before the real files land. Delete them, or let
 the real parts overwrite them, once art arrives.
+
+## Leftover backdrop
+
+`npm run audit-keys` walks every shipped PNG looking for backdrop that survived
+keying. Keying only cuts what reaches the border, so anything the art encloses —
+inside a pipe loop, a chain link, a topknot — stays solid screen colour and
+shows up in game as a green (or grey, or magenta) hole.
+
+The delivered originals in `characters/archive/` are what make this reliable:
+where an original exists, the audit knows which pixels really were backdrop and
+reports them as **confirmed**; `--fix` cuts exactly those and feathers the new
+rim. Without an original it can only go by colour, and reports those as
+**suspect** without touching them — pip's irises, fizz's whole body and riot's
+paint spray are all legitimately screen-coloured. Eyeball a suspect and pass
+`--force <file>` if it really is backdrop.

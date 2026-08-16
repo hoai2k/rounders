@@ -109,9 +109,11 @@
   function defaultStats() {
     return {
       maxHp: 100, speed: 560, accel: 12, airAccel: 5.2, brake: 10, jump: 880,
-      damage: 44, bulletSpeed: 980, bulletGravity: 1300, bulletDrag: 0.997,
+      // ROUNDS-style baseline: 100 HP, no regen, the default gun two-shots
+      // (55 a hit), 3 ammo with an automatic whole-clip reload when empty
+      damage: 55, bulletSpeed: 980, bulletGravity: 1300, bulletDrag: 0.997,
       bulletRestitution: 0.72, bulletSize: 1,
-      maxAmmo: 3, reload: 1.12, fireDelay: 0.26,
+      maxAmmo: 3, reload: 2.0, fireDelay: 0.3,
       blockCooldown: 1.55, blockDuration: 0.25,
       radius: 27, pellets: 1, spread: 0.04,
       bounces: 0, explosive: 0, homing: 0, grow: 0, pierce: 0,
@@ -155,6 +157,7 @@
       botStrafe: Math.random() < 0.5 ? -1 : 1,
       draftLock: false,
       spawnGrace: 0.9,
+      hazardGrace: 0,
       blinkClock: Math.random() * 4
     };
   }
@@ -443,6 +446,7 @@
       p.activeCooldown = 0; p.teleWasInside = false;
       p.poisonTimer = 0; p.burnTimer = 0; p.chillTimer = 0;
       p.teleCooldown = 0;
+      p.hazardGrace = 0;
       p.guardianCharges = p.stats.guardian;
       p.roundRevives = p.stats.revives;
       p.trail = [];
@@ -468,11 +472,17 @@
     }
     world.state = "round-won";
     world.roundWinner = winner;
-    const losers = players.filter(p => p !== winner).sort((a, b) => a.score - b.score || a.id - b.id);
+    // ranked worst-first; only the bottom two draft, so a 4-player match never
+    // has more than two hands on screen at once
+    const ranked = players.filter(p => p !== winner).sort((a, b) => a.score - b.score || a.id - b.id);
+    const losers = ranked.slice(0, 2);
     battleKicker.textContent = "Round " + players.reduce((s, p) => s + p.score, 0);
     battleTitle.textContent = `${winner.name} wins the round`;
     battleTitle.style.color = winner.color;
-    battleSub.textContent = losers.length > 1 ? "The fallen draft new powers…" : `${losers[0].name} drafts a new power…`;
+    battleSub.textContent =
+      ranked.length > 2 ? "The two furthest behind draft new powers…"
+      : losers.length > 1 ? "The fallen draft new powers…"
+      : `${losers[0].name} drafts a new power…`;
     battleSplash.classList.remove("hidden");
     sfx("win");
     setTimeout(() => {
@@ -512,7 +522,7 @@
       index: 0,
       picked: false
     }));
-    world.draftBaseTitle = losers.length > 1 ? "Draft — everyone picks at once" : `${losers[0].name} drafts`;
+    world.draftBaseTitle = losers.length > 1 ? "Draft — both pick at once" : `${losers[0].name} drafts`;
     world.draftTimer = 30;
     draftTitle.textContent = world.draftBaseTitle;
     renderDraftPanel();
@@ -529,34 +539,49 @@
     }
   }
 
+  // Each chooser gets a full stage washed in their color: their character
+  // large at the bottom, holding a fanned hand of playing cards. One chooser
+  // fills the screen; two stand side by side with a slimmer hand.
   function renderDraftPanel() {
     draftGrid.innerHTML = "";
     draftGrid.classList.toggle("multi", world.drafters.length > 1);
-    world.drafters.forEach((d, di) => {
-      const row = document.createElement("div");
-      row.className = "draft-row";
-      row.style.setProperty("--pcol", d.player.color);
-      const head = document.createElement("div");
-      head.className = "draft-row-head";
-      head.innerHTML = `<canvas width="56" height="56"></canvas><div><strong>${escapeHtml(d.player.name)}</strong><span>${d.picked ? "Locked in!" : "◀ ▶ browse · shoot to pick"}</span></div>`;
-      const pc = head.querySelector("canvas").getContext("2d");
-      pc.translate(23, 31);
-      drawCharacter(pc, d.player.character, 14, { t: 0, aimX: 1 });
-      row.appendChild(head);
+    world.drafters.forEach(d => {
+      const stage = document.createElement("section");
+      stage.className = `draft-stage${d.picked ? " locked" : ""}`;
+      stage.style.setProperty("--pcol", d.player.color);
+
+      const who = document.createElement("div");
+      who.className = "draft-who";
+      who.innerHTML = `
+        <canvas width="220" height="220"></canvas>
+        <div class="draft-who-text">
+          <strong>${escapeHtml(d.player.name)}</strong>
+          <span>${d.picked ? "Locked in!" : "◀ ▶ browse · shoot to pick"}</span>
+        </div>`;
+      const pc = who.querySelector("canvas").getContext("2d");
+      pc.translate(110, 124);
+      drawCharacter(pc, d.player.character, 62, { t: world.time, aimX: 1, aimY: -0.15 });
+
       const hand = document.createElement("div");
       hand.className = "draft-hand";
+      hand.style.setProperty("--n", d.options.length);
       d.options.forEach((c, i) => {
         const rar = RARITIES[c.rarity];
         const el = document.createElement("article");
         el.className = `card r-${c.rarity}${i === d.index ? " selected" : ""}${d.picked && i === d.index ? " picked" : ""}`;
         el.style.setProperty("--rcol", rar.color);
         el.style.setProperty("--rglow", rar.glow);
+        // fan the hand around its middle like held playing cards
+        el.style.setProperty("--tilt", `${(i - (d.options.length - 1) / 2) * 5.5}deg`);
+        el.style.setProperty("--deal", `${i * 70}ms`);
         el.innerHTML = `
+          <span class="card-pip">${rar.name[0]}</span>
           <span class="rarity">${rar.name}</span>
           <strong class="card-name">${c.name}</strong>
           <em class="card-tagline">${c.tagline}</em>
           <p class="card-desc">${c.description}</p>
           <div class="stat-list">${c.effects.map(s => `<span>${s}</span>`).join("")}</div>
+          <span class="card-pip flip">${rar.name[0]}</span>
         `;
         el.addEventListener("pointerdown", event => {
           event.preventDefault();
@@ -566,9 +591,11 @@
         });
         hand.appendChild(el);
       });
-      row.appendChild(hand);
-      draftGrid.appendChild(row);
-      d.rowEl = row;
+
+      stage.appendChild(hand);
+      stage.appendChild(who);
+      draftGrid.appendChild(stage);
+      d.rowEl = stage;
     });
   }
 
@@ -578,7 +605,8 @@
       el.classList.toggle("selected", i === d.index);
       el.classList.toggle("picked", d.picked && i === d.index);
     });
-    const state = d.rowEl.querySelector(".draft-row-head span");
+    d.rowEl.classList.toggle("locked", d.picked);
+    const state = d.rowEl.querySelector(".draft-who-text span");
     if (state) state.textContent = d.picked ? "Locked in!" : "◀ ▶ browse · shoot to pick";
   }
 
@@ -930,6 +958,7 @@
       p.blockTimer = Math.max(0, p.blockTimer - dt);
       p.activeCooldown = Math.max(0, p.activeCooldown - dt);
       p.spawnGrace = Math.max(0, p.spawnGrace - dt);
+      p.hazardGrace = Math.max(0, p.hazardGrace - dt);
       p.teleCooldown = Math.max(0, p.teleCooldown - dt);
       p.blinkClock += dt;
 
@@ -1067,11 +1096,11 @@
         if (Math.random() < dt * 10) puffOne(p.x + rand(-12, 12), p.y - 20, "#7fe8d0");
       }
 
-      // world bounds & hazards
+      // world bounds kill; hazards sting and launch instead
       if (p.x < -80 || p.x > world.width + 80 || p.y > world.height + 120) hurt(p, 999, null, 0, -1);
       if (settings.hazards) {
         for (const h of level.hazards) {
-          if (circleRect(p, h)) hurt(p, 999, null, 0, -1);
+          if (circleRect(p, h)) { hazardHit(p, h); break; }
         }
       }
     }
@@ -1454,6 +1483,25 @@
   }
 
   // hurt with knockback, blockable
+  // Touching a hazard hurts and launches the player clear rather than killing:
+  // damage first (so guardian/revive rules still apply at low HP), then a hard
+  // upward bounce away from the hazard, with a grace window so one dip into
+  // lava reads as one hit.
+  function hazardHit(p, h) {
+    if (!p.alive || p.hazardGrace > 0 || p.spawnGrace > 0) return;
+    p.hazardGrace = 0.9;
+    hurtRaw(p, 25, null);
+    if (!p.alive) return;
+    const cx = h.x + h.w / 2;
+    p.vy = -Math.max(980, Math.abs(p.vy) * 0.6 + 760);
+    p.vx += (p.x < cx ? -1 : 1) * 180;
+    p.y = Math.min(p.y, h.y - p.stats.radius * 0.35);
+    sfx("hit");
+    pulse(p, 0.4, 150);
+    world.shake = Math.max(world.shake, 7);
+    burst(p.x, p.y + p.stats.radius, currentLevel().palette.hazard || "#ff6a3d", 18, 420);
+  }
+
   function hurt(p, amount, attacker, kx, ky) {
     if (!p.alive || p.blockTimer > 0 || p.spawnGrace > 0) return;
     const mag = Math.hypot(kx, ky) || 1;

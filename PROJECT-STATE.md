@@ -119,12 +119,27 @@ Pillars:
 ### 5. Game flow redesign
 - [x] Random arena every round (no immediate repeats)
 - [x] Settings: arena picker — Random or lock any of the 25
-- [x] **Simultaneous drafting**: when multiple players lose a round, all of them
-      draft at the same time, each with their own hand and their own controls
+- [x] **Simultaneous drafting**: the two lowest-ranked losers draft at the same
+      time (max 2 hands on screen — in 4-player the third loser sits out), each
+      with their own hand and their own controls
+- [x] **Draft stage redesign**: full-screen scene per chooser washed in their
+      color, their character shown large, cards fanned like a held hand of
+      playing cards (corner pips, deal-in animation, lift on select); two
+      choosers split the screen side by side
+- [x] **ROUNDS-style baseline**: 100 HP, no regen, damage subtracted and reset
+      each round; default gun two-shots (55 dmg), 3 ammo, automatic whole-clip
+      reload when empty (2s), no manual reload
+- [x] **Hazards sting, not kill**: touching a hazard deals 25 damage and
+      launches the player up and away (0.9s grace between hits); falling out
+      of the world still kills
 - [x] Winner banner → draft → next arena loop with splash screens
 - [x] Bots pick cards and characters automatically
 
 ### 6. UI / UX overhaul
+- [x] **Arch logo art**: `assets/images/logo-arch.png` (keyed from
+      `rounders_logo_arch_v3.png`) replaces the text logo on the title screen
+      and main menu; UI palette shifted to match (gunmetal panels, steel-bevel
+      buttons, crystal magenta/purple accents)
 - [x] Arcade title screen (flashing PRESS START, any input begins, keyboard/mouse
       start also enters fullscreen)
 - [x] Full controller menu navigation (D-pad move, A/Menu confirm, B/View back)

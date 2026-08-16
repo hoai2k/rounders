@@ -1,13 +1,16 @@
 /* Rounders — UI */
 :root {
-  --ink: #12101c;
-  --paper: #f5f2ff;
-  --panel: rgba(18, 15, 32, 0.78);
-  --panel-edge: rgba(255, 255, 255, 0.14);
-  --coral: #ff5277;
-  --sky: #52d7ff;
-  --lemon: #ffe169;
-  --mint: #74f08b;
+  /* palette keyed to the arch logo: gunmetal stone + neon crystal accents */
+  --ink: #101018;
+  --paper: #f2f3fa;
+  --panel: rgba(15, 15, 22, 0.82);
+  --panel-edge: rgba(196, 206, 224, 0.2);
+  --coral: #ff3d84;
+  --sky: #45d0ff;
+  --lemon: #ffd84d;
+  --mint: #8dff54;
+  --steel-hi: rgba(222, 228, 240, 0.16);
+  --steel-lo: rgba(20, 22, 30, 0.6);
   --common: #b8c4d0;
   --uncommon: #3ddc84;
   --rare: #4da6ff;
@@ -86,31 +89,20 @@ kbd {
 
 h1.logo {
   margin: 0;
-  font-size: clamp(52px, 9vw, 96px);
-  font-weight: 900;
-  letter-spacing: 0.02em;
   line-height: 1;
-  background: linear-gradient(100deg, var(--coral) 0%, var(--lemon) 45%, var(--sky) 75%, var(--mint) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.35));
 }
 
-h1.logo span {
-  animation: logo-bounce 2.4s ease-in-out infinite;
-  display: inline-block;
-  background: linear-gradient(100deg, #ffb23d, var(--lemon));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+.logo-img {
+  display: block;
+  margin: 0 auto;
+  width: min(760px, 84vw);
+  height: auto;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 42px rgba(255, 61, 132, 0.22));
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
-@keyframes logo-bounce {
-  0%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-9px) rotate(-6deg); }
-  55% { transform: translateY(2px); }
-}
+.logo-img-menu { width: min(420px, 62vw); }
 
 .tagline {
   margin: 10px auto 0;
@@ -136,31 +128,34 @@ h2 {
 
 button {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(210, 218, 234, 0.22);
+  border-bottom-color: rgba(0, 0, 0, 0.55);
   border-radius: 14px;
   padding: 14px 18px;
-  background: rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, var(--steel-hi), rgba(255, 255, 255, 0.04) 48%, var(--steel-lo));
   color: var(--paper);
   font: 700 16px/1 inherit;
   font-family: inherit;
   cursor: pointer;
-  transition: transform 0.12s, background 0.15s, box-shadow 0.15s;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  transition: transform 0.12s, background 0.15s, box-shadow 0.15s, border-color 0.15s;
 }
 
 button:hover, button.controller-focus {
-  background: rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(232, 238, 250, 0.24), rgba(255, 255, 255, 0.08) 48%, var(--steel-lo));
+  border-color: color-mix(in srgb, var(--coral) 55%, rgba(210, 218, 234, 0.3));
   transform: translateY(-2px);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35), 0 0 0 2px rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), 0 0 18px rgba(255, 61, 132, 0.28);
 }
 
 button.primary {
-  background: linear-gradient(120deg, var(--coral), #ff7a52);
+  background: linear-gradient(120deg, var(--coral), #b45cff);
   border: none;
-  box-shadow: 0 8px 26px rgba(255, 82, 119, 0.4);
+  box-shadow: 0 8px 26px rgba(255, 61, 132, 0.4);
 }
 
 button.primary:hover, button.primary.controller-focus {
-  box-shadow: 0 12px 32px rgba(255, 82, 119, 0.6), 0 0 0 2px #fff;
+  box-shadow: 0 12px 32px rgba(255, 61, 132, 0.6), 0 0 0 2px #fff;
 }
 
 .quick-card {
@@ -359,20 +354,17 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
-  padding: 20px;
-  background: rgba(8, 6, 16, 0.82);
+  padding: 14px 0 0;
+  background: rgba(8, 6, 16, 0.84);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  overflow: auto;
+  overflow: hidden;
   z-index: 20;
 }
 
-.draft-header { margin-top: auto; }
-
 .draft-header p {
-  margin: 0 0 4px;
-  font-size: clamp(20px, 3vw, 30px);
+  margin: 0;
+  font-size: clamp(18px, 2.6vw, 28px);
   font-weight: 900;
   text-align: center;
   letter-spacing: 0.02em;
@@ -380,82 +372,149 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 }
 
 .draft-grid {
+  flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 14px;
-  width: min(1400px, 100%);
-  margin-bottom: auto;
+  width: 100%;
+  min-height: 0;
 }
 
-.draft-row {
+/* one chooser's whole scene: their color washes the stage, character at the
+   bottom, hand of cards above */
+.draft-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 16px 16px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border: 1px solid color-mix(in srgb, var(--pcol) 45%, transparent);
-  box-shadow: inset 0 0 40px color-mix(in srgb, var(--pcol) 6%, transparent);
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  padding: 30px 12px 14px;
+  background:
+    radial-gradient(ellipse 90% 68% at 50% 108%, color-mix(in srgb, var(--pcol) 34%, transparent), transparent 72%),
+    radial-gradient(ellipse 70% 45% at 50% -12%, color-mix(in srgb, var(--pcol) 14%, transparent), transparent 75%);
+  transition: filter 0.4s, opacity 0.4s;
 }
 
-.draft-row-head {
+.draft-grid.multi .draft-stage + .draft-stage {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.draft-stage.locked { filter: saturate(0.55) brightness(0.75); }
+
+.draft-who {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
+  margin-top: 6px;
 }
 
-.draft-row-head strong { font-size: 17px; color: var(--pcol); }
-.draft-row-head span { display: block; font-size: 12px; opacity: 0.7; }
+.draft-who canvas {
+  width: clamp(96px, 13vh, 160px);
+  height: clamp(96px, 13vh, 160px);
+  filter: drop-shadow(0 8px 22px color-mix(in srgb, var(--pcol) 55%, transparent));
+}
 
+.draft-who-text strong {
+  display: block;
+  font-size: clamp(18px, 2.4vw, 26px);
+  color: var(--pcol);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
+
+.draft-who-text span { display: block; font-size: 13px; opacity: 0.75; }
+
+/* the hand: cards fanned from a shared pivot below, like held playing cards */
 .draft-hand {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(180px, 1fr);
-  gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 26px 0 30px;
+  min-height: 0;
+  /* never wider than the stage, whatever the hand size */
+  --cardw: min(clamp(220px, 27vh, 330px), calc((100vw - 120px) / var(--n, 4)));
 }
 
-.draft-grid.multi .draft-hand { grid-auto-columns: minmax(150px, 1fr); }
+.draft-grid.multi .draft-hand {
+  --cardw: min(clamp(180px, 21vh, 260px), calc((50vw - 80px) / var(--n, 4)));
+}
 
 .card {
   position: relative;
-  border-radius: 16px;
-  padding: 14px 14px 12px;
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02));
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border: 2px solid color-mix(in srgb, var(--rcol) 55%, transparent);
+  width: var(--cardw);
+  aspect-ratio: 5 / 7;
+  border-radius: 14px;
+  padding: 30px 14px 12px;
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--rcol) 16%, transparent), transparent 62%),
+    linear-gradient(165deg, #262a36, #14161e 55%, #1b1e28);
+  border: 2px solid color-mix(in srgb, var(--rcol) 60%, #3a3f4d);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 5px rgba(255, 255, 255, 0.04),
+    0 12px 26px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
+  overflow: hidden;
   cursor: pointer;
-  transition: transform 0.14s, box-shadow 0.18s, border-color 0.18s;
-  min-height: 172px;
+  margin: 0 calc(var(--cardw) * -0.055);
+  transform: rotate(var(--tilt)) translateY(0);
+  transform-origin: 50% 240%;
+  transition: transform 0.18s cubic-bezier(0.2, 1.2, 0.4, 1), box-shadow 0.18s, border-color 0.18s, filter 0.18s;
+  animation: card-deal 0.45s cubic-bezier(0.2, 1.3, 0.4, 1) backwards;
+  animation-delay: var(--deal, 0ms);
 }
 
-.draft-grid.multi .card { min-height: 150px; padding: 11px 12px 10px; }
+.draft-grid.multi .card { padding-top: 26px; }
 
-.card:hover { transform: translateY(-3px); }
+@keyframes card-deal {
+  from { transform: rotate(var(--tilt)) translateY(150px); opacity: 0; }
+}
+
+.card:hover { transform: rotate(var(--tilt)) translateY(-14px); }
 
 .card.selected {
   border-color: var(--rcol);
-  box-shadow: 0 0 0 2px var(--rcol), 0 0 34px var(--rglow), 0 14px 30px rgba(0, 0, 0, 0.4);
-  transform: translateY(-6px) scale(1.02);
-  z-index: 2;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 5px rgba(255, 255, 255, 0.05),
+    0 0 0 2px var(--rcol), 0 0 44px var(--rglow), 0 22px 40px rgba(0, 0, 0, 0.55);
+  transform: rotate(calc(var(--tilt) * 0.35)) translateY(-34px) scale(1.05);
+  z-index: 3;
 }
 
-.card.picked { animation: card-picked 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.card.picked { animation: card-picked 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); z-index: 4; }
 
 @keyframes card-picked {
-  0% { transform: scale(1.02); }
-  40% { transform: scale(1.12) rotate(1.5deg); }
-  100% { transform: translateY(-6px) scale(1.02); }
+  0% { transform: rotate(calc(var(--tilt) * 0.35)) translateY(-34px) scale(1.05); }
+  40% { transform: rotate(0deg) translateY(-52px) scale(1.16); }
+  100% { transform: rotate(calc(var(--tilt) * 0.35)) translateY(-34px) scale(1.05); }
+}
+
+/* corner pips, like the index of a playing card */
+.card-pip {
+  position: absolute;
+  top: 8px;
+  left: 11px;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--rcol);
+  opacity: 0.9;
+}
+
+.card-pip.flip {
+  top: auto;
+  left: auto;
+  right: 11px;
+  bottom: 8px;
+  transform: rotate(180deg);
 }
 
 .card .rarity {
   align-self: flex-start;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.22em;
@@ -472,24 +531,22 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   color: #fff;
 }
 
-.card.r-mythic { border-image: linear-gradient(130deg, #ff4d8f, #b45cff, #52d7ff) 1; border-radius: 16px; }
+.card.r-mythic { border-image: linear-gradient(130deg, #ff4d8f, #b45cff, #52d7ff) 1; border-radius: 14px; }
 
 @keyframes mythic-shimmer { to { background-position: 300% 0; } }
 
-.card-name { font-size: 16.5px; font-weight: 900; letter-spacing: 0.01em; color: var(--rcol); }
-.card-tagline { font-size: 11.5px; font-style: italic; opacity: 0.65; }
-.card-desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: rgba(245, 242, 255, 0.9); flex: 1; }
+.card-name { font-size: clamp(15px, 2.2vh, 20px); font-weight: 900; letter-spacing: 0.01em; color: var(--rcol); }
+.card-tagline { font-size: clamp(11px, 1.5vh, 13px); font-style: italic; opacity: 0.65; }
+.card-desc { margin: 0; font-size: clamp(11.5px, 1.7vh, 14px); line-height: 1.45; color: rgba(245, 242, 255, 0.9); flex: 1; overflow: hidden; }
 
-.stat-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.stat-list { display: flex; flex-wrap: wrap; gap: 4px; }
 
 .stat-list span {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
   background: color-mix(in srgb, var(--rcol) 16%, transparent);
-  border: 1px solid rgba(255, 255, 255, 0.25);
   border: 1px solid color-mix(in srgb, var(--rcol) 35%, transparent);
 }
 
@@ -755,9 +812,15 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   animation: splash-in 0.6s ease-out;
 }
 
-h1.title-logo {
-  font-size: clamp(64px, 13vw, 150px);
-  filter: drop-shadow(0 8px 0 rgba(0, 0, 0, 0.4)) drop-shadow(0 18px 46px rgba(255, 82, 119, 0.35));
+h1.title-logo .logo-img {
+  width: min(980px, 92vw);
+  filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.65)) drop-shadow(0 0 60px rgba(255, 61, 132, 0.3));
+  animation: logo-loom 3.4s ease-in-out infinite;
+}
+
+@keyframes logo-loom {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.015); }
 }
 
 .title-tagline {
@@ -793,7 +856,7 @@ h1.title-logo {
 
 @media (prefers-reduced-motion: reduce) {
   .press-start { animation-duration: 2.6s; }
-  h1.logo span { animation: none; }
+  h1.title-logo .logo-img { animation: none; }
 }
 
 /* --------------------------------------------------------- pause additions */

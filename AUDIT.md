@@ -89,6 +89,73 @@ need 54px of headroom above a moving platform, bounce apex = power²/4200.
 
 ---
 
+## 5. Level design vs ROUNDS (terrain language · destructibility · verticality)
+
+A dedicated pass comparing the 25 arenas against how ROUNDS maps actually play.
+ROUNDS levels are small but *dense with interactions*: walls you climb and
+wall-kick between, physics boxes you shove and stack, objects hanging on ropes
+you can shoot down, destructible chunks, perches with sightline advantages, and
+strongly varied / asymmetric silhouettes. Our arenas had personality in palette
+and hazards, but the **terrain vocabulary was a single word: the floating
+platform**. Every level was "floor + 5–8 thin horizontal ledges", horizontally
+mirrored, with nothing to shoot except the other player.
+
+### Systemic findings
+
+| # | Finding | Resolution |
+|---|---|---|
+| L1 | **CRITICAL** — The engine gained ROUNDS-style wall jumping, but no arena offered a wall. The mechanic was only reachable at the two screen edges. | ✅ Every arena now has climbable vertical structure where it fits the theme: towers, pillars, monoliths, bookcases, masts, tree trunks, mesa faces, poles (see per-arena list). |
+| L2 | **CRITICAL** — Zero destructible or physics-reactive terrain; bullets only ever hit players or dead geometry. | ✅ Three new engine systems, all per-round: **breakable platforms** (`breakable: hp` — crack visibly, shatter, telegraphed with a stitched accent outline), **chain-hung platforms** (`hung[]` — cut every chain with bullets and the platform drops, then settles where it lands), and **crates** (`crates[]` — pushable, climbable, stackable, shootable; knocked around by hits and explosions; float on tides). |
+| L3 | Layouts were almost all left-right mirrors of the same stack; no perches, no overhangs, no high-ground worth fighting over. | ✅ Redesigns favor asymmetry (Aurora Summit's staircase ridge, Prism's offset monoliths, Rustyard's uneven junk piles) and true perches (tower caps, crow's nest, torii beam, lightning-rod plate). |
+| L4 | Explosions ignored the arena entirely. | ✅ Explosive splash now damages crates and breakable platforms in radius. |
+| L5 | Nothing in a round ever changed the map (movers/phase loops aside), so long rounds played identically to their first ten seconds. | ✅ Dropped chain platforms, shattered floors, and shoved/broken crates persist for the rest of the round and reset for the next — rounds now develop. |
+
+### Per-arena changes
+
+Every arena keeps its id, palette, backdrop art, and signature mechanic; the
+geometry got a second draft. Jump math from §3 still holds (max rise 184px);
+anything taller than that is deliberately gated behind a wall-kick, a crate
+step, a bounce pad, or an elevator.
+
+| Arena | What's new |
+|---|---|
+| Neon Skyline | Split rooftops with a deadly alley between them; climbable towers with cap perches at both ends; hung neon sign over the gap; AC-unit crates. |
+| Ember Foundry | Furnace towers to scale; crane platform on two chains that drops onto the catwalks to bridge the lava; ingot crates. |
+| Frostbite Observatory | Observatory tower with a dome perch; breakable icicle shelf; ice-block crates that skate on the ice floor. |
+| Verdant Overgrowth | Two ruined columns of uneven height; vine-hung top platform; stone crates between the bounce pads. |
+| Orbital Drift | Central solar mast for slow-motion wall-kicks; two single-chain cargo pods; floating supply crates. Low-g cuts feel deliberate. |
+| Sirocco Canyon | Mesa-edge walls; the ravine is now crossed by a **breakable plank bridge**; wind-side crates. |
+| Saltwind Boardwalk | Pier posts rising out of the water with perch caps; string-light rig hung on chains; stacked cargo crates on the docks. |
+| Glimmer Hollow | Stalagmite towers; two stalactite platforms hanging from the dark on chains; spore-pod crate. |
+| Cogwork Spire | A spire climbable straight out of the gear pit; breakable service panels; gear crates. |
+| Prism Caverns | Second offset monolith (wall-kick alley between the two); breakable crystal panes that ricochet bullets chew through; crystal crate. |
+| Sugar Rush | Gingerbread towers (two heights); licorice-hung platform; breakable cookie shelf; gumdrop crates. |
+| Thunderhead Perch | Lightning-rod tower — the best perch on the map is the one the storm targets. |
+| Midnight Library | Central bookcase wall dividing the room; chandelier on two chains; book crates; right-side shelf step. |
+| Koi Temple | Full torii gate spanning the pond — climbable pillars, duel-able beam — plus a temple bell hung beneath it that drops onto the bridge. |
+| Neon Grid | Central data pillar; two vertical **breakable firewall panels** as destructible cover; data-cube crates. |
+| Bonepit Arena | Colosseum walls with spectator perches; hanging cage; bone crates. |
+| Aurora Summit | Fully asymmetric now: staircase ridge to a peak on the left, sheer ice wall at the cliff, low route right; ice crates. |
+| Rustyard | Climbable junk piles (uneven); wrecked chassis hanging from the crane on chains; a rusted-through breakable platform; four crates including a stack. |
+| Hexwood Glade | Two tree trunks with canopy perches; wisp-hung platform; pumpkin crates. |
+| Tidal Wreck | A whole wreck mid-channel: hull block, climbable mast, crow's-nest perch, breakable rigging plank — and crates that **float on the tide**. |
+| Lantern Festival | Two-tier pagoda mid-river (base wall, two roofs); firework crates on the shores. |
+| Ion Lift | Service pylon under the center platform for wall-kicks; two single-chain maintenance steps you can cut out from under someone. |
+| Cloud Nine | Marble columns propping the islands; harp platform hung mid-sky. |
+| Static Circus | High-wire poles with tiny top plates; **two single-chain trapezes**; prop crates. |
+| Voidfall | Obelisks with cap perches on both islands; shard platform hung over the void (cut it and the void keeps it); breakable rune plates. |
+
+### Verified
+
+- Static validator over all 25 arenas: spawns above ground and outside solids,
+  chains inside their platform span and not passing through geometry, crates
+  non-intersecting with ground below (or a tide to float on), mover sweeps
+  clear of hung platforms and crates.
+- Headless playthroughs (Playwright/Chromium) across sampled arenas: no JS
+  errors. A purpose-built test arena confirmed the full loop live: chain shot →
+  platform drops and settles; crates shoved across the floor by gunfire;
+  breakable telegraph rendering.
+
 ## Verification
 
 - `node --check` passes on all JS files.

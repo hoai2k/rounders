@@ -34,7 +34,7 @@ Pillars:
 - [x] `image-requests.md` — prompts for all generated art (committed to main early so
       generation can start while code is built). Delivered batches move to
       `image-requests-history.md`, so the live doc is only what is still wanted
-- [ ] **Card art** (`image-requests.md` §1): one 512×384 scene per card, so a draft
+- [ ] **Card art** (`image-requests.md` §2): one 512×384 scene per card, so a draft
       hand is recognised instead of read. The 52 emblem icons are already in
       `assets/images/cards/` but nothing displays them yet — the card face is
       still text only
@@ -60,6 +60,16 @@ Pillars:
       arena bullet-bounce modifier
 - [x] **25 arenas**, each with a distinct theme + 1–2 signature mechanics
 - [x] File: `js/levels.js`
+- [x] **Level-design pass vs ROUNDS** (AUDIT.md §5): three new engine systems —
+      breakable platforms (`breakable`), chain-hung platforms shot down by
+      cutting their chains (`hung[]`), and pushable/climbable/destructible
+      crates (`crates[]`, tide-buoyant, shoved by bullets and explosions) —
+      plus a geometry second draft of all 25 arenas: climbable walls/towers
+      everywhere (wall-jump finally has terrain), perches, overhangs, and
+      asymmetric silhouettes. Per-round prop state resets in `resetRound`
+- [ ] **Backdrop refreshes** (`image-requests.md` §1): repaints for the 6
+      arenas whose silhouette changed most (Neon Skyline, Koi Temple, Tidal
+      Wreck, Midnight Library, Lantern Festival, Aurora Summit)
 
 ### 4. Characters — 24 pilots across two waves, procedural + generated art
 - [x] Round 2: 12 indie-badass characters lead the roster (Vex, Rook, Jinx,

@@ -109,6 +109,11 @@
   let particles = [];
   let fields = [];
   let bolts = []; // lightning polylines {points, life, color}
+  // Destructible / dynamic arena props, rebuilt every round from level data:
+  //   breaks — Map(level platform → {hp,max,dead}) for platforms with `breakable`
+  //   hungs  — platforms suspended on shootable chains; cut every chain and they drop
+  //   crates — pushable, shootable boxes players can climb and knock around
+  const props = { breaks: new Map(), hungs: [], crates: [] };
   let last = performance.now();
   let toastTimer = 0;
   let audioCtx = null;
@@ -213,13 +218,23 @@
     if (platCache.t === t && platCache.level === level) return platCache.list;
     const list = [];
     for (const p of level.platforms) {
+      const brk = props.breaks.get(p);
+      if (brk && brk.dead) continue;
       if (p.phase) {
         const cyc = ((t + p.phase.offset) % p.phase.period) / p.phase.period;
         if (cyc > p.phase.duty) continue;
-        list.push({ ...p, vxDelta: 0, vyDelta: 0, phaseCyc: cyc });
+        list.push({ ...p, vxDelta: 0, vyDelta: 0, phaseCyc: cyc, breakRef: brk });
       } else {
-        list.push({ ...p, vxDelta: 0, vyDelta: 0 });
+        list.push({ ...p, vxDelta: 0, vyDelta: 0, breakRef: brk });
       }
+    }
+    for (const hg of props.hungs) {
+      if (hg.dead) continue;
+      list.push({ x: hg.x, y: hg.y, w: hg.w, h: hg.h, ice: hg.ice, vxDelta: 0, vyDelta: hg.falling ? hg.vy * world.lastStep : 0, isMover: hg.falling, hungRef: hg });
+    }
+    for (const c of props.crates) {
+      if (c.dead) continue;
+      list.push({ x: c.x, y: c.y, w: c.w, h: c.h, vxDelta: 0, vyDelta: 0, isCrate: true, crateRef: c });
     }
     for (const m of level.movers || []) {
       const ph = (m.phase || 0) * Math.PI * 2;
@@ -532,6 +547,7 @@
     world.lightningTimer = level.lightning ? level.lightning.period : 0;
     world.lightningFlash = 0;
     world.tideLevel = level.tide ? level.tide.min : world.height + 100;
+    resetProps(level);
     players.forEach((p, i) => {
       const sp = level.spawns[i % level.spawns.length];
       p.x = sp.x; p.y = sp.y;
@@ -979,6 +995,7 @@
     const step = Math.min(dt, 1 / 45);
     world.lastStep = step;
     updateArena(step);
+    updateProps(step);
     updatePlayers(step);
     updateBullets(step);
     updateFields(step);
@@ -1051,6 +1068,156 @@
   }
 
   // ----------------------------------------------------------------- players
+  // ------------------------------------------------------- destructible props
+  function resetProps(level) {
+    props.breaks = new Map();
+    for (const p of level.platforms) {
+      if (p.breakable) props.breaks.set(p, { hp: p.breakable, max: p.breakable, dead: false, flash: 0 });
+    }
+    props.hungs = (level.hung || []).map(h => ({
+      x: h.x, y: h.y, w: h.w, h: h.h, ice: h.ice, anchorY: h.anchorY || 0,
+      chains: h.chains.map(cx => ({ x: cx, cut: false, cutAt: 0 })),
+      vy: 0, falling: false, settled: false, dead: false
+    }));
+    props.crates = (level.crates || []).map(c => ({
+      x: c.x, y: c.y, w: c.s, h: c.s, vx: 0, vy: 0,
+      hp: c.hp || 70, max: c.hp || 70, dead: false, grounded: false,
+      seed: Math.floor(Math.random() * 1000)
+    }));
+  }
+
+  // Static solids a prop can rest on: live level platforms + settled hung ones.
+  function propSolids(level) {
+    const t = world.time;
+    const list = [];
+    for (const p of level.platforms) {
+      const brk = props.breaks.get(p);
+      if (brk && brk.dead) continue;
+      if (p.phase) {
+        const cyc = ((t + p.phase.offset) % p.phase.period) / p.phase.period;
+        if (cyc > p.phase.duty) continue;
+      }
+      list.push(p);
+    }
+    for (const hg of props.hungs) if (!hg.dead && !hg.falling) list.push(hg);
+    return list;
+  }
+
+  function updateProps(dt) {
+    const level = currentLevel();
+    const g = levelGravity();
+    const solids = propSolids(level);
+    for (const brk of props.breaks.values()) brk.flash = Math.max(0, brk.flash - dt);
+    for (const hg of props.hungs) {
+      if (hg.dead || !hg.falling) continue;
+      hg.vy += g * dt;
+      hg.y += hg.vy * dt;
+      for (const s of solids) {
+        if (s === hg) continue;
+        if (hg.x + hg.w > s.x && hg.x < s.x + s.w &&
+            hg.y + hg.h > s.y && hg.y + hg.h < s.y + s.h + hg.vy * dt + 30) {
+          hg.y = s.y - hg.h;
+          hg.falling = false;
+          hg.settled = true;
+          hg.vy = 0;
+          world.shake = Math.max(world.shake, 8);
+          puff(hg.x + hg.w / 2, hg.y + hg.h, level.palette.accent, 14);
+          sfx("thud");
+          break;
+        }
+      }
+      if (hg.y > world.height + 100) hg.dead = true;
+    }
+    for (const c of props.crates) {
+      if (c.dead) continue;
+      c.vy += g * dt;
+      c.vx *= Math.pow(c.grounded ? 0.86 : 0.985, dt * 60);
+      c.x += c.vx * dt;
+      c.y += c.vy * dt;
+      c.grounded = false;
+      if (c.x < 0) { c.x = 0; c.vx = Math.abs(c.vx) * 0.3; }
+      if (c.x + c.w > world.width) { c.x = world.width - c.w; c.vx = -Math.abs(c.vx) * 0.3; }
+      const rests = solids.concat(props.crates.filter(o => o !== c && !o.dead));
+      for (const s of rests) {
+        if (c.x + c.w <= s.x || c.x >= s.x + s.w || c.y + c.h <= s.y || c.y >= s.y + s.h) continue;
+        const overlaps = [
+          { side: "top", amount: c.y + c.h - s.y },
+          { side: "bottom", amount: s.y + s.h - c.y },
+          { side: "left", amount: c.x + c.w - s.x },
+          { side: "right", amount: s.x + s.w - c.x }
+        ].sort((a, b) => a.amount - b.amount);
+        const o = overlaps[0];
+        if (o.side === "top" && c.vy >= 0) {
+          c.y = s.y - c.h;
+          c.vy = 0;
+          c.grounded = true;
+        } else if (o.side === "bottom") {
+          c.y = s.y + s.h;
+          c.vy = Math.max(0, c.vy);
+        } else if (o.side === "left") {
+          c.x = s.x - c.w;
+          c.vx = -Math.abs(c.vx) * 0.25;
+          if (s.vx !== undefined) s.vx += 30;
+        } else if (o.side === "right") {
+          c.x = s.x + s.w;
+          c.vx = Math.abs(c.vx) * 0.25;
+          if (s.vx !== undefined) s.vx -= 30;
+        }
+      }
+      if (level.tide && c.y + c.h > world.tideLevel + 6) {
+        c.vy -= g * dt * 1.6; // crates float
+        c.vx *= 0.96;
+      }
+      if (c.y > world.height + 80) c.dead = true;
+    }
+  }
+
+  function damageCrate(c, dmg, ix, iy) {
+    c.hp -= dmg;
+    c.vx += clamp(ix, -260, 260) * 0.4;
+    c.vy += clamp(iy, -200, 200) * 0.3 - 40;
+    puff(c.x + c.w / 2, c.y + c.h / 2, currentLevel().palette.plat, 5);
+    if (c.hp <= 0 && !c.dead) {
+      c.dead = true;
+      burst(c.x + c.w / 2, c.y + c.h / 2, currentLevel().palette.accent, 22, 330);
+      world.shake = Math.max(world.shake, 6);
+      sfx("thud");
+    }
+  }
+
+  function damageBreakable(brk, x, y, dmg) {
+    brk.hp -= dmg;
+    brk.flash = 0.12;
+    if (brk.hp <= 0 && !brk.dead) {
+      brk.dead = true;
+      burst(x, y, currentLevel().palette.accent, 26, 380);
+      world.shake = Math.max(world.shake, 7);
+      sfx("thud");
+    }
+  }
+
+  // A bullet crossing an intact chain cuts it; the last chain drops the platform.
+  function checkChainHits(b) {
+    for (const hg of props.hungs) {
+      if (hg.dead || hg.falling || hg.settled) continue;
+      for (const ch of hg.chains) {
+        if (ch.cut) continue;
+        if (Math.abs(b.x - ch.x) < 9 + b.r && b.y > hg.anchorY && b.y < hg.y) {
+          ch.cut = true;
+          ch.cutAt = world.time;
+          burst(b.x, b.y, "#ffd27a", 12, 260);
+          sfx("chain");
+          if (hg.chains.every(k => k.cut)) {
+            hg.falling = true;
+            world.shake = Math.max(world.shake, 5);
+          }
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   function updatePlayers(dt) {
     const level = currentLevel();
     const plats = activePlatforms(level, world.time);
@@ -1259,13 +1426,26 @@
         p.y += overlap.amount;
         p.vy = Math.max(0, p.vy) * 0.24;
       } else if (overlap.side === "left") {
-        p.x -= overlap.amount;
-        p.vx = Math.min(0, p.vx) * 0.22;
-        touchWall(p, -1);
+        if (platform.isCrate) {
+          // shoulder the crate along instead of stopping dead
+          platform.crateRef.x += overlap.amount * 0.55;
+          platform.crateRef.vx = Math.max(platform.crateRef.vx, p.vx * 0.9);
+          p.x -= overlap.amount * 0.45;
+        } else {
+          p.x -= overlap.amount;
+          p.vx = Math.min(0, p.vx) * 0.22;
+          touchWall(p, -1);
+        }
       } else if (overlap.side === "right") {
-        p.x += overlap.amount;
-        p.vx = Math.max(0, p.vx) * 0.22;
-        touchWall(p, 1);
+        if (platform.isCrate) {
+          platform.crateRef.x -= overlap.amount * 0.55;
+          platform.crateRef.vx = Math.min(platform.crateRef.vx, p.vx * 0.9);
+          p.x += overlap.amount * 0.45;
+        } else {
+          p.x += overlap.amount;
+          p.vx = Math.max(0, p.vx) * 0.22;
+          touchWall(p, 1);
+        }
       }
     }
   }
@@ -1458,9 +1638,28 @@
         color: b.burn ? "#ff9e3d" : b.color
       });
 
+      if (b.life > 0 && checkChainHits(b)) {
+        b.life = -1;
+      }
+
       for (const platform of plats) {
+        if (b.life <= 0) break;
         if (circleRect(b, platform)) {
-          if (b.bounces > 0) {
+          if (platform.isCrate) {
+            damageCrate(platform.crateRef, b.damage, b.vx, b.vy);
+            b.life = -1;
+            explodeBullet(b);
+          } else if (platform.breakRef) {
+            damageBreakable(platform.breakRef, b.x, b.y, b.damage);
+            if (b.bounces > 0 && !platform.breakRef.dead) {
+              bounceBullet(b, platform);
+              b.bounces -= 1;
+              sfx("block");
+            } else {
+              b.life = -1;
+              explodeBullet(b);
+            }
+          } else if (b.bounces > 0) {
             bounceBullet(b, platform);
             b.bounces -= 1;
             sfx("block");
@@ -1554,6 +1753,20 @@
       }
       world.shake = Math.max(world.shake, 9);
       sfx("boom");
+      // splash also batters nearby crates and cracked platforms
+      const radius = 105 + b.explosive * 12;
+      for (const c of props.crates) {
+        if (c.dead) continue;
+        const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+        const d = Math.hypot(cx - b.x, cy - b.y);
+        if (d < radius) damageCrate(c, (1 - d / radius) * (30 + b.explosive * 10), (cx - b.x) * 4, (cy - b.y) * 4);
+      }
+      for (const [pl, brk] of props.breaks) {
+        if (brk.dead) continue;
+        const cx = clamp(b.x, pl.x, pl.x + pl.w), cy = clamp(b.y, pl.y, pl.y + pl.h);
+        const d = Math.hypot(cx - b.x, cy - b.y);
+        if (d < radius) damageBreakable(brk, cx, cy, (1 - d / radius) * (30 + b.explosive * 10));
+      }
     }
     if (b.shards && !b.isShard) {
       for (let i = 0; i < b.shards; i += 1) {
@@ -2322,8 +2535,20 @@
     const pal = level.palette;
     const t = world.time;
     for (const p of level.platforms) {
+      const brk = props.breaks.get(p);
+      if (brk && brk.dead) continue;
       const alpha = phaseAlpha(p, t);
       drawPlatform(p, pal, alpha, p.ice, p.conveyor);
+      if (brk) drawBreakableOverlay(p, brk, pal);
+    }
+    for (const hg of props.hungs) {
+      if (hg.dead) continue;
+      drawChains(hg, pal);
+      drawPlatform(hg, pal, 1, hg.ice, 0);
+    }
+    for (const c of props.crates) {
+      if (c.dead) continue;
+      drawCrate(c, pal, level.id);
     }
     for (const m of level.movers || []) {
       const ph = (m.phase || 0) * Math.PI * 2;
@@ -2385,6 +2610,102 @@
       ctx.setLineDash([5, 7]);
       ctx.strokeRect(p.x - 4, p.y - 4, p.w + 8, p.h + 8);
       ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
+
+  // Breakables telegraph with a stitched accent outline; cracks grow with damage.
+  function drawBreakableOverlay(p, brk, pal) {
+    ctx.save();
+    ctx.strokeStyle = hexAlpha(pal.accent, 0.55);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 6]);
+    ctx.strokeRect(p.x + 3, p.y + 3, p.w - 6, p.h - 6);
+    ctx.setLineDash([]);
+    const dmg = 1 - brk.hp / brk.max;
+    if (dmg > 0.02) {
+      ctx.strokeStyle = `rgba(10,8,8,${0.35 + dmg * 0.45})`;
+      ctx.lineWidth = 2;
+      const n = Math.ceil(dmg * 6);
+      const seedId = `crack${p.x},${p.y}`;
+      for (let i = 0; i < n; i += 1) {
+        const sx = p.x + seeded(seedId, i * 7 + 1) * p.w;
+        const sy = p.y + 2;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + (seeded(seedId, i * 3 + 2) - 0.5) * 24, sy + p.h * 0.55);
+        ctx.lineTo(sx + (seeded(seedId, i * 5 + 3) - 0.5) * 34, sy + p.h - 4);
+        ctx.stroke();
+      }
+    }
+    if (brk.flash > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${brk.flash * 3})`;
+      ctx.beginPath();
+      ctx.roundRect(p.x, p.y, p.w, p.h, 8);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawChains(hg, pal) {
+    ctx.save();
+    ctx.lineWidth = 3;
+    for (const ch of hg.chains) {
+      const topY = hg.anchorY;
+      const endY = ch.cut ? topY + Math.min(60, (world.time - ch.cutAt) * 90 + 26) : hg.y;
+      const sway = ch.cut ? Math.sin(world.time * 3 + ch.x) * 10 : 0;
+      ctx.strokeStyle = ch.cut ? hexAlpha(pal.platEdge, 0.7) : shade(pal.plat, -25);
+      for (let y = topY; y < endY - 6; y += 13) {
+        const f = (y - topY) / Math.max(1, endY - topY);
+        const cx = ch.x + sway * f;
+        ctx.beginPath();
+        ctx.ellipse(cx, y + 6, 3.5, 6.5, sway * 0.02, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (!ch.cut) {
+        // glint so players read the chain as shootable
+        const gy = topY + ((world.time * 60 + ch.x) % Math.max(1, hg.y - topY));
+        ctx.fillStyle = hexAlpha(pal.accent, 0.9);
+        ctx.beginPath();
+        ctx.arc(ch.x, gy, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawCrate(c, pal, levelId) {
+    ctx.save();
+    const body = shade(pal.plat, 18);
+    ctx.fillStyle = body;
+    ctx.strokeStyle = pal.platEdge;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.roundRect(c.x, c.y, c.w, c.h, 6);
+    ctx.fill();
+    ctx.stroke();
+    // cross braces
+    ctx.strokeStyle = hexAlpha(pal.platEdge, 0.65);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(c.x + 5, c.y + 5); ctx.lineTo(c.x + c.w - 5, c.y + c.h - 5);
+    ctx.moveTo(c.x + c.w - 5, c.y + 5); ctx.lineTo(c.x + 5, c.y + c.h - 5);
+    ctx.stroke();
+    ctx.strokeStyle = hexAlpha(pal.accent, 0.5);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(c.x + 4, c.y + 4, c.w - 8, c.h - 8);
+    const dmg = 1 - c.hp / c.max;
+    if (dmg > 0.05) {
+      ctx.strokeStyle = `rgba(0,0,0,${0.3 + dmg * 0.5})`;
+      ctx.lineWidth = 2;
+      const n = Math.ceil(dmg * 5);
+      for (let i = 0; i < n; i += 1) {
+        const sx = c.x + seeded(`${levelId}c${c.seed}`, i * 11) * c.w;
+        ctx.beginPath();
+        ctx.moveTo(sx, c.y + 3);
+        ctx.lineTo(sx + (seeded(`${levelId}c${c.seed}`, i * 13) - 0.5) * 20, c.y + c.h * 0.6);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
@@ -3140,6 +3461,7 @@
     else if (name === "card") { tone(440, 0.08, "triangle", 0.06, now); tone(660, 0.12, "triangle", 0.05, now + 0.07); }
     else if (name === "chain") { tone(880, 0.05, "sawtooth", 0.05, now, 1400); noise(0.05, 0.04, 3200, now); }
     else if (name === "bounce") { tone(240, 0.12, "sine", 0.09, now, 620); }
+    else if (name === "thud") { tone(90, 0.18, "sine", 0.11, now, 45); noise(0.14, 0.08, 420, now); }
     else if (name === "teleport") { tone(500, 0.14, "sine", 0.07, now, 1200); tone(1200, 0.12, "sine", 0.05, now + 0.08, 500); }
     else if (name === "mythic") { tone(330, 0.12, "sawtooth", 0.07, now, 660); tone(660, 0.18, "triangle", 0.07, now + 0.1, 990); }
     else if (name === "win") { tone(330, 0.13, "triangle", 0.08, now); tone(440, 0.13, "triangle", 0.08, now + 0.12); tone(660, 0.2, "triangle", 0.08, now + 0.24); }

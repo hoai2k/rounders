@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rounders — Art Intake</title>
+    <link rel="stylesheet" href="workbench.css" />
+    <link rel="stylesheet" href="intake.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1>Art Intake</h1>
+      <label class="ghost file">Add images<input id="pick" type="file" accept="image/*" multiple hidden /></label>
+      <span class="spacer"></span>
+      <span id="summary" class="muted"></span>
+      <button id="downloadAll" class="primary">Download all as PNG</button>
+      <a class="ghost" href="./">Sprite workbench →</a>
+    </header>
+
+    <main class="intake">
+      <section id="drop" class="drop">
+        <p><strong>Drop delivered character art here</strong></p>
+        <p class="muted">
+          Images with an alpha channel pass through untouched. Images on a solid
+          backdrop (magenta / green / white screen) get keyed out to transparent PNG.
+          Nothing is cropped or resized, so body / weapon / arm parts stay on the
+          same canvas.
+        </p>
+        <p class="muted">
+          Filenames route themselves: <code>vex.png</code> →
+          <code>characters/canonical/</code>, <code>vex_weapon.png</code> →
+          <code>characters/render/</code>. Keep the originals — drop them in
+          <code>art-source/characters/</code>.
+        </p>
+      </section>
+      <div id="cards" class="cards"></div>
+    </main>
+
+    <script>window.ROUNDERS_ASSET_BASE = "../";</script>
+    <script src="../js/chroma.js"></script>
+    <script src="../js/characters.js"></script>
+    <script src="intake.js"></script>
+  </body>
+</html>

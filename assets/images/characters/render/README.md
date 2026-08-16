@@ -14,9 +14,14 @@ assets/images/characters/render/
 ```
 
 `<id>` is the character id from `js/characters.js` (`vex`, `rook`, `jinx`, …).
-The canonical `assets/images/characters/<id>.png` stays as the hero/reference
-image and is still used for victory scenes and as the fallback if the parts here
-are incomplete.
+The canonical `assets/images/characters/canonical/<id>.png` stays as the
+hero/reference image and is still used for victory scenes and as the fallback if
+the parts here are incomplete.
+
+Don't hand-place files here if they arrived on a solid backdrop — drop them in
+`intake/` at the repo root and run `npm run intake`, which keys the backdrop
+out, writes the transparent PNG here, and keeps the delivered original in
+`art-source/characters/`.
 
 ## Export tips
 
@@ -28,7 +33,9 @@ are incomplete.
   just gets a generic default position that you will want to fix in `/workbench`.
 - The arm image may contain one blob (used for both hands) or two (one per hand);
   each blob is cropped into its own sprite automatically.
-- Transparent background, no drop shadow baked in.
+- Transparent background is preferred; a flat magenta/green screen is fine and
+  gets keyed out at intake (and, as a safety net, at load time if an un-keyed
+  file ever makes it in). No drop shadow baked in.
 
 ## Anchors
 

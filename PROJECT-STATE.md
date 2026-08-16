@@ -64,7 +64,7 @@ Pillars:
 - [x] Procedural canvas renderer per character (crest, eyes, accessory, weapon shape,
       palette) so the game is fully playable before art is generated
 - [x] Image prompts for each character in `image-requests.md`; game auto-loads
-      `assets/images/characters/<id>.png` when present, falls back to procedural
+      `assets/images/characters/canonical/<id>.png` when present, falls back to procedural
 - [x] Character select in the lobby: each player joins, cycles characters, locks in
 - [x] **Composed sprites**: when `assets/images/characters/render/<id>_body.png` +
       `_weapon.png` (+ optional `_arm.png`) exist, the character is drawn from parts —
@@ -76,7 +76,15 @@ Pillars:
       on the right, **character** mode (place/orient/size weapon + hands) and
       **anchor** mode (anchor points on body/weapon/arm), exports `rigs.json`
       (or `rigs.js` for `file://`) which the game merges over the auto anchors
-- [x] Files: `js/characters.js`, `js/rig.js`, `workbench/`
+- [x] **Art intake**: `npm run intake` takes delivered files from `intake/`, keys
+      out solid backdrops (magenta/green/white screens) into transparent PNGs,
+      files them into `characters/canonical/` or `characters/render/`, and keeps
+      the delivered originals in `art-source/characters/`. Interior color matching
+      the screen survives (only backdrop connected to the border is cut) and
+      already-transparent art passes through untouched. `/workbench/intake.html`
+      is the visual version for stubborn cutouts; `js/chroma.js` is shared by
+      both and also keys at load time as a safety net
+- [x] Files: `js/characters.js`, `js/rig.js`, `js/chroma.js`, `tools/`, `workbench/`
 
 ### 5. Game flow redesign
 - [x] Random arena every round (no immediate repeats)

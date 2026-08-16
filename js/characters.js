@@ -59,12 +59,17 @@
       color: "#3fc9b0", dark: "#238a77", accent: "#d7c2ff", crest: "antennae", eyes: "glow", weapon: "prism" }
   ];
 
+  // Canonical hero art: assets/images/characters/canonical/<id>.png. Art that
+  // still has a solid backdrop baked in is keyed on load as a safety net.
   const images = new Map();
   for (const ch of CHARACTERS) {
     const img = new Image();
-    img.onload = () => images.set(ch.id, img);
+    img.onload = () => {
+      const chroma = window.ROUNDERS.chroma;
+      images.set(ch.id, (chroma && chroma.keyImage(img)) || img);
+    };
     img.onerror = () => {};
-    img.src = `${window.ROUNDERS_ASSET_BASE || ""}assets/images/characters/${ch.id}.png`;
+    img.src = `${window.ROUNDERS_ASSET_BASE || ""}assets/images/characters/canonical/${ch.id}.png`;
   }
 
   // Composed render parts (body/weapon/arm) + their hand-tweaked rig file.

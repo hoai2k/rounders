@@ -1,0 +1,366 @@
+{
+  "version": 1,
+  "note": "Authored in /workbench. Overrides only — anything not listed here is detected from the art. Values are source-image pixels unless noted.",
+  "characters": {
+    "vex": {
+      "weapon": {
+        "grip": {
+          "x": 48.75,
+          "y": 224.95
+        },
+        "muzzle": {
+          "x": 374.23,
+          "y": 98.69
+        }
+      },
+      "rig": {
+        "bodyScale": 1.06,
+        "weapon": {
+          "distance": 0.76
+        }
+      }
+    },
+    "rook": {
+      "weapon": {
+        "grip": {
+          "x": 122.3,
+          "y": 197.66
+        },
+        "muzzle": {
+          "x": 487.57,
+          "y": 187.15
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.9
+        }
+      }
+    },
+    "jinx": {
+      "weapon": {
+        "grip": {
+          "x": 118.02,
+          "y": 218.78
+        },
+        "muzzle": {
+          "x": 437.41,
+          "y": 219.67
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.93
+        }
+      }
+    },
+    "diesel": {
+      "weapon": {
+        "grip": {
+          "x": 63.88,
+          "y": 249.36
+        },
+        "muzzle": {
+          "x": 476.81,
+          "y": 259.41
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.88
+        }
+      }
+    },
+    "nyx": {
+      "rig": {
+        "weapon": {
+          "distance": 0.86
+        }
+      }
+    },
+    "saber": {
+      "body": {
+        "pivot": {
+          "x": 269.03,
+          "y": 262.68
+        },
+        "radius": 159.63,
+        "mount": {
+          "x": 356.82,
+          "y": 262.68
+        }
+      },
+      "weapon": {
+        "muzzle": {
+          "x": 492.1,
+          "y": 249.22
+        }
+      },
+      "rig": {
+        "bodyScale": 1.12,
+        "weapon": {
+          "distance": 0.45
+        }
+      }
+    },
+    "havoc": {
+      "weapon": {
+        "grip": {
+          "x": 94.88,
+          "y": 228.12
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.57
+        }
+      }
+    },
+    "wraith": {
+      "weapon": {
+        "grip": {
+          "x": 25.55,
+          "y": 221.15
+        },
+        "muzzle": {
+          "x": 489.51,
+          "y": 242.28
+        }
+      },
+      "rig": {
+        "bodyScale": 1.2,
+        "weapon": {
+          "distance": 0.75
+        }
+      }
+    },
+    "blitz": {
+      "weapon": {
+        "grip": {
+          "x": 76.9,
+          "y": 234.6
+        },
+        "muzzle": {
+          "x": 469.92,
+          "y": 236.33
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.79
+        }
+      }
+    },
+    "fang": {
+      "weapon": {
+        "grip": {
+          "x": 45.72,
+          "y": 252.3
+        },
+        "muzzle": {
+          "x": 481.96,
+          "y": 247.64
+        }
+      },
+      "rig": {
+        "bodyScale": 1.05,
+        "weapon": {
+          "distance": 0.74
+        }
+      }
+    },
+    "onyx": {
+      "weapon": {
+        "grip": {
+          "x": 39.75,
+          "y": 213.91
+        },
+        "muzzle": {
+          "x": 474.18,
+          "y": 224.45
+        }
+      },
+      "rig": {
+        "bodyScale": 1.05
+      }
+    },
+    "riot": {
+      "weapon": {
+        "grip": {
+          "x": 83.55,
+          "y": 269.41
+        },
+        "muzzle": {
+          "x": 432.04,
+          "y": 274.46
+        }
+      }
+    },
+    "pip": {
+      "weapon": {
+        "grip": {
+          "x": 118.38,
+          "y": 221.48
+        },
+        "muzzle": {
+          "x": 478.21,
+          "y": 214.84
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.75
+        }
+      }
+    },
+    "bolt": {
+      "weapon": {
+        "grip": {
+          "x": 71.9,
+          "y": 222.09
+        },
+        "muzzle": {
+          "x": 476.76,
+          "y": 219.84
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.74
+        }
+      }
+    },
+    "mochi": {
+      "weapon": {
+        "grip": {
+          "x": 62.89,
+          "y": 229.51
+        },
+        "muzzle": {
+          "x": 479.52,
+          "y": 221.21
+        }
+      }
+    },
+    "gruff": {
+      "weapon": {
+        "grip": {
+          "x": 26.57,
+          "y": 241.02
+        },
+        "muzzle": {
+          "x": 466.15,
+          "y": 229.17
+        }
+      }
+    },
+    "nova": {
+      "weapon": {
+        "grip": {
+          "x": 97.32,
+          "y": 232.25
+        },
+        "muzzle": {
+          "x": 474.94,
+          "y": 212.2
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.83
+        }
+      }
+    },
+    "fizz": {
+      "weapon": {
+        "grip": {
+          "x": 50.47,
+          "y": 232.65
+        },
+        "muzzle": {
+          "x": 466.34,
+          "y": 230.07
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.3
+        }
+      }
+    },
+    "ember": {
+      "weapon": {
+        "grip": {
+          "x": 69.66,
+          "y": 278.84
+        },
+        "muzzle": {
+          "x": 454.82,
+          "y": 274.41
+        }
+      }
+    },
+    "glacia": {
+      "weapon": {
+        "grip": {
+          "x": 43.3,
+          "y": 244.33
+        },
+        "muzzle": {
+          "x": 443.46,
+          "y": 264.51
+        }
+      }
+    },
+    "shade": {
+      "weapon": {
+        "grip": {
+          "x": 54.05,
+          "y": 253.24
+        }
+      }
+    },
+    "duke": {
+      "weapon": {
+        "grip": {
+          "x": 28.39,
+          "y": 219.24
+        },
+        "muzzle": {
+          "x": 493.63,
+          "y": 214.23
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.26
+        }
+      }
+    },
+    "sprocket": {
+      "weapon": {
+        "grip": {
+          "x": 62.18,
+          "y": 211.18
+        },
+        "muzzle": {
+          "x": 471.41,
+          "y": 210.67
+        }
+      }
+    },
+    "luna": {
+      "weapon": {
+        "grip": {
+          "x": 98.31,
+          "y": 240.5
+        }
+      },
+      "rig": {
+        "weapon": {
+          "distance": 0.74
+        }
+      }
+    }
+  }
+}

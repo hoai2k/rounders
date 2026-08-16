@@ -3,146 +3,251 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Rounder</title>
-    <link rel="stylesheet" href="styles.css?v=17">
+    <title>Rounders</title>
+<link rel="icon" href="assets/favicon/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon/favicon-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon/favicon-64.png">
+    <link rel="icon" type="image/png" sizes="256x256" href="assets/favicon/favicon-256.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="assets/favicon/favicon-512.png">
+    <link rel="stylesheet" href="styles.css?v=26">
   </head>
   <body>
-    <canvas id="game" aria-label="Rounder game canvas"></canvas>
+    <canvas id="game" aria-label="Rounders game canvas"></canvas>
 
-    <section id="menu" class="panel menu-panel">
-      <div>
-        <p class="eyebrow">Local arena roguelite</p>
-        <h1>Rounder</h1>
-        <p class="tagline">Four-player physics duels with loser drafts, volatile cards, controller rumble, and fast rematches.</p>
-      </div>
+    <section id="title" class="title-screen">
+      <p class="eyebrow" data-str="title.eyebrow"></p>
+      <h1 class="logo title-logo"><img class="logo-img" src="assets/images/logo-arch.png" alt="ROUNDERS"></h1>
+      <p class="title-tagline" data-str="title.tagline"></p>
+      <p class="press-start" data-str="title.pressStart"></p>
+    </section>
 
-      <div class="menu-grid">
-        <button id="startBtn" class="primary">Start Match</button>
-        <button id="createOnlineBtn">Create Online Game</button>
-        <button id="fullscreenBtn">Fullscreen</button>
-        <button id="musicBtn">Music: On</button>
-        <button id="settingsBtn">Settings</button>
-        <button id="howBtn">Controls</button>
-      </div>
-
-      <div id="onlineGames" class="online-games"></div>
+    <section id="menu" class="panel menu-panel hidden">
+      <header class="menu-header">
+        <p class="eyebrow" data-str="menu.eyebrow"></p>
+        <h1 class="logo"><img class="logo-img logo-img-menu" src="assets/images/logo-arch.png" alt="ROUNDERS"></h1>
+        <p class="tagline" data-str="menu.tagline"></p>
+      </header>
 
       <div id="joinSlots" class="join-slots"></div>
 
-      <div class="quick-card">
-        <strong>Join:</strong> press any controller button. Start uses joined players only.
+      <div id="lobbyActions" class="lobby-actions">
+        <button id="startBtn" class="primary start-big hidden" data-str="menu.startMatch"></button>
       </div>
     </section>
 
     <section id="settings" class="panel settings-panel hidden">
-      <h2>Settings</h2>
+      <h2 data-str="settings.title"></h2>
+
+      <h3 class="settings-group" data-str="settings.groupMatch"></h3>
       <label>
-        Max Players
+        <span data-str="settings.arena"></span>
+        <select id="levelSelect"></select>
+      </label>
+      <label>
+        <span data-str="settings.maxPlayers"></span>
         <input id="playerCount" type="range" min="2" max="4" value="4">
         <span id="playerCountValue">4</span>
       </label>
       <label>
-        Bots
-        <input id="botCount" type="range" min="0" max="3" value="0">
-        <span id="botCountValue">0</span>
-      </label>
-      <label>
-        Bot Difficulty
-        <input id="botDifficulty" type="range" min="1" max="3" value="1">
-        <span id="botDifficultyValue">Easy</span>
-      </label>
-      <label>
-        Score to Win
-        <input id="scoreLimit" type="range" min="3" max="8" value="5">
+        <span data-str="settings.scoreLimit"></span>
+        <input id="scoreLimit" type="range" min="3" max="10" value="5">
         <span id="scoreLimitValue">5</span>
       </label>
       <label>
-        Cards Per Draft
-        <input id="draftCount" type="range" min="3" max="5" value="5">
-        <span id="draftCountValue">5</span>
+        <span data-str="settings.draftCount"></span>
+        <input id="draftCount" type="range" min="3" max="5" value="4">
+        <span id="draftCountValue">4</span>
       </label>
       <label>
-        Arena Hazards
+        <span data-str="settings.botDifficulty"></span>
+        <input id="botDifficulty" type="range" min="1" max="3" value="2">
+        <span id="botDifficultyValue">Normal</span>
+      </label>
+      <label>
+        <span data-str="settings.hazards"></span>
         <input id="hazards" type="checkbox" checked>
       </label>
-      <label>
-        Controller Haptics
-        <input id="haptics" type="checkbox" checked>
-      </label>
-      <label>
-        Screen Shake
-        <input id="shake" type="checkbox" checked>
-      </label>
-      <label>
-        Music Volume
-        <input id="musicVolume" type="range" min="0" max="100" value="20">
-        <span id="musicVolumeValue">20</span>
-      </label>
-      <label>
-        Common Rate
+
+      <h3 class="settings-group" data-str="settings.groupRarity"></h3>
+      <label class="r-common">
+        <span data-str="settings.common"></span>
         <input id="commonWeight" type="range" min="0" max="20" value="9">
         <span id="commonWeightValue">9</span>
       </label>
-      <label>
-        Uncommon Rate
+      <label class="r-uncommon">
+        <span data-str="settings.uncommon"></span>
         <input id="uncommonWeight" type="range" min="0" max="20" value="6">
         <span id="uncommonWeightValue">6</span>
       </label>
-      <label>
-        Rare Rate
+      <label class="r-rare">
+        <span data-str="settings.rare"></span>
         <input id="rareWeight" type="range" min="0" max="20" value="4">
         <span id="rareWeightValue">4</span>
       </label>
-      <label>
-        Epic Rate
+      <label class="r-epic">
+        <span data-str="settings.epic"></span>
         <input id="epicWeight" type="range" min="0" max="20" value="3">
         <span id="epicWeightValue">3</span>
       </label>
-      <label>
-        Legendary Rate
+      <label class="r-legendary">
+        <span data-str="settings.legendary"></span>
         <input id="legendaryWeight" type="range" min="0" max="20" value="2">
         <span id="legendaryWeightValue">2</span>
       </label>
-      <label>
-        Mythical Rate
-        <input id="mythicalWeight" type="range" min="0" max="20" value="1">
-        <span id="mythicalWeightValue">1</span>
+      <label class="r-mythic">
+        <span data-str="settings.mythic"></span>
+        <input id="mythicWeight" type="range" min="0" max="20" value="1">
+        <span id="mythicWeightValue">1</span>
       </label>
+
+      <h3 class="settings-group" data-str="settings.groupVisuals"></h3>
+      <label>
+        <span data-str="settings.proceduralCharacters"></span>
+        <input id="proceduralCharacters" type="checkbox">
+      </label>
+
+      <h3 class="settings-group" data-str="settings.groupFeel"></h3>
+      <label>
+        <span data-str="settings.haptics"></span>
+        <input id="haptics" type="checkbox" checked>
+      </label>
+      <label>
+        <span data-str="settings.screenShake"></span>
+        <input id="shake" type="checkbox" checked>
+      </label>
+      <label>
+        <span data-str="settings.musicVolume"></span>
+        <input id="musicVolume" type="range" min="0" max="100" value="20">
+        <span id="musicVolumeValue">20</span>
+      </label>
+
       <div class="menu-grid">
-        <button id="settingsBack">Back</button>
+        <button id="settingsBack" data-str="settings.back"></button>
       </div>
     </section>
 
     <section id="how" class="panel how-panel hidden">
-      <h2>Controls</h2>
+      <h2 data-str="how.title"></h2>
+
+      <div class="pad-diagram">
+        <svg viewBox="-60 0 1040 520" role="img" aria-labelledby="padTitle padDesc">
+          <title id="padTitle">Xbox controller layout for Rounders</title>
+          <desc id="padDesc">Left stick moves, right stick aims, A jumps and confirms, RT or RB shoots,
+            LT, LB or B blocks and triggers Mythic abilities, the D-pad navigates menus,
+            the Menu button pauses and confirms, and the View button goes back.</desc>
+
+          <!-- triggers -->
+          <rect class="pad-part f-block" x="272" y="84" width="90" height="34" rx="14"></rect>
+          <rect class="pad-part f-shoot" x="558" y="84" width="90" height="34" rx="14"></rect>
+          <text class="pad-glyph" x="317" y="107">LT</text>
+          <text class="pad-glyph" x="603" y="107">RT</text>
+
+          <!-- bumpers -->
+          <rect class="pad-part f-block" x="258" y="120" width="118" height="28" rx="13"></rect>
+          <rect class="pad-part f-shoot" x="544" y="120" width="118" height="28" rx="13"></rect>
+          <text class="pad-glyph" x="317" y="141">LB</text>
+          <text class="pad-glyph" x="603" y="141">RB</text>
+
+          <!-- body -->
+          <path class="pad-body" d="M 300 148 H 620 Q 676 148 692 192 L 726 336 Q 744 424 692 448
+            Q 642 466 606 416 L 552 350 H 368 L 314 416 Q 278 466 228 448 Q 176 424 194 336
+            L 228 192 Q 244 148 300 148 Z"></path>
+
+          <!-- left stick -->
+          <circle class="pad-well" cx="330" cy="212" r="40"></circle>
+          <circle class="pad-stick f-move" cx="330" cy="212" r="27"></circle>
+          <circle class="pad-stick-top" cx="330" cy="212" r="14"></circle>
+
+          <!-- right stick -->
+          <circle class="pad-well" cx="525" cy="302" r="40"></circle>
+          <circle class="pad-stick f-move" cx="525" cy="302" r="27"></circle>
+          <circle class="pad-stick-top" cx="525" cy="302" r="14"></circle>
+
+          <!-- d-pad -->
+          <path class="pad-part f-menu" d="M 382 262 h 26 v 27 h 27 v 26 h -27 v 27 h -26 v -27 h -27 v -26 h 27 z"></path>
+
+          <!-- face buttons -->
+          <circle class="pad-face" cx="590" cy="172" r="19"></circle>
+          <text class="pad-letter" x="590" y="179">Y</text>
+          <circle class="pad-face" cx="550" cy="212" r="19"></circle>
+          <text class="pad-letter" x="550" y="219">X</text>
+          <circle class="pad-face f-block" cx="630" cy="212" r="19"></circle>
+          <text class="pad-letter dark" x="630" y="219">B</text>
+          <circle class="pad-face f-jump" cx="590" cy="252" r="19"></circle>
+          <text class="pad-letter dark" x="590" y="259">A</text>
+
+          <!-- centre buttons -->
+          <circle class="pad-face f-menu" cx="424" cy="206" r="12"></circle>
+          <circle class="pad-guide" cx="461" cy="190" r="15"></circle>
+          <circle class="pad-face f-menu" cx="498" cy="206" r="12"></circle>
+
+          <!-- leaders -->
+          <path class="pad-lead" d="M 200 101 H 250"></path>
+          <path class="pad-lead" d="M 200 212 H 286"></path>
+          <path class="pad-lead" d="M 200 330 H 300 L 352 306"></path>
+          <path class="pad-lead" d="M 720 101 H 664"></path>
+          <path class="pad-lead" d="M 720 186 H 690 L 652 204"></path>
+          <path class="pad-lead" d="M 720 252 H 680 L 612 252"></path>
+          <path class="pad-lead" d="M 720 330 H 640 L 568 308"></path>
+          <path class="pad-lead" d="M 414 68 L 424 192"></path>
+          <path class="pad-lead" d="M 506 68 L 498 192"></path>
+
+          <!-- labels -->
+          <text class="pad-label end f-block" x="196" y="107"><tspan class="k" data-str="how.padTriggersLeft"></tspan><tspan data-str="how.padTriggersLeftUse"></tspan></text>
+          <text class="pad-label end f-move" x="196" y="218"><tspan class="k" data-str="how.padStickLeft"></tspan><tspan data-str="how.padStickLeftUse"></tspan></text>
+          <text class="pad-label end f-menu" x="196" y="336"><tspan class="k" data-str="how.padDpad"></tspan><tspan data-str="how.padDpadUse"></tspan></text>
+          <text class="pad-label f-shoot" x="724" y="107"><tspan class="k" data-str="how.padTriggersRight"></tspan><tspan data-str="how.padTriggersRightUse"></tspan></text>
+          <text class="pad-label f-block" x="724" y="192"><tspan class="k" data-str="how.padB"></tspan><tspan data-str="how.padBUse"></tspan></text>
+          <text class="pad-label f-jump" x="724" y="258"><tspan class="k" data-str="how.padA"></tspan><tspan data-str="how.padAUse"></tspan></text>
+          <text class="pad-label f-move" x="724" y="336"><tspan class="k" data-str="how.padStickRight"></tspan><tspan data-str="how.padStickRightUse"></tspan></text>
+          <text class="pad-label end f-menu" x="408" y="62"><tspan class="k" data-str="how.padView"></tspan><tspan data-str="how.padViewUse"></tspan></text>
+          <text class="pad-label f-menu" x="512" y="62"><tspan class="k" data-str="how.padMenu"></tspan><tspan data-str="how.padMenuUse"></tspan></text>
+
+          <text class="pad-note" x="460" y="500" data-str-html="how.padNoteHtml"></text>
+        </svg>
+      </div>
+
       <div class="controls-grid">
         <div>
-          <h3>Keyboard P1</h3>
-          <p>A/D move, W jump, F shoot, G block</p>
+          <h3 data-str="how.joiningTitle"></h3>
+          <p data-str-html="how.joiningHtml"></p>
         </div>
         <div>
-          <h3>Keyboard P2</h3>
-          <p>Left/Right move, Up jump, / shoot, . block</p>
+          <h3 data-str="how.keyboard1Title"></h3>
+          <p data-str-html="how.keyboard1Html"></p>
         </div>
         <div>
-          <h3>Controller</h3>
-          <p>Left stick/D-pad move, A jump, RT/RB shoot, LT/LB block</p>
+          <h3 data-str="how.keyboard2Title"></h3>
+          <p data-str-html="how.keyboard2Html"></p>
         </div>
         <div>
-          <h3>Draft</h3>
-          <p>Move left/right and press shoot/jump to pick a card. Mythical cards activate with G or LB.</p>
+          <h3 data-str="how.loopTitle"></h3>
+          <p data-str-html="how.loopHtml"></p>
+        </div>
+        <div>
+          <h3 data-str="how.blockingTitle"></h3>
+          <p data-str-html="how.blockingHtml"></p>
+        </div>
+        <div>
+          <h3 data-str="how.wallTitle"></h3>
+          <p data-str-html="how.wallHtml"></p>
+        </div>
+        <div>
+          <h3 data-str="how.pausingTitle"></h3>
+          <p data-str-html="how.pausingHtml"></p>
         </div>
       </div>
       <div class="menu-grid">
-        <button id="howBack">Back</button>
+        <button id="howBack" data-str="how.back"></button>
       </div>
     </section>
 
     <section id="draft" class="draft hidden" aria-live="polite">
       <div class="draft-header">
-        <p id="draftPrompt"></p>
+        <p id="draftTitle"></p>
       </div>
-      <div id="draftCards" class="draft-cards"></div>
+      <div id="draftGrid" class="draft-grid"></div>
     </section>
 
     <section id="battleSplash" class="splash hidden" aria-live="polite">
@@ -151,20 +256,52 @@
       <p id="battleSub"></p>
     </section>
 
+    <section id="arenaBanner" class="arena-banner hidden" aria-live="polite">
+      <h2 id="arenaName"></h2>
+      <p id="arenaTag"></p>
+    </section>
+
     <section id="pausePanel" class="panel pause-panel hidden">
-      <h2>Paused</h2>
-      <div class="menu-grid">
-        <button id="resumeBtn" class="primary">Resume</button>
-        <button id="pauseFullscreenBtn">Fullscreen</button>
-        <button id="pauseMusicBtn">Music: On</button>
-        <button id="pauseMenuBtn">Main Menu</button>
+      <h2 data-str="pause.title"></h2>
+      <div class="menu-grid pause-grid">
+        <button id="resumeBtn" class="primary" data-str="pause.resume"></button>
+        <button id="pauseSettingsBtn" data-str="pause.settings"></button>
+        <button id="pauseMenuBtn" data-str="pause.quit"></button>
       </div>
     </section>
+
+    <nav id="iconBar" class="icon-bar hidden" aria-label="Menu actions">
+      <button id="iconHow" class="icon-btn" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+      </button>
+      <button id="iconSound" class="icon-btn" type="button">
+        <svg class="ico-sound-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.47 4.47 0 0 0 16.5 12zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06a9 9 0 0 0 0-17.54z"/></svg>
+        <svg class="ico-sound-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.8 8.8 0 0 0 21 12a9 9 0 0 0-7-8.77v2.06A7 7 0 0 1 19 12zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.9 8.9 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+      </button>
+      <button id="iconSettings" class="icon-btn" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.03 7.03 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.65 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96a7.03 7.03 0 0 0 1.62.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54a7.03 7.03 0 0 0 1.62-.94l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.6A3.6 3.6 0 1 1 15.6 12 3.6 3.6 0 0 1 12 15.6z"/></svg>
+      </button>
+      <button id="iconFullscreen" class="icon-btn" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+      </button>
+    </nav>
 
     <section id="hud" class="hud"></section>
     <section id="toast" class="toast hidden"></section>
 
-    <script src="https://www.unpkg.com/@instantdb/core@latest/dist/standalone/index.umd.cjs"></script>
-    <script src="game.js?v=17"></script>
+    <section id="nowPlaying" class="now-playing" aria-label="Music">
+      <button id="musicPrev" type="button" class="np-btn" title="Previous track" aria-label="Previous track">◀</button>
+      <span id="nowPlayingName" class="np-name">—</span>
+      <button id="musicNext" type="button" class="np-btn" title="Next track" aria-label="Next track">▶</button>
+    </section>
+
+    <script src="js/strings.js?v=26"></script>
+    <script src="js/cards.js?v=26"></script>
+    <script src="js/chroma.js?v=26"></script>
+    <script src="js/rig.js?v=26"></script>
+    <script src="js/characters.js?v=26"></script>
+    <script src="js/levels.js?v=26"></script>
+    <script src="js/music.js?v=26"></script>
+    <script src="game.js?v=26"></script>
   </body>
 </html>

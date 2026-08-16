@@ -7,6 +7,32 @@
 
   // crest: shape drawn on top of the body. weapon: barrel style. eyes: expression.
   const CHARACTERS = [
+    // ---- round 2: the indie-badass wave (front of the roster)
+    { id: "vex", name: "Vex", title: "the neon reaper", blurb: "Collects souls. Keeps receipts.",
+      color: "#b0104f", dark: "#6e0a33", accent: "#ff2e8a", crest: "mohawk", eyes: "xeye", weapon: "scythe" },
+    { id: "rook", name: "Rook", title: "the wasteland warden", blurb: "Half armor, half attitude, zero vacancies.",
+      color: "#7d8087", dark: "#45474d", accent: "#ff7a2e", crest: "plate", eyes: "patch", weapon: "sawnoff" },
+    { id: "jinx", name: "Jinx", title: "the glitch witch", blurb: "Your bugs are her features.",
+      color: "#1f2333", dark: "#0e101a", accent: "#29f2ff", crest: "glitch", eyes: "pixel", weapon: "glitchgun" },
+    { id: "diesel", name: "Diesel", title: "the road king", blurb: "Runs on fumes and grudges.",
+      color: "#4d2e26", dark: "#291712", accent: "#ff9e2e", crest: "spikes", eyes: "goggles", weapon: "flamer" },
+    { id: "nyx", name: "Nyx", title: "the void dancer", blurb: "Between the stars, mostly knives.",
+      color: "#2a1f4d", dark: "#171130", accent: "#b8a8ff", crest: "hood", eyes: "slit", weapon: "twindagger" },
+    { id: "saber", name: "Saber", title: "the last ronin", blurb: "One cut. Usually enough.",
+      color: "#a32639", dark: "#5c1420", accent: "#f2e2c9", crest: "topknot", eyes: "scar", weapon: "katana" },
+    { id: "havoc", name: "Havoc", title: "the demolition artist", blurb: "Every wall is a door if you believe.",
+      color: "#a08a52", dark: "#665732", accent: "#ffd23d", crest: "fuse", eyes: "manic", weapon: "launcher" },
+    { id: "wraith", name: "Wraith", title: "the static ghost", blurb: "Died once. Wasn't impressed.",
+      color: "#a3b3a6", dark: "#5f6e62", accent: "#7ff2d8", crest: "wisps", eyes: "hollow", weapon: "spectral" },
+    { id: "blitz", name: "Blitz", title: "the arc runner", blurb: "Outruns the thunder she starts.",
+      color: "#ffd21f", dark: "#a8890a", accent: "#29b6ff", crest: "arcs", eyes: "fierce", weapon: "coilgun" },
+    { id: "fang", name: "Fang", title: "the stray", blurb: "No collar. No mercy.",
+      color: "#4f7285", dark: "#2c414d", accent: "#ff5252", crest: "wolf", eyes: "feral", weapon: "chainblade" },
+    { id: "onyx", name: "Onyx", title: "the magma golem", blurb: "Old as mountains. Half as forgiving.",
+      color: "#33302e", dark: "#1a1817", accent: "#ff6316", crest: "shards", eyes: "glow", weapon: "gauntlet" },
+    { id: "riot", name: "Riot", title: "the paint prophet", blurb: "The city is her canvas. You're the wall.",
+      color: "#1f6e62", dark: "#103b34", accent: "#ff3df2", crest: "backcap", eyes: "bandit", weapon: "spraygat" },
+    // ---- round 1: the founding cast
     { id: "pip", name: "Pip", title: "the cheerful rookie", blurb: "Wide-eyed, cork-loaded, unreasonably optimistic.",
       color: "#ff9838", dark: "#c96a12", accent: "#7ed957", crest: "sprout", eyes: "wide", weapon: "peashooter" },
     { id: "bolt", name: "Bolt", title: "the livewire", blurb: "Runs on static, excitement, and poor impulse control.",
@@ -236,6 +262,207 @@
         ctx.beginPath(); ctx.moveTo(0, -r * 0.85); ctx.lineTo(0, -r * 1.1); ctx.stroke();
         break;
       }
+      case "mohawk": {
+        ctx.fillStyle = a;
+        for (let i = -2; i <= 2; i += 1) {
+          const hgt = (1 - Math.abs(i) * 0.22) * r * 0.62;
+          ctx.beginPath();
+          ctx.moveTo(i * r * 0.22 - r * 0.11, -r * 0.85 + Math.abs(i) * r * 0.1);
+          ctx.lineTo(i * r * 0.22 + r * 0.03, -r * 0.85 - hgt);
+          ctx.lineTo(i * r * 0.22 + r * 0.14, -r * 0.82 + Math.abs(i) * r * 0.1);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        break;
+      }
+      case "plate": {
+        ctx.fillStyle = "#c96a2e";
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 0.62, r * 0.72, r * 0.42, 0, Math.PI, 0);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#1c1a24";
+        for (const rx of [-0.45, 0, 0.45]) {
+          ctx.beginPath(); ctx.arc(rx * r, -r * 0.72, r * 0.05, 0, Math.PI * 2); ctx.fill();
+        }
+        break;
+      }
+      case "glitch": {
+        for (const [gx, gy, gw, gh, col] of [
+          [-0.7, -1.05, 0.3, 0.1, a], [0.35, -1.2, 0.35, 0.09, "#ff2ea8"],
+          [-0.2, -1.28, 0.28, 0.08, a], [0.65, -0.9, 0.24, 0.08, "#ff2ea8"]
+        ]) {
+          ctx.fillStyle = col;
+          ctx.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(t * 7 + gx * 9));
+          ctx.fillRect(gx * r, gy * r, gw * r, gh * r);
+        }
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "spikes": {
+        ctx.fillStyle = "#c9ccd4";
+        for (const sx of [-0.55, -0.18, 0.18, 0.55]) {
+          ctx.beginPath();
+          ctx.moveTo(sx * r - r * 0.09, -r * (0.86 - Math.abs(sx) * 0.16));
+          ctx.lineTo(sx * r, -r * (1.18 - Math.abs(sx) * 0.2));
+          ctx.lineTo(sx * r + r * 0.09, -r * (0.84 - Math.abs(sx) * 0.16));
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        break;
+      }
+      case "hood": {
+        ctx.fillStyle = d;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.95, r * 0.12);
+        ctx.quadraticCurveTo(-r * 1.05, -r * 1.15, 0, -r * 1.18);
+        ctx.quadraticCurveTo(r * 1.05, -r * 1.15, r * 0.95, r * 0.12);
+        ctx.quadraticCurveTo(r * 0.55, -r * 0.25, 0, -r * 0.28);
+        ctx.quadraticCurveTo(-r * 0.55, -r * 0.25, -r * 0.95, r * 0.12);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        // star specks on the hood
+        ctx.fillStyle = a;
+        for (const [px, py] of [[-0.55, -0.72], [0.4, -0.9], [0.68, -0.5], [-0.25, -1.0]]) {
+          ctx.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(t * 2 + px * 7));
+          ctx.fillRect(px * r, py * r, r * 0.05, r * 0.05);
+        }
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "topknot": {
+        ctx.fillStyle = "#14121c";
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 0.86, r * 0.52, r * 0.24, 0, Math.PI, 0);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 1.22, r * 0.19, r * 0.25, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = a;
+        ctx.lineWidth = Math.max(2.5, r * 0.08);
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.2, -r * 1.0); ctx.lineTo(r * 0.2, -r * 1.0);
+        ctx.stroke();
+        break;
+      }
+      case "fuse": {
+        ctx.strokeStyle = "#1c1a24";
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 0.9);
+        ctx.quadraticCurveTo(r * 0.18, -r * 1.2, r * 0.05, -r * 1.34);
+        ctx.stroke();
+        const spark = 0.7 + Math.sin(t * 16) * 0.3;
+        ctx.fillStyle = a;
+        ctx.beginPath(); ctx.arc(r * 0.05, -r * 1.38, r * 0.1 * spark, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(r * 0.05, -r * 1.38, r * 0.045 * spark, 0, Math.PI * 2); ctx.fill();
+        // hazard band high on the brow, clear of the eyes
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(-r * 0.9, -r * 0.72, r * 1.8, r * 0.2);
+        ctx.clip();
+        for (let i = -6; i < 6; i += 1) {
+          ctx.fillStyle = i % 2 ? "#1c1a24" : a;
+          ctx.beginPath();
+          ctx.moveTo(i * r * 0.22, -r * 0.72); ctx.lineTo((i + 1) * r * 0.22, -r * 0.72);
+          ctx.lineTo(i * r * 0.22 + r * 0.09, -r * 0.52); ctx.lineTo(i * r * 0.22 - r * 0.13, -r * 0.52);
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+        ctx.strokeStyle = "#1c1a24";
+        ctx.lineWidth = Math.max(1.5, r * 0.05);
+        ctx.strokeRect(-r * 0.9, -r * 0.72, r * 1.8, r * 0.2);
+        break;
+      }
+      case "wisps": {
+        ctx.fillStyle = ch.color;
+        for (const [wx, ph] of [[-0.55, 0], [-0.1, 2], [0.4, 4]]) {
+          const sway = Math.sin(t * 3 + ph) * r * 0.08;
+          ctx.globalAlpha = 0.75;
+          ctx.beginPath();
+          ctx.moveTo(wx * r - r * 0.14, -r * 0.82);
+          ctx.quadraticCurveTo(wx * r + sway, -r * 1.35, wx * r + sway * 2, -r * 1.5);
+          ctx.quadraticCurveTo(wx * r + r * 0.14 + sway, -r * 1.2, wx * r + r * 0.16, -r * 0.8);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "arcs": {
+        ctx.fillStyle = a;
+        for (const sd of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(sd * r * 0.3, -r * 0.8);
+          ctx.lineTo(sd * r * 0.72, -r * 1.22);
+          ctx.lineTo(sd * r * 0.5, -r * 1.05);
+          ctx.lineTo(sd * r * 0.85, -r * 1.42);
+          ctx.lineTo(sd * r * 0.42, -r * 1.02);
+          ctx.lineTo(sd * r * 0.58, -r * 1.16);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        break;
+      }
+      case "wolf": {
+        ctx.fillStyle = ch.color;
+        for (const sd of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(sd * r * 0.26, -r * 0.82);
+          ctx.lineTo(sd * r * 0.78, -r * 1.42);
+          ctx.lineTo(sd * r * 0.88, -r * 0.68);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+          // battle notch
+          ctx.fillStyle = "#1c1a24";
+          ctx.beginPath();
+          ctx.moveTo(sd * r * 0.8, -r * 1.06);
+          ctx.lineTo(sd * r * 0.92, -r * 1.0);
+          ctx.lineTo(sd * r * 0.84, -r * 0.94);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = ch.dark;
+          ctx.beginPath();
+          ctx.moveTo(sd * r * 0.42, -r * 0.86);
+          ctx.lineTo(sd * r * 0.72, -r * 1.22);
+          ctx.lineTo(sd * r * 0.78, -r * 0.78);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = ch.color;
+        }
+        break;
+      }
+      case "shards": {
+        // jagged rock crown
+        ctx.fillStyle = "#6b6460";
+        for (const [sx, h] of [[-0.5, 0.4], [-0.15, 0.62], [0.22, 0.5], [0.55, 0.32]]) {
+          ctx.beginPath();
+          ctx.moveTo(sx * r - r * 0.13, -r * 0.8);
+          ctx.lineTo(sx * r + r * 0.02, -r * (0.8 + h));
+          ctx.lineTo(sx * r + r * 0.15, -r * 0.78);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        // magma cracks across the body
+        ctx.strokeStyle = a;
+        ctx.lineWidth = Math.max(1.5, r * 0.05);
+        ctx.globalAlpha = 0.65 + 0.35 * Math.abs(Math.sin(t * 1.8));
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.62, -r * 0.1);
+        ctx.lineTo(-r * 0.3, r * 0.08); ctx.lineTo(-r * 0.42, r * 0.42);
+        ctx.moveTo(r * 0.3, -r * 0.4);
+        ctx.lineTo(r * 0.5, -r * 0.12); ctx.lineTo(r * 0.34, r * 0.2); ctx.lineTo(r * 0.58, r * 0.44);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "backcap": {
+        ctx.fillStyle = d;
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 0.78, r * 0.62, r * 0.38, 0, Math.PI, 0);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        // backwards brim
+        ctx.fillStyle = d;
+        ctx.beginPath();
+        ctx.roundRect(-r * 0.98, -r * 0.86, r * 0.42, r * 0.16, r * 0.06);
+        ctx.fill(); ctx.stroke();
+        // paint splats on the cap
+        ctx.fillStyle = a;
+        ctx.beginPath(); ctx.arc(-r * 0.2, -r * 0.92, r * 0.07, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#3dff9e";
+        ctx.beginPath(); ctx.arc(r * 0.22, -r * 0.86, r * 0.055, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
       case "antennae": {
         for (const s of [-1, 1]) {
           ctx.beginPath();
@@ -321,6 +548,142 @@
         ctx.shadowBlur = 0;
         smile(ctx, r, 0.4); break;
       }
+      case "xeye": {
+        eye(-r * 0.3, b);
+        ctx.strokeStyle = "#f2e2c9";
+        ctx.lineWidth = Math.max(2, r * 0.09);
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(r * 0.18, -r * 0.34); ctx.lineTo(r * 0.42, -r * 0.1);
+        ctx.moveTo(r * 0.42, -r * 0.34); ctx.lineTo(r * 0.18, -r * 0.1);
+        ctx.stroke();
+        flat(ctx, r);
+        break;
+      }
+      case "patch": {
+        eye(-r * 0.3, b);
+        ctx.fillStyle = "#14121c";
+        ctx.beginPath(); ctx.arc(r * 0.3, -r * 0.22, r * 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#14121c";
+        ctx.lineWidth = Math.max(2, r * 0.07);
+        ctx.beginPath();
+        ctx.moveTo(r * 0.12, -r * 0.38); ctx.lineTo(r * 0.62, -r * 0.55);
+        ctx.moveTo(r * 0.46, -r * 0.1); ctx.lineTo(r * 0.72, r * 0.05);
+        ctx.stroke();
+        flat(ctx, r);
+        break;
+      }
+      case "pixel": {
+        ctx.fillStyle = ch.accent;
+        ctx.fillRect(-r * 0.4, -r * 0.32, r * 0.2, r * 0.2);
+        ctx.fillRect(r * 0.2, -r * 0.32, r * 0.2, r * 0.2);
+        ctx.fillStyle = "#ff2ea8";
+        ctx.fillRect(-r * 0.44, -r * 0.36, r * 0.08, r * 0.08);
+        ctx.fillRect(r * 0.36, -r * 0.16, r * 0.08, r * 0.08);
+        ctx.strokeStyle = ch.accent;
+        ctx.lineWidth = Math.max(2, r * 0.07);
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.24, r * 0.24);
+        ctx.lineTo(-r * 0.1, r * 0.14); ctx.lineTo(r * 0.04, r * 0.26); ctx.lineTo(r * 0.18, r * 0.14);
+        ctx.stroke();
+        break;
+      }
+      case "goggles": {
+        // goggles worn over the eyes: amber lenses with a strap
+        ctx.strokeStyle = "#14121c";
+        ctx.lineWidth = Math.max(2.5, r * 0.09);
+        ctx.beginPath(); ctx.moveTo(-r * 0.85, -r * 0.22); ctx.lineTo(r * 0.85, -r * 0.22); ctx.stroke();
+        for (const sd of [-1, 1]) {
+          ctx.fillStyle = "#14121c";
+          ctx.beginPath(); ctx.arc(sd * r * 0.3, -r * 0.22, r * 0.24, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#e8b23d";
+          ctx.beginPath(); ctx.arc(sd * r * 0.3, -r * 0.22, r * 0.18, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "rgba(255,255,255,0.65)";
+          ctx.beginPath(); ctx.arc(sd * r * 0.3 - r * 0.06, -r * 0.28, r * 0.06, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.strokeStyle = "#f2e2c9";
+        ctx.lineWidth = Math.max(2, r * 0.07);
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.14, r * 0.26); ctx.lineTo(r * 0.14, r * 0.26);
+        ctx.stroke();
+        break;
+      }
+      case "scar": {
+        brow(ctx, -r * 0.3, r, 0.2); brow(ctx, r * 0.3, r, -0.2);
+        eye(-r * 0.3, b * 0.75); eye(r * 0.3, b * 0.75);
+        ctx.strokeStyle = "#f2e2c9";
+        ctx.lineWidth = Math.max(1.5, r * 0.05);
+        ctx.beginPath();
+        ctx.moveTo(r * 0.14, -r * 0.5); ctx.lineTo(r * 0.46, r * 0.02);
+        ctx.moveTo(r * 0.18, -r * 0.32); ctx.lineTo(r * 0.34, -r * 0.38);
+        ctx.moveTo(r * 0.28, -r * 0.14); ctx.lineTo(r * 0.44, -r * 0.2);
+        ctx.stroke();
+        flat(ctx, r);
+        break;
+      }
+      case "manic": {
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(-r * 0.28, -r * 0.18, r * 0.19, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(r * 0.3, -r * 0.16, r * 0.12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#14121c";
+        ctx.beginPath(); ctx.arc(-r * 0.25, -r * 0.16, r * 0.08 * b + r * 0.01, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(r * 0.32, -r * 0.15, r * 0.05 * b + r * 0.01, 0, Math.PI * 2); ctx.fill();
+        grin(ctx, r);
+        break;
+      }
+      case "hollow": {
+        ctx.fillStyle = "#14121c";
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.28, -r * 0.2, r * 0.13, r * 0.17 * b + r * 0.01, 0, 0, Math.PI * 2);
+        ctx.ellipse(r * 0.28, -r * 0.2, r * 0.13, r * 0.17 * b + r * 0.01, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // spectral drip from one socket
+        ctx.fillStyle = ch.accent;
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(-r * 0.31, -r * 0.06, r * 0.06, r * 0.22);
+        ctx.globalAlpha = 1;
+        flat(ctx, r);
+        break;
+      }
+      case "feral": {
+        ctx.fillStyle = ch.accent;
+        for (const sd of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(sd * r * 0.14, -r * 0.2);
+          ctx.lineTo(sd * r * 0.46, -r * 0.36);
+          ctx.lineTo(sd * r * 0.44, -r * 0.16);
+          ctx.closePath(); ctx.fill();
+        }
+        flat(ctx, r);
+        // one visible fang
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.1, r * 0.24); ctx.lineTo(-r * 0.03, r * 0.42); ctx.lineTo(r * 0.04, r * 0.24);
+        ctx.closePath(); ctx.fill();
+        break;
+      }
+      case "bandit": {
+        brow(ctx, -r * 0.3, r, 0.24); brow(ctx, r * 0.3, r, -0.24);
+        eye(-r * 0.3, b); eye(r * 0.3, b);
+        // paint-splattered bandana over the mouth
+        ctx.fillStyle = ch.dark;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.75, r * 0.02);
+        ctx.quadraticCurveTo(0, r * 0.28, r * 0.75, r * 0.02);
+        ctx.lineTo(r * 0.62, r * 0.55);
+        ctx.quadraticCurveTo(0, r * 0.78, -r * 0.62, r * 0.55);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = "#1c1a24";
+        ctx.lineWidth = Math.max(1.5, r * 0.05);
+        ctx.stroke();
+        ctx.fillStyle = ch.accent;
+        ctx.beginPath(); ctx.arc(-r * 0.2, r * 0.34, r * 0.06, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#3dff9e";
+        ctx.beginPath(); ctx.arc(r * 0.18, r * 0.42, r * 0.05, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
       default: eye(-r * 0.3, b); eye(r * 0.3, b); smile(ctx, r, 0.5);
     }
     ctx.restore();
@@ -402,6 +765,158 @@
     ctx.strokeStyle = "#1c1a24";
     const L = r * 1.5; // barrel length
     switch (ch.weapon) {
+      case "scythe": {
+        ctx.fillStyle = "#2b2333";
+        rr(ctx, 0, -r * 0.08, L * 0.72, r * 0.16, r * 0.05); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = ch.accent;
+        ctx.beginPath();
+        ctx.moveTo(L * 0.68, -r * 0.05);
+        ctx.quadraticCurveTo(L * 1.06, -r * 0.1, L * 0.98, r * 0.62);
+        ctx.quadraticCurveTo(L * 1.0, r * 0.05, L * 0.66, r * 0.12);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      }
+      case "sawnoff": {
+        ctx.fillStyle = "#3d3e42";
+        rr(ctx, 0, -r * 0.2, L * 0.58, r * 0.18, r * 0.07); ctx.fill(); ctx.stroke();
+        rr(ctx, 0, 0.02 * r, L * 0.58, r * 0.18, r * 0.07); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#6e4a2a";
+        rr(ctx, -L * 0.1, -r * 0.14, L * 0.16, r * 0.3, r * 0.06); ctx.fill(); ctx.stroke();
+        break;
+      }
+      case "glitchgun": {
+        for (const [ox, oy, w2, col] of [[0, -0.14, 0.5, "#2b3140"], [0.1, -0.02, 0.62, ch.accent], [0.04, 0.08, 0.45, "#ff2ea8"]]) {
+          ctx.fillStyle = col;
+          rr(ctx, L * ox, oy * r - r * 0.05, L * w2, r * 0.12, r * 0.03); ctx.fill(); ctx.stroke();
+        }
+        break;
+      }
+      case "flamer": {
+        ctx.fillStyle = "#57493f";
+        rr(ctx, 0, -r * 0.14, L * 0.55, r * 0.28, r * 0.07); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#8f959e";
+        ctx.beginPath();
+        ctx.moveTo(L * 0.55, -r * 0.2); ctx.lineTo(L * 0.78, -r * 0.26); ctx.lineTo(L * 0.78, r * 0.26); ctx.lineTo(L * 0.55, r * 0.2);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = ch.accent;
+        ctx.beginPath();
+        ctx.moveTo(L * 0.8, -r * 0.12);
+        ctx.quadraticCurveTo(L * 1.02, 0, L * 0.8, r * 0.12);
+        ctx.quadraticCurveTo(L * 0.92, 0, L * 0.8, -r * 0.12);
+        ctx.closePath(); ctx.fill();
+        break;
+      }
+      case "twindagger": {
+        ctx.fillStyle = "#2a2340";
+        rr(ctx, 0, -r * 0.16, L * 0.45, r * 0.32, r * 0.06); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#d8d2f0";
+        for (const dy of [-0.11, 0.11]) {
+          ctx.beginPath();
+          ctx.moveTo(L * 0.44, dy * r - r * 0.05);
+          ctx.lineTo(L * (dy < 0 ? 0.95 : 0.8), dy * r);
+          ctx.lineTo(L * 0.44, dy * r + r * 0.05);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        break;
+      }
+      case "katana": {
+        ctx.fillStyle = "#1c1a24";
+        rr(ctx, 0, -r * 0.06, L * 0.22, r * 0.12, r * 0.03); ctx.fill();
+        ctx.strokeStyle = ch.accent;
+        ctx.lineWidth = Math.max(1.5, r * 0.05);
+        for (const wx of [0.05, 0.12, 0.19]) {
+          ctx.beginPath(); ctx.moveTo(L * wx, -r * 0.06); ctx.lineTo(L * (wx + 0.03), r * 0.06); ctx.stroke();
+        }
+        ctx.strokeStyle = "#1c1a24";
+        ctx.lineWidth = Math.max(2, r * 0.08);
+        ctx.fillStyle = "#8f8a75";
+        ctx.beginPath(); ctx.ellipse(L * 0.25, 0, r * 0.06, r * 0.16, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#e8e4f2";
+        ctx.beginPath();
+        ctx.moveTo(L * 0.28, -r * 0.13);
+        ctx.lineTo(L * 1.06, -r * 0.15);
+        ctx.lineTo(L * 1.16, -r * 0.02);
+        ctx.lineTo(L * 0.28, r * 0.09);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.lineWidth = Math.max(1.5, r * 0.045);
+        ctx.beginPath();
+        ctx.moveTo(L * 0.32, -r * 0.02); ctx.lineTo(L * 1.08, -r * 0.05);
+        ctx.stroke();
+        break;
+      }
+      case "launcher": {
+        ctx.fillStyle = "#4a4f37";
+        rr(ctx, 0, -r * 0.22, L * 0.7, r * 0.44, r * 0.14); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#1c1a24";
+        ctx.beginPath(); ctx.arc(L * 0.72, 0, r * 0.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = ch.accent;
+        ctx.beginPath(); ctx.arc(L * 0.72, 0, r * 0.09, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#33381c";
+        ctx.beginPath(); ctx.arc(L * 0.28, r * 0.3, r * 0.16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        break;
+      }
+      case "spectral": {
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = "#8fa398";
+        rr(ctx, 0, -r * 0.1, L * 0.95, r * 0.2, r * 0.08); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = ch.accent;
+        ctx.globalAlpha = 0.9;
+        rr(ctx, L * 0.2, -r * 0.04, L * 0.6, r * 0.08, r * 0.04); ctx.fill();
+        ctx.beginPath(); ctx.arc(L * 0.98, 0, r * 0.08, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        break;
+      }
+      case "coilgun": {
+        ctx.fillStyle = "#33333f";
+        rr(ctx, 0, -r * 0.09, L * 0.85, r * 0.18, r * 0.05); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = ch.accent;
+        for (const wx of [0.25, 0.45, 0.65]) {
+          rr(ctx, L * wx, -r * 0.17, L * 0.07, r * 0.34, r * 0.03); ctx.fill(); ctx.stroke();
+        }
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(L * 0.9, 0, r * 0.07, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      case "chainblade": {
+        ctx.fillStyle = "#3d4752";
+        rr(ctx, 0, -r * 0.12, L * 0.5, r * 0.24, r * 0.06); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#c9ccd4";
+        ctx.beginPath();
+        ctx.moveTo(L * 0.5, -r * 0.12); ctx.lineTo(L * 0.95, 0); ctx.lineTo(L * 0.5, r * 0.12);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "#8f959e";
+        ctx.lineWidth = Math.max(1.5, r * 0.05);
+        for (let i = 0; i < 4; i += 1) {
+          ctx.beginPath();
+          ctx.arc(L * (0.15 + i * 0.14), r * (0.3 + Math.sin(i * 1.8) * 0.06), r * 0.06, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        break;
+      }
+      case "gauntlet": {
+        ctx.fillStyle = "#4a4542";
+        rr(ctx, 0, -r * 0.2, L * 0.42, r * 0.4, r * 0.1); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#5c5652";
+        rr(ctx, L * 0.4, -r * 0.28, L * 0.42, r * 0.56, r * 0.16); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = ch.accent;
+        for (const dy of [-0.16, 0, 0.16]) {
+          ctx.beginPath(); ctx.arc(L * 0.78, dy * r, r * 0.055, 0, Math.PI * 2); ctx.fill();
+        }
+        break;
+      }
+      case "spraygat": {
+        ctx.fillStyle = "#2c3b3a";
+        rr(ctx, 0, -r * 0.18, L * 0.45, r * 0.36, r * 0.1); ctx.fill(); ctx.stroke();
+        for (const [dy, col] of [[-0.14, ch.accent], [0, "#3dff9e"], [0.14, "#29b6ff"]]) {
+          ctx.fillStyle = "#c9ccd4";
+          rr(ctx, L * 0.45, dy * r - r * 0.05, L * 0.34, r * 0.1, r * 0.04); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = col;
+          ctx.beginPath(); ctx.arc(L * 0.82, dy * r, r * 0.05, 0, Math.PI * 2); ctx.fill();
+        }
+        break;
+      }
       case "peashooter": {
         ctx.fillStyle = "#a0713d";
         rr(ctx, 0, -r * 0.16, L * 0.8, r * 0.32, r * 0.12); ctx.fill(); ctx.stroke();

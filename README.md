@@ -36,7 +36,7 @@ The game opens on an arcade "PRESS START" title screen; starting from keyboard
 or mouse also enters fullscreen.
 
 Join the lobby with your **shoot** button (or any pad button), pick one of the
-**12 characters** with ◀ ▶, and lock in with shoot. `M` toggles music,
+**24 characters** with ◀ ▶, and lock in with shoot. `M` toggles music,
 `Esc`/`P` pauses.
 
 ## What's inside
@@ -49,7 +49,9 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
   teleporters, crumbling floors, rising tides, timed lightning, syrup pools,
   black-hole voids, and more. Every round is a random arena (or lock one in
   Settings).
-- **12 playable characters** — round bodies, signature weapons, big personalities.
+- **24 playable characters** in two waves — an indie-badass front line (Vex,
+  Rook, Jinx, Diesel, Nyx, Saber, Havoc, Wraith, Blitz, Fang, Onyx, Riot) and
+  the founding cheerful cast — round bodies, signature weapons, big personalities.
   Fully procedural art, with automatic upgrade to generated images when dropped
   into `assets/images/` (see `image-requests.md`).
 - **Simultaneous drafting** — when several players lose a round, they all draft at

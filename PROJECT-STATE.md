@@ -56,7 +56,10 @@ Pillars:
 - [x] **25 arenas**, each with a distinct theme + 1–2 signature mechanics
 - [x] File: `js/levels.js`
 
-### 4. Characters — 12 pilots, procedural + generated art
+### 4. Characters — 24 pilots across two waves, procedural + generated art
+- [x] Round 2: 12 indie-badass characters lead the roster (Vex, Rook, Jinx,
+      Diesel, Nyx, Saber, Havoc, Wraith, Blitz, Fang, Onyx, Riot) — new crest,
+      face, and weapon renderers; prompts in image-requests.md §6
 - [x] 12 characters, all roughly circular with a signature weapon sticking out
 - [x] Procedural canvas renderer per character (crest, eyes, accessory, weapon shape,
       palette) so the game is fully playable before art is generated

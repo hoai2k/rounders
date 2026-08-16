@@ -72,6 +72,10 @@ Pillars:
       real muzzle. Anchors (body pivot/radius/mount, weapon grip/muzzle, arm
       shoulder/hand) are auto-detected from the alpha channel, whatever framing
       the parts were delivered in
+- [x] **Split facing**: the body mirrors with the character's facing (movement)
+      and the weapon mirrors with the aim, in two independent frames, so aiming
+      behind yourself no longer draws the weapon upside down. Arms ride the
+      weapon's frame; the muzzle is a weapon point and depends only on the aim
 - [x] **Arm attachment**: each arm sprite (drawn facing right like the weapon)
       keeps its shoulder pinned to a socket on the body and its hand on a hold
       point that rides the weapon, swinging and stretching within limits as the

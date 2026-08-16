@@ -292,8 +292,11 @@
   }
 
   // mirrored rig space <-> screen
-  const toScreen = (f, p) => ({ x: f.cx + p.x * f.T.facing * f.z, y: f.cy + p.y * f.z });
-  const toRigSpace = (f, p) => ({ x: ((p.x - f.cx) / f.z) * f.T.facing, y: (p.y - f.cy) / f.z });
+  // Grip, muzzle and hold points are weapon-space, so they mirror with the
+  // weapon's facing rather than the body's — the two disagree whenever the
+  // player aims behind themselves.
+  const toScreen = (f, p) => ({ x: f.cx + p.x * f.T.wFacing * f.z, y: f.cy + p.y * f.z });
+  const toRigSpace = (f, p) => ({ x: ((p.x - f.cx) / f.z) * f.T.wFacing, y: (p.y - f.cy) / f.z });
 
   // weapon-image px <-> mirrored rig space
   function weaponToRig(f, px, py) {
@@ -593,12 +596,12 @@
       ctx.strokeStyle = "rgba(255,210,77,0.8)";
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.lineTo(f.T.facing * state.r * 2.05, 0);
+      ctx.lineTo(f.T.wFacing * state.r * 2.05, 0);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = "rgba(255,210,77,0.9)";
       for (const [at, label] of [[0.55, "grip"], [2.05, "muzzle"]]) {
-        const x = f.T.facing * state.r * at;
+        const x = f.T.wFacing * state.r * at;
         ctx.beginPath();
         ctx.arc(x, 0, 3 / f.z, 0, Math.PI * 2);
         ctx.fill();

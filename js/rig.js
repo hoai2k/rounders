@@ -9,8 +9,10 @@
 //                    hand end right) — a round nub hand works too
 //
 // When those exist the character is drawn as a composition: the body mirrors
-// with facing and the weapon swings to the aim, with the arms riding on the
-// weapon so they follow it and mirror with it.
+// with the character's facing while the weapon swings to the aim, with the arms
+// riding on the weapon. Body and weapon mirror independently — the body turns
+// with movement, the weapon with the aim — so a fighter can back away one way
+// and shoot the other without the weapon flipping over.
 //
 // The weapon's grip → muzzle line is the whole specification of how it aims:
 // its angle in the source art is cancelled so the barrel lands exactly on the
@@ -787,12 +789,17 @@
     const R = getResolved(id);
     if (!R) return null;
     const facing = facingIn < 0 ? -1 : facingIn > 0 ? 1 : (aimX < 0 ? -1 : 1);
+    // The weapon keeps a facing of its own, taken from the aim. Mirroring it
+    // with the body instead would flip it about the aim line every time the two
+    // disagree — back away to the left while shooting right and the weapon
+    // would hang upside down off the barrel.
+    const wFacing = aimX < 0 ? -1 : 1;
     const k = r / Math.max(1e-3, R.body.radius);
     // The body's own scale/offset/rotation only adjust the body art against the
     // collision circle; the weapon and arms are unaffected by them.
     const kBody = k * R.rig.bodyScale;
-    // In the mirrored frame the aim vector flips back on x.
-    const aimAngle = Math.atan2(aimY, aimX * facing);
+    // Inside the weapon's own mirrored frame the aim flips back on x.
+    const aimAngle = Math.atan2(aimY, aimX * wFacing);
 
     // grip → muzzle *is* the weapon's direction: whatever angle that line is
     // drawn at in the source image is cancelled here, so the barrel lands on
@@ -818,11 +825,13 @@
     const mount = R.rig.weapon.orbit
       ? { x: off.x * ca - off.y * sa, y: off.x * sa + off.y * ca + wob }
       : {
-        x: (R.body.mount.x - R.body.pivot.x) * k + R.rig.weapon.offset.x * r,
+        // A pinned grip is a point on the body, so it is mirrored with the
+        // body and then read in the weapon's frame.
+        x: (R.body.mount.x - R.body.pivot.x) * k * facing * wFacing + R.rig.weapon.offset.x * r,
         y: (R.body.mount.y - R.body.pivot.y) * k + R.rig.weapon.offset.y * r + wob
       };
     return {
-      R, facing, k, kBody, kw, angle, mount, wob,
+      R, facing, wFacing, k, kBody, kw, angle, mount, wob,
       bodyImg: entry(id).body, weaponImg: entry(id).weapon
     };
   }
@@ -862,7 +871,9 @@
     const s = k * a.scale;
     // The socket rides the body, so it takes the body's bob with it.
     const socket = {
-      x: (a.socket.x - R.body.pivot.x) * k,
+      // The socket is on the body, so it crosses from the body's frame into
+      // the weapon's.
+      x: (a.socket.x - R.body.pivot.x) * k * T.facing * T.wFacing,
       y: (a.socket.y - R.body.pivot.y) * k + wob
     };
     const hold = holdPoint(T, a.hold);
@@ -924,11 +935,20 @@
     const T = transform(id, r, opts.aimX ?? 1, opts.aimY ?? 0, opts.wob || 0, opts.facing || 0);
     if (!T) return false;
 
+    // Two frames, mirrored independently: the body by its own facing, the
+    // weapon (and the arms holding it) by the aim's.
+    const weaponGroup = (fn) => {
+      ctx.save();
+      ctx.scale(T.wFacing, 1);
+      fn();
+      ctx.restore();
+    };
+    weaponGroup(() => {
+      drawArms(ctx, T, "back");
+      if (T.R.rig.weapon.behind) drawWeapon(ctx, T);
+    });
     ctx.save();
     ctx.scale(T.facing, 1);
-    drawArms(ctx, T, "back");
-    if (T.R.rig.weapon.behind) drawWeapon(ctx, T);
-    ctx.save();
     ctx.translate(T.R.rig.bodyOffset.x * r, T.R.rig.bodyOffset.y * r + T.wob);
     if (T.R.rig.bodyRotation) ctx.rotate((T.R.rig.bodyRotation * Math.PI) / 180);
     ctx.drawImage(
@@ -937,10 +957,11 @@
       e.body.width * T.kBody, e.body.height * T.kBody
     );
     ctx.restore();
-    drawArms(ctx, T, "mid");
-    if (!T.R.rig.weapon.behind) drawWeapon(ctx, T);
-    drawArms(ctx, T, "front");
-    ctx.restore();
+    weaponGroup(() => {
+      drawArms(ctx, T, "mid");
+      if (!T.R.rig.weapon.behind) drawWeapon(ctx, T);
+      drawArms(ctx, T, "front");
+    });
     return true;
   }
 
@@ -951,7 +972,8 @@
     const T = transform(id, r, aimX, aimY, wob, facing);
     if (!T) return null;
     const p = holdPoint(T, T.R.weapon.muzzle);
-    return { x: p.x * T.facing, y: p.y };
+    // The muzzle is on the weapon, so it comes out of the weapon's frame.
+    return { x: p.x * T.wFacing, y: p.y };
   }
 
   window.ROUNDERS.rig = {

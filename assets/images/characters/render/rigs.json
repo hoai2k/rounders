@@ -14,6 +14,7 @@
         }
       },
       "rig": {
+        "bodyScale": 1.06,
         "weapon": {
           "distance": 0.76
         }
@@ -96,6 +97,7 @@
         }
       },
       "rig": {
+        "bodyScale": 1.12,
         "weapon": {
           "distance": 0.45
         }
@@ -126,6 +128,7 @@
         }
       },
       "rig": {
+        "bodyScale": 1.2,
         "weapon": {
           "distance": 0.75
         }
@@ -160,6 +163,7 @@
         }
       },
       "rig": {
+        "bodyScale": 1.05,
         "weapon": {
           "distance": 0.74
         }
@@ -175,6 +179,9 @@
           "x": 474.18,
           "y": 224.45
         }
+      },
+      "rig": {
+        "bodyScale": 1.05
       }
     },
     "riot": {

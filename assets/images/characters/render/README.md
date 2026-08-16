@@ -71,6 +71,20 @@ hero art (and to the procedural renderer where that is missing) — everything
 still runs, the weapon just doesn't aim. Use `npm start` (or the deployed site)
 to see the composed rigs.
 
+## Facing
+
+The body and the weapon mirror **independently**. The body turns with the
+character's facing — which the game takes from movement, not from the aim — and
+the weapon mirrors with the aim. Run left while shooting right and the body
+faces left while the weapon stays upright, pointing right; mirroring the weapon
+with the body instead would flip it about the aim line and draw it upside down.
+The arms ride the weapon, so they belong to the weapon's frame too, and an arm's
+socket (a point on the body) is carried across between the two.
+
+`rig.transform(id, r, aimX, aimY, wob, facing)` returns both: `facing` for the
+body, `wFacing` for the weapon. `rig.muzzle()` reports a point on the weapon, so
+it depends only on the aim.
+
 ## Anchors
 
 Everything below is detected from the alpha channel on load. `rigs.json` only

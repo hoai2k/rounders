@@ -5,7 +5,10 @@
 // Feature reference:
 //   platforms[]  {x,y,w,h, ice, conveyor(px/s), phase:{period,offset,duty}}
 //   movers[]     platform oscillating (x,y)→(x+dx,y+dy) over `period` seconds
-//   hazards[]    deadly rects (spikes/lava/water) — style via palette.hazard
+//   hazards[]    hurt rects — style via palette.hazard. {kind:"water"} makes one
+//                a fluid volume: you float and swim in it taking small ticks of
+//                damage, and bullets crossing it are slowed. Anything else is a
+//                contact hazard (spikes, lava): one hit and a launch clear of it
 //   bouncePads[] {x,y,w,power} launch upward on touch
 //   teleporters[]{ax,ay,bx,by} bidirectional portals
 //   zones[]      {x,y,w,h,type:'syrup'} slow fields
@@ -129,7 +132,7 @@
         P(660, 350, 280, 24)
       ],
       movers: [P(560, 585, 160, 22, { dx: 320, dy: 0, period: 6 })],
-      hazards: [P(520, 852, 560, 48)],
+      hazards: [P(520, 852, 560, 48, { kind: "water" })],
       spawns: [{ x: 240, y: 790 }, { x: 1360, y: 790 }, { x: 320, y: 610 }, { x: 1280, y: 610 }]
     },
     {
@@ -254,7 +257,7 @@
         P(320, 430, 220, 24), P(1060, 430, 220, 24),
         P(660, 330, 280, 24)
       ],
-      hazards: [P(560, 852, 480, 48)],
+      hazards: [P(560, 852, 480, 48, { kind: "water" })],
       spawns: [{ x: 260, y: 790 }, { x: 1340, y: 790 }, { x: 420, y: 390 }, { x: 1180, y: 390 }]
     },
     {
@@ -304,7 +307,7 @@
         P(340, 400, 200, 24, { ice: true }), P(1060, 400, 200, 24, { ice: true }),
         P(700, 300, 200, 24, { ice: true })
       ],
-      hazards: [P(500, 852, 600, 48)],
+      hazards: [P(500, 852, 600, 48, { kind: "water" })],
       spawns: [{ x: 240, y: 790 }, { x: 1360, y: 790 }, { x: 440, y: 360 }, { x: 1160, y: 360 }]
     },
     {
@@ -376,7 +379,7 @@
         P(380, 450, 150, 22, { dx: 0, dy: -80, period: 5.5 }),
         P(1070, 450, 150, 22, { dx: 0, dy: -80, period: 5.5, phase: 0.5 })
       ],
-      hazards: [P(480, 852, 640, 48)],
+      hazards: [P(480, 852, 640, 48, { kind: "water" })],
       spawns: [{ x: 240, y: 790 }, { x: 1360, y: 790 }, { x: 300, y: 615 }, { x: 1300, y: 615 }]
     },
     {

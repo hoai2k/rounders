@@ -3,6 +3,7 @@
   "use strict";
 
   const { CARDS, RARITIES, CHARACTERS, LEVELS, drawCharacter, setProceduralCharacters, arenaImage } = window.ROUNDERS;
+  const { cardArt, cardArtUrl } = window.ROUNDERS;
   const str = window.ROUNDERS.str;
 
   // Fills every [data-str] / [data-str-html] node from js/strings.js so all UI
@@ -70,6 +71,8 @@
     winner: null,
     roundWinner: null,
     drafters: [],
+    botPicks: [],
+    cardShows: [],
     levelIndex: 0,
     lastLevelIndex: -1,
     roundFreeze: 0,
@@ -617,30 +620,121 @@
     return picked;
   }
 
-  // All losers draft simultaneously, each with their own hand + controls.
+  // Humans draft on the card screen. Bots don't need a screen — nobody is
+  // choosing — so they take a card off-screen and it is *shown*: the card flies
+  // up over the arena and then flings back into the bot that took it. A round
+  // with only bots drafting never opens the panel at all.
   function beginDraft(losers) {
     world.state = "draft";
-    world.drafters = losers.map(p => ({
+    const humans = losers.filter(p => !p.bot);
+    const bots = losers.filter(p => p.bot);
+    world.drafters = humans.map(p => ({
       player: p,
       options: drawCards(settings.draftCount),
       index: 0,
       picked: false
     }));
-    world.draftBaseTitle = losers.length > 1 ? str("draft.titleMulti") : str("draft.titleSolo", { name: losers[0].name });
+    // Bots pick from a real hand, so the rarity odds are the ones everyone plays.
+    world.botPicks = bots.map(p => {
+      const options = drawCards(settings.draftCount);
+      return { player: p, card: options[Math.floor(Math.random() * options.length)] };
+    });
+
+    if (!world.drafters.length) {
+      showBotPicks();
+      return;
+    }
+    world.draftBaseTitle = humans.length > 1 ? str("draft.titleMulti") : str("draft.titleSolo", { name: humans[0].name });
     world.draftTimer = 30;
     draftTitle.textContent = world.draftBaseTitle;
     renderDraftPanel();
     draftPanel.classList.remove("hidden");
-    for (const d of world.drafters) {
-      if (d.player.bot) {
-        setTimeout(() => {
-          if (world.state === "draft" && !d.picked) {
-            d.index = Math.floor(Math.random() * d.options.length);
-            confirmPick(d);
-          }
-        }, 700 + Math.random() * 900);
+  }
+
+  // ------------------------------------------------------- bot card flings
+  // One card at a time, so four bots read as four separate gifts rather than a
+  // pile-up. The card is only applied when it lands in the bot.
+  const CARD_FLY = { rise: 0.42, hold: 0.62, fling: 0.42 };
+  const CARD_FLY_TOTAL = CARD_FLY.rise + CARD_FLY.hold + CARD_FLY.fling;
+
+  function showBotPicks() {
+    if (!world.botPicks || !world.botPicks.length) {
+      finishDraft();
+      return;
+    }
+    world.state = "card-show";
+    world.cardShows = world.botPicks.map((b, i) => ({
+      player: b.player, card: b.card,
+      t: -i * (CARD_FLY_TOTAL * 0.78), // the previous card is already flying home
+      landed: false
+    }));
+    world.botPicks = [];
+  }
+
+  function updateCardShows(dt) {
+    let running = false;
+    for (const show of world.cardShows) {
+      show.t += dt;
+      if (show.t < 0) { running = true; continue; }
+      if (show.t < CARD_FLY_TOTAL) running = true;
+      if (!show.landed && show.t >= CARD_FLY.rise + CARD_FLY.hold + CARD_FLY.fling * 0.85) {
+        show.landed = true;
+        grantCard(show.player, show.card);
+        burst(show.player.x, show.player.y, RARITIES[show.card.rarity].color, 34, 460);
+        world.shake = Math.max(world.shake, 5);
+        sfx("card");
+        pulse(show.player, 0.5, 150);
+        showToast(str("draft.picked", { name: show.player.name, card: show.card.name }));
       }
     }
+    if (!running) {
+      world.cardShows = [];
+      finishDraft();
+    }
+  }
+
+  // Where a flying card is right now, in world space, plus how big it is.
+  function cardShowPose(show) {
+    const p = show.player;
+    const stage = { x: world.width / 2, y: world.height * 0.34 };
+    const t = show.t;
+    if (t < CARD_FLY.rise) {
+      const k = t / CARD_FLY.rise;
+      const ease = 1 - (1 - k) ** 3;
+      return {
+        x: stage.x, y: stage.y + (1 - ease) * 220,
+        scale: 0.25 + ease * 0.75, alpha: Math.min(1, k * 2.2), spin: (1 - ease) * 0.5
+      };
+    }
+    if (t < CARD_FLY.rise + CARD_FLY.hold) {
+      const k = (t - CARD_FLY.rise) / CARD_FLY.hold;
+      return { x: stage.x, y: stage.y - Math.sin(k * Math.PI) * 10, scale: 1, alpha: 1, spin: 0 };
+    }
+    const k = Math.min(1, (t - CARD_FLY.rise - CARD_FLY.hold) / CARD_FLY.fling);
+    const ease = k * k;
+    return {
+      x: stage.x + (p.x - stage.x) * ease,
+      y: stage.y + (p.y - stage.y) * ease,
+      scale: 1 - ease * 0.86,
+      alpha: 1 - ease * 0.25,
+      spin: ease * 1.6
+    };
+  }
+
+  function finishDraft() {
+    if (world.state !== "draft" && world.state !== "card-show") return;
+    draftPanel.classList.add("hidden");
+    world.state = "playing";
+    buildHud();
+    resetRound();
+  }
+
+  // Everything that happens when a card lands on a player, whoever picked it.
+  function grantCard(p, c) {
+    p.cards.push(c);
+    c.apply(p);
+    p.hp = p.stats.maxHp;
+    p.ammo = p.stats.maxAmmo;
   }
 
   // Each chooser gets a full stage washed in their color: their character
@@ -681,6 +775,7 @@
         el.innerHTML = `
           <span class="card-pip">${rar.name[0]}</span>
           <span class="rarity">${rar.name}</span>
+          <span class="card-art" style="background-image:url('${cardArtUrl(c.id)}')"></span>
           <strong class="card-name">${c.name}</strong>
           <em class="card-tagline">${c.tagline}</em>
           <p class="card-desc">${c.description}</p>
@@ -718,22 +813,18 @@
     if (d.picked || world.state !== "draft") return;
     const c = d.options[d.index];
     d.picked = true;
-    d.player.cards.push(c);
-    c.apply(d.player);
-    d.player.hp = d.player.stats.maxHp;
-    d.player.ammo = d.player.stats.maxAmmo;
+    grantCard(d.player, c);
     sfx("card");
     pulse(d.player, 0.5, 150);
     refreshDraftSelection(d);
     showToast(str("draft.picked", { name: d.player.name, card: c.name }));
     if (world.drafters.every(x => x.picked)) {
       setTimeout(() => {
-        if (world.state === "draft") {
-          draftPanel.classList.add("hidden");
-          world.state = "playing";
-          buildHud();
-          resetRound();
-        }
+        if (world.state !== "draft") return;
+        draftPanel.classList.add("hidden");
+        // Bots that lost the same round take their cards now, on the arena,
+        // where the fling is visible instead of hidden behind the panel.
+        showBotPicks();
       }, 650);
     }
   }
@@ -967,6 +1058,9 @@
     }
     if (world.state === "round-won") { updateParticles(dt); return; }
     if (world.state === "draft") { updateDraftInput(dt); updateParticles(dt); return; }
+    // A bot's card flying back into it: the arena is still drawn, frozen, so
+    // the fling reads against the fighters rather than a blank screen.
+    if (world.state === "card-show") { updateCardShows(dt); updateParticles(dt); return; }
     if (world.state !== "playing") { updateParticles(dt); return; }
 
     updateWeather(dt);
@@ -1063,6 +1157,7 @@
       p.activeCooldown = Math.max(0, p.activeCooldown - dt);
       p.spawnGrace = Math.max(0, p.spawnGrace - dt);
       p.hazardGrace = Math.max(0, p.hazardGrace - dt);
+      p.hitFlash = Math.max(0, (p.hitFlash || 0) - dt);
       p.teleCooldown = Math.max(0, p.teleCooldown - dt);
       p.wallTimer = Math.max(0, p.wallTimer - dt);
       p.wallCooldown = Math.max(0, p.wallCooldown - dt);
@@ -1222,18 +1317,23 @@
       }
       p.teleWasInside = onTele;
 
-      // tide drowning
-      if (level.tide && p.y > world.tideLevel + 10) {
-        p.vy -= levelGravity() * dt * 0.7; // buoyancy
-        p.vx *= 0.94;
-        hurtRaw(p, 16 * dt, null);
-        if (Math.random() < dt * 10) puffOne(p.x + rand(-12, 12), p.y - 20, "#7fe8d0");
-      }
+      // Water — the rising tide, or a pool tagged {kind:"water"} — is somewhere
+      // you can be, not something that kills you. You float, you slow down, and
+      // it wears you down in small bites until you climb out.
+      const submerged = inWater(p.x, p.y, level);
+      if (submerged) {
+        p.vy -= levelGravity() * dt * 0.72;     // buoyancy
+        p.vy *= Math.pow(0.9, dt * 60);          // and the water resists
+        p.vx *= Math.pow(0.93, dt * 60);
+        soakDamage(p, dt);
+        if (Math.random() < dt * 12) puffOne(p.x + rand(-14, 14), p.y - 18, "#9ff0e0");
+      } else p.soak = 0;
 
       // world bounds kill; hazards sting and launch instead
       if (p.x < -80 || p.x > world.width + 80 || p.y > world.height + 120) hurt(p, 999, null, 0, -1);
       if (settings.hazards) {
         for (const h of level.hazards) {
+          if (h.kind === "water") continue; // handled above, as a volume
           if (circleRect(p, h)) { hazardHit(p, h); break; }
         }
       }
@@ -1447,7 +1547,21 @@
       b.prevX = b.x; b.prevY = b.y;
       b.vy += b.gravity * dt;
       if (wind) b.vx += wind * 0.9 * dt;
-      const drag = Math.pow(b.drag, dt * 60);
+      let drag = Math.pow(b.drag, dt * 60);
+      // Water drags a shot down hard: shooting across a pool is a real choice,
+      // and a bullet fired into one visibly gives up.
+      const wet = inWater(b.x, b.y, level);
+      if (wet) {
+        // Enough to matter — a shot across a pond arrives visibly late and
+        // short — without stopping it dead the moment it touches the surface.
+        drag *= Math.pow(0.955, dt * 60);
+        if (Math.random() < dt * 26) {
+          particles.push({
+            x: b.x + rand(-4, 4), y: b.y + rand(-4, 4), vx: rand(-10, 10), vy: rand(-45, -12),
+            life: 0.4, maxLife: 0.4, r: rand(1.5, 3), color: "#bff4ff"
+          });
+        }
+      }
       b.vx *= drag; b.vy *= drag;
       b.x += b.vx * dt;
       b.y += b.vy * dt;
@@ -1632,6 +1746,38 @@
     fields = fields.filter(f => f.life > 0);
   }
 
+  // -------------------------------------------------------------- water
+  // Is this point under water — the level's tide, or inside a water hazard?
+  function inWater(x, y, level = currentLevel()) {
+    if (level.tide && y > world.tideLevel + 10) return true;
+    if (!settings.hazards) return false;
+    for (const h of level.hazards) {
+      if (h.kind !== "water") continue;
+      if (x > h.x && x < h.x + h.w && y > h.y && y < h.y + h.h + 200) return true;
+    }
+    return false;
+  }
+
+  const SOAK_RATE = 7;    // HP per second under water
+  const SOAK_BITE = 3.5;  // ...delivered in bites this size
+
+  // Drowning is damage over time, but a health bar sliding down reads as a bug.
+  // Bank the damage and spend it in small bites, each with its own splash and
+  // flash, so it looks like the water is landing a series of little hits.
+  function soakDamage(p, dt) {
+    if (!p.alive || p.spawnGrace > 0) return;
+    p.soak = (p.soak || 0) + SOAK_RATE * dt;
+    while (p.soak >= SOAK_BITE) {
+      p.soak -= SOAK_BITE;
+      hurtRaw(p, SOAK_BITE, null);
+      if (!p.alive) return;
+      p.hitFlash = Math.max(p.hitFlash || 0, 0.16);
+      burst(p.x + rand(-10, 10), p.y + rand(-8, 8), "#bff4ff", 7, 190);
+      sfx("hit");
+      pulse(p, 0.18, 70);
+    }
+  }
+
   // hurt with knockback, blockable
   // Touching a hazard hurts and launches the player clear rather than killing:
   // damage first (so guardian/revive rules still apply at low HP), then a hard
@@ -1678,6 +1824,7 @@
   }
 
   function applyDamage(p, amount, attacker) {
+    p.hitFlash = Math.max(p.hitFlash || 0, amount >= 8 ? 0.2 : 0.16);
     const lethal = p.hp - amount <= 0;
     if (lethal && p.guardianCharges > 0 && amount < 500) {
       p.guardianCharges -= 1;
@@ -2019,7 +2166,7 @@
         ref.lastCards = p.cards.length;
         const shown = p.cards.slice(-3);
         ref.cards.innerHTML = shown.map(c =>
-          `<span style="--rcol:${RARITIES[c.rarity].color}">${c.name}</span>`).join("") +
+          `<span style="--rcol:${RARITIES[c.rarity].color};--art:url('${cardArtUrl(c.id)}')">${c.name}</span>`).join("") +
           (p.cards.length > 3 ? `<span class="more">${escapeHtml(str("hud.more", { count: p.cards.length - 3 }))}</span>` : "") ||
           `<span class="none">${escapeHtml(str("hud.noCards"))}</span>`;
       }
@@ -2072,6 +2219,7 @@
         ctx.fillStyle = `rgba(255,244,200,${world.lightningFlash * 1.4})`;
         ctx.fillRect(0, 0, world.width, world.height);
       }
+      if (world.state === "card-show") drawCardShows();
       if (world.roundFreeze > 0 && world.state === "playing") drawCountdown();
       if (world.state === "ended") drawWinner();
       // vignette
@@ -2083,6 +2231,102 @@
     }
     ctx.restore();
     updateToast();
+  }
+
+  // A bot's card, drawn the size of a real card and flung home. Same face as the
+  // draft hand — emblem, rarity colour, name — so a card learned on the card
+  // screen is the same card here.
+  const CARD_W = 190, CARD_H = 266;
+
+  function drawCardShows() {
+    // Darken behind the flight so a card reads over a busy arena.
+    const lead = world.cardShows.find(sh => sh.t >= 0 && sh.t < CARD_FLY_TOTAL);
+    if (lead) {
+      const fade = Math.min(1, lead.t / 0.25) * (1 - Math.max(0, (lead.t - CARD_FLY.rise - CARD_FLY.hold) / CARD_FLY.fling));
+      ctx.fillStyle = `rgba(6,6,14,${0.45 * fade})`;
+      ctx.fillRect(0, 0, world.width, world.height);
+    }
+    for (const show of world.cardShows) {
+      if (show.t < 0 || show.t > CARD_FLY_TOTAL) continue;
+      const pose = cardShowPose(show);
+      ctx.save();
+      ctx.globalAlpha = pose.alpha;
+      ctx.translate(pose.x, pose.y);
+      ctx.rotate(pose.spin * 0.35);
+      ctx.scale(pose.scale, pose.scale);
+      drawCardFace(show.card, show.player);
+      ctx.restore();
+    }
+  }
+
+  function drawCardFace(c, owner) {
+    const rar = RARITIES[c.rarity];
+    const w = CARD_W, h = CARD_H;
+    ctx.save();
+    ctx.translate(-w / 2, -h / 2);
+
+    ctx.shadowColor = rar.glow;
+    ctx.shadowBlur = 34;
+    ctx.fillStyle = "#191c26";
+    ctx.beginPath();
+    ctx.roundRect(0, 0, w, h, 14);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = rar.color;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // art panel
+    const art = cardArt(c.id);
+    const pad = 12, artH = 120;
+    ctx.fillStyle = hexAlpha(rar.color, 0.14);
+    ctx.beginPath();
+    ctx.roundRect(pad, pad + 16, w - pad * 2, artH, 10);
+    ctx.fill();
+    if (art) {
+      const size = Math.min(w - pad * 2 - 8, artH - 8);
+      ctx.drawImage(art, w / 2 - size / 2, pad + 16 + artH / 2 - size / 2, size, size);
+    }
+
+    ctx.fillStyle = rar.color;
+    ctx.font = "700 15px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(rar.name.toUpperCase(), w / 2, 22);
+
+    ctx.fillStyle = "#f2eeff";
+    ctx.font = "700 19px system-ui, sans-serif";
+    wrapText(c.name, w / 2, pad + 16 + artH + 30, w - 26, 22);
+
+    ctx.fillStyle = "rgba(226,220,255,0.7)";
+    ctx.font = "13px system-ui, sans-serif";
+    const effects = c.effects.slice(0, 3);
+    effects.forEach((line, i) => {
+      ctx.fillText(line, w / 2, pad + 16 + artH + 58 + i * 17);
+    });
+
+    if (owner) {
+      ctx.fillStyle = owner.color;
+      ctx.font = "700 13px system-ui, sans-serif";
+      ctx.fillText(owner.name, w / 2, h - 14);
+    }
+    ctx.restore();
+  }
+
+  // Card names are short but not all short; two lines is plenty.
+  function wrapText(text, x, y, maxWidth, lineHeight) {
+    const words = String(text).split(" ");
+    let line = "";
+    let dy = 0;
+    for (const word of words) {
+      const next = line ? `${line} ${word}` : word;
+      if (ctx.measureText(next).width > maxWidth && line) {
+        ctx.fillText(line, x, y + dy);
+        dy += lineHeight;
+        line = word;
+      } else line = next;
+    }
+    if (line) ctx.fillText(line, x, y + dy);
   }
 
   // -------- backdrop
@@ -2390,6 +2634,7 @@
   }
 
   function drawHazard(h, pal) {
+    if (h.kind === "water") { drawWaterHazard(h, pal); return; }
     ctx.fillStyle = pal.hazard;
     ctx.strokeStyle = shade(pal.hazard, -60);
     ctx.lineWidth = 3;
@@ -2407,6 +2652,41 @@
       ctx.lineTo(x + 16, h.y + h.h);
       ctx.fill();
     }
+  }
+
+  // Water reads as water: a translucent body with a moving surface line, so it
+  // is obvious you can be in it rather than obliterated by it.
+  function drawWaterHazard(h, pal) {
+    const surf = 5;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(h.x, h.y - surf, h.w, h.h + surf, 5);
+    ctx.clip();
+    const g = ctx.createLinearGradient(0, h.y - surf, 0, h.y + h.h);
+    g.addColorStop(0, hexAlpha(pal.hazard, 0.55));
+    g.addColorStop(1, hexAlpha(pal.hazard, 0.85));
+    ctx.fillStyle = g;
+    ctx.fillRect(h.x, h.y - surf, h.w, h.h + surf);
+
+    // surface chop
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let x = h.x; x <= h.x + h.w; x += 8) {
+      const y = h.y - surf + 3 + Math.sin(world.time * 2.6 + x * 0.05) * 2.5;
+      if (x === h.x) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // slow drifting glints
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    for (let x = h.x + 14; x < h.x + h.w; x += 46) {
+      const y = h.y + 12 + ((world.time * 12 + x) % (h.h - 6));
+      ctx.beginPath();
+      ctx.ellipse(x + Math.sin(world.time + x) * 5, y, 7, 2.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   function drawTide(level) {
@@ -2464,6 +2744,12 @@
       if (p.burnTimer > 0) {
         ctx.fillStyle = "rgba(255,120,40,0.22)";
         ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      }
+      // one bite of damage landing — a quick white bloom, so a stream of small
+      // hits reads as hits rather than as a health bar quietly draining
+      if (p.hitFlash > 0) {
+        ctx.fillStyle = `rgba(255,255,255,${0.5 * (p.hitFlash / 0.16)})`;
+        ctx.beginPath(); ctx.arc(0, 0, r * 1.04, 0, Math.PI * 2); ctx.fill();
       }
       ctx.restore();
 

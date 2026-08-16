@@ -339,7 +339,31 @@
       p => { p.stats.active = "chronoshift"; p.stats.activeCooldown = 10; p.stats.speed *= 1.08; })
   ];
 
+  // Card emblems: assets/images/cards/<id>.png, 256×256. Loaded on demand and
+  // cached; a card with no art simply draws without one, the way it always has.
+  const ART = `${window.ROUNDERS_ASSET_BASE || ""}assets/images/cards/`;
+  const art = new Map();
+
+  function cardArtUrl(id) { return `${ART}${id}.png`; }
+
+  // Returns the loaded image, or null until it is ready (or forever, if the
+  // file is missing). Callers draw the card either way.
+  function cardArt(id) {
+    let entry = art.get(id);
+    if (!entry) {
+      const img = new Image();
+      entry = { img, ok: false };
+      art.set(id, entry);
+      img.onload = () => { entry.ok = true; };
+      img.onerror = () => { entry.ok = false; entry.failed = true; };
+      img.src = cardArtUrl(id);
+    }
+    return entry.ok ? entry.img : null;
+  }
+
   window.ROUNDERS.RARITIES = RARITIES;
   window.ROUNDERS.RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
   window.ROUNDERS.CARDS = CARDS;
+  window.ROUNDERS.cardArt = cardArt;
+  window.ROUNDERS.cardArtUrl = cardArtUrl;
 })();

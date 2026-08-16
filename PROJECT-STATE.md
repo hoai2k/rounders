@@ -34,10 +34,9 @@ Pillars:
 - [x] `image-requests.md` — prompts for all generated art (committed to main early so
       generation can start while code is built). Delivered batches move to
       `image-requests-history.md`, so the live doc is only what is still wanted
-- [ ] **Card art** (`image-requests.md` §1): one 512×384 scene per card, so a draft
-      hand is recognised instead of read. The 52 emblem icons are already in
-      `assets/images/cards/` but nothing displays them yet — the card face is
-      still text only
+- [x] **Card art wired in**: the 52 emblems in `assets/images/cards/` are drawn on
+      the card faces in the draft hand, on the HUD card chips, and on the card a
+      bot is shown taking, so a hand is recognised instead of read
 - [x] `CLAUDE.md` — repo policy (merge to main when a task is done)
 - [x] This state document
 
@@ -159,6 +158,15 @@ Pillars:
       of the world still kills
 - [x] Winner banner → draft → next arena loop with splash screens
 - [x] Bots pick cards and characters automatically
+- [x] **Bots draft off-screen**: a bot never opens the card screen. Its card flies
+      up over the arena and flings back into the bot that took it, and the card
+      only applies when it lands. A round where only bots draft never shows the
+      panel at all
+- [x] **Hazards hurt instead of killing**: water ({kind:"water"} pools and the
+      rising tide) is a volume you float in — small repeated bites of damage,
+      each with its own flash and splash, so you can swim out — and bullets
+      crossing it are dragged down. Spikes and lava still hit once and launch
+      you clear
 
 ### 6. UI / UX overhaul
 - [x] Character select stripped to cards only; icon row (info / sound / settings /

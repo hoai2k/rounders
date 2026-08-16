@@ -32,7 +32,12 @@ Pillars:
 - [x] Define rarity ladder + colors: Common (silver), Uncommon (green), Rare (blue),
       Epic (purple), Legendary (gold), Mythic (animated magenta) — Mythics grant active abilities
 - [x] `image-requests.md` — prompts for all generated art (committed to main early so
-      generation can start while code is built)
+      generation can start while code is built). Delivered batches move to
+      `image-requests-history.md`, so the live doc is only what is still wanted
+- [ ] **Card art** (`image-requests.md` §1): one 512×384 scene per card, so a draft
+      hand is recognised instead of read. The 52 emblem icons are already in
+      `assets/images/cards/` but nothing displays them yet — the card face is
+      still text only
 - [x] `CLAUDE.md` — repo policy (merge to main when a task is done)
 - [x] This state document
 

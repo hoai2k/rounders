@@ -68,7 +68,8 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 ## Project docs
 
 - `PROJECT-STATE.md` — workstream tracker for the redesign
-- `image-requests.md` — prompts + file paths for all optional generated art
+- `image-requests.md` — open art requests (prompts + file paths)
+- `image-requests-history.md` — the same for art already generated and in the repo
 - `intake/README.md` — how to bring delivered art into the game
 - `AUDIT.md` — variety/balance audit findings
 - `CLAUDE.md` — repo policies

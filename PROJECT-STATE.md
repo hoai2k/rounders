@@ -79,11 +79,13 @@ Pillars:
       to being rigidly parented to the weapon; per-arm layering is back / behind
       weapon / front. `npm run mock-parts <id>` writes placeholder parts so the
       whole path can be exercised before art arrives
-- [x] `/workbench` UI for hand-tuning: character grid on the left, interactive viewer
-      on the right, **character** mode (place/orient/size weapon + arms, with a
-      shoulder and a hand handle per arm and a stretch-limit warning) and
-      **anchor** mode (anchor points on body/weapon/arm), exports `rigs.json`
-      (or `rigs.js` for `file://`) which the game merges over the auto anchors
+- [x] `/workbench` UI for hand-tuning: character grid on the left, viewer on the
+      right, and three modes kept in the URL (`?c=vex&mode=edit`) so a reload
+      resumes where you left off — **preview** (clean, gamepad aims it like a
+      player would), **edit** (onscreen Body/Weapon/Hand selector, move/resize/
+      turn handles mirrored as numbers in the panel, reference overlay, undo and
+      redo) and **anchor** (anchor points on the source images). Exports
+      `rigs.json`, which the game merges over the auto anchors
 - [x] **Art intake**: `npm run intake` takes delivered files from `intake/`, keys
       out solid backdrops (magenta/green/white screens) into transparent PNGs,
       files them into `characters/canonical/` or `characters/render/`, and keeps
@@ -98,8 +100,10 @@ Pillars:
       and were keyed at intake; the delivered originals are kept in
       `characters/archive/`
 - [x] **Composed characters match the procedural geometry**: the body's ball is
-      the largest circle inside its silhouette (so it lines up with the collision
-      circle), the weapon is scaled to a 1.5-radius barrel with the grip riding
+      found by fitting a circle to the outline (RANSAC + least squares + a
+      hug-the-outline polish), so hats, horns and flames fall out as outliers and
+      the ball lands on the collision circle; the weapon is scaled to a
+      1.5-radius barrel with the grip riding
       0.55 radii out along the aim, and the barrel's tilt in the source art is
       cancelled — the weapon points exactly where the stick does (verified at
       0.00° off-axis across all 24 characters and eight aim angles)

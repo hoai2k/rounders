@@ -85,6 +85,6 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 | `js/chroma.js` | Backdrop keying (magenta/green screen → transparent), shared by intake and runtime |
 | `tools/intake.mjs` | `npm run intake` — keys and files delivered art, archives the originals |
 | `tools/fitrig.mjs` | `npm run fitrig` — measures hand size against the canonical art into `rigs.json` |
-| `workbench/` | Sprite workbench (anchors + weapon/hand placement → `rigs.json`) and art intake page |
+| `workbench/` | Sprite workbench (preview / edit handles / anchors → `rigs.json`) and art intake page |
 | `index.html`, `styles.css` | UI |
 | `server.mjs` | Zero-dependency static server |

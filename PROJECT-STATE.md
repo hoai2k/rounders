@@ -93,6 +93,8 @@ Pillars:
 ### 9. Ship
 - [x] Commit and push feature branch
 - [x] Merge to `main` and push
+- [x] Deploy live: **https://hoai2k.github.io/rounders/** (GitHub Pages via
+      `.github/workflows/deploy-pages.yml`, redeploys on every push to `main`)
 
 ---
 

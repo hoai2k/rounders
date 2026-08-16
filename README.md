@@ -6,13 +6,19 @@ drafts a power card — all at the same time — and comes back angrier.
 
 ## Play
 
-Open `index.html` in a browser, or run the local server:
+**▶ Play online: https://hoai2k.github.io/rounders/**
+
+Or run it locally — open `index.html` in a browser, or start the server:
 
 ```bash
 npm start
 ```
 
 Default URL: `http://127.0.0.1:4173`.
+
+The live site redeploys automatically on every push to `main`
+(`.github/workflows/deploy-pages.yml`), so dropping generated art into
+`assets/images/` and pushing is all it takes to see it online.
 
 ### Controls
 

@@ -28,6 +28,13 @@ The live site redeploys automatically on every push to `main`
 | Keyboard 2 | ◀ / ▶ | ▲ | / | . |
 | Controller | Left stick | A | RT / RB | LT / LB / B |
 
+Menus are fully controller-navigable: **D-pad** moves, **A**/**Menu** confirms,
+**B**/**View** goes back, **Menu** pauses. The How to Play screen has a full
+Xbox controller diagram. `Esc`/`P` also pauses — pausing ducks the music and the
+pause menu links to Settings, How to Play, fullscreen, and quit-to-menu.
+The game opens on an arcade "PRESS START" title screen; starting from keyboard
+or mouse also enters fullscreen.
+
 Join the lobby with your **shoot** button (or any pad button), pick one of the
 **12 characters** with ◀ ▶, and lock in with shoot. `M` toggles music,
 `Esc`/`P` pauses.

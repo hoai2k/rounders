@@ -74,6 +74,12 @@ Pillars:
 - [x] Bots pick cards and characters automatically
 
 ### 6. UI / UX overhaul
+- [x] Arcade title screen (flashing PRESS START, any input begins, keyboard/mouse
+      start also enters fullscreen)
+- [x] Full controller menu navigation (D-pad move, A/Menu confirm, B/View back)
+- [x] Pause menu: resume, settings, how-to-play, fullscreen, music, quit to menu —
+      music ducks to 22% while paused
+- [x] Xbox controller diagram (inline SVG) on the How to Play screen
 - [x] Full visual redesign: animated gradient menu, glassmorphism panels, rarity-glow
       cards, character-portrait HUD, arena intro banner with theme blurb
 - [x] Restructured settings (grouped sections, arena picker, rarity rates)

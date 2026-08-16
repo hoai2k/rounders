@@ -9,6 +9,7 @@
   const hud = document.getElementById("hud");
   const toast = document.getElementById("toast");
   const menu = document.getElementById("menu");
+  const titleScreen = document.getElementById("title");
   const settingsPanel = document.getElementById("settings");
   const howPanel = document.getElementById("how");
   const draftPanel = document.getElementById("draft");
@@ -44,7 +45,10 @@
     gravity: 2100,
     airDrag: 0.996,
     floorDrag: 0.86,
-    state: "menu",
+    state: "title",
+    panelReturn: "menu",
+    musicDucked: false,
+    lockedThisFrame: false,
     winner: null,
     roundWinner: null,
     drafters: [],
@@ -303,7 +307,12 @@
       }
       if (!slot.locked && left) cycleSlotChar(slot, -1);
       if (!slot.locked && right) cycleSlotChar(slot, 1);
-      if (lock && !slot.locked) { slot.locked = true; sfx("card"); renderLobby(); }
+      if (lock && !slot.locked) {
+        slot.locked = true;
+        world.lockedThisFrame = true;
+        sfx("card");
+        renderLobby();
+      }
     }
   }
 
@@ -376,8 +385,28 @@
     }
   }
 
+  function startFromTitle(canFullscreen) {
+    if (world.state !== "title") return;
+    world.state = "menu";
+    world.panelReturn = "menu";
+    titleScreen.classList.add("hidden");
+    menu.classList.remove("hidden");
+    ensureAudio();
+    startMusic();
+    sfx("card");
+    renderLobby();
+    setMenuIndex(0);
+    // don't let the same press also activate the focused menu button
+    pressed.clear();
+    if (canFullscreen) {
+      enterFullscreen();
+    } else if (!document.fullscreenElement) {
+      showToast("Fullscreen needs a key or click — use the Fullscreen button");
+    }
+  }
+
   function hideAllPanels() {
-    for (const el of [menu, settingsPanel, howPanel, draftPanel, battleSplash, pausePanel, arenaBanner]) el.classList.add("hidden");
+    for (const el of [titleScreen, menu, settingsPanel, howPanel, draftPanel, battleSplash, pausePanel, arenaBanner]) el.classList.add("hidden");
   }
 
   function resetRound() {
@@ -756,8 +785,18 @@
     const pads = getPads();
     world.joinedThisFrame = false;
     world.pausedThisFrame = false;
+    world.lockedThisFrame = false;
     world.time += dt;
     world.dt = dt;
+
+    if (world.state === "title") {
+      // Gamepads cannot grant the user activation the Fullscreen API needs, so a
+      // pad start enters the menu without it (keyboard and click paths can).
+      if (pads.some(pad => pad.buttons.some((_, i) => buttonEdge(pad, i)))) startFromTitle(false);
+      updateParticles(dt);
+      return;
+    }
+
     if (world.state === "menu") updateLobby(pads);
     applyInputs(pads);
 
@@ -767,6 +806,7 @@
       updateParticles(dt);
       return;
     }
+
 
     const globalPauseKey = pressed.has("Escape") || pressed.has("KeyP");
     if ((players.some(p => p.input.pausePressed) || globalPauseKey) && (world.state === "playing" || world.state === "paused")) togglePause();
@@ -1515,9 +1555,9 @@
       }
     }
     if (menuBack(pads)) {
-      if (world.state === "settings") showMainMenu(settingsPanel);
-      if (world.state === "how") showMainMenu(howPanel);
-      if (world.state === "paused") togglePause(false);
+      if (world.state === "settings") closePanel(settingsPanel);
+      else if (world.state === "how") closePanel(howPanel);
+      else if (world.state === "paused") togglePause(false);
     }
   }
 
@@ -1557,15 +1597,29 @@
     return 0;
   }
 
+  function padSlotLocked(pad) {
+    const slot = lobbySlots.find(s => s.type === "pad" && s.gamepadIndex === pad.index);
+    return !slot || slot.locked;
+  }
+
   function menuConfirm(pads) {
-    if (world.pausedThisFrame || world.joinedThisFrame) return false;
+    if (world.pausedThisFrame || world.joinedThisFrame || world.lockedThisFrame) return false;
     if (pressed.has("Enter") || pressed.has("Space") || pressed.has("NumpadEnter")) return true;
-    return pads.some(pad => buttonEdge(pad, 9));
+    if (world.state === "menu") {
+      // In the lobby A locks your character first; once you're ready it confirms
+      // the focused button. Start always confirms.
+      return pads.some(pad => buttonEdge(pad, 9) || ((buttonEdge(pad, 0) || buttonEdge(pad, 7)) && padSlotLocked(pad)));
+    }
+    return pads.some(pad => buttonEdge(pad, 0) || buttonEdge(pad, 7) || buttonEdge(pad, 9));
   }
 
   function menuBack(pads) {
+    // the keypress that just opened the pause panel must not also close it
+    if (world.pausedThisFrame) return false;
     if (pressed.has("Escape") || pressed.has("Backspace")) return true;
-    return pads.some(pad => buttonEdge(pad, 8));
+    // In the lobby B un-readies your slot, so only View/Back exits there.
+    if (world.state === "menu") return pads.some(pad => buttonEdge(pad, 8));
+    return pads.some(pad => buttonEdge(pad, 1) || buttonEdge(pad, 8));
   }
 
   function adjustMenuControl(el, dir) {
@@ -1581,13 +1635,28 @@
     }
   }
 
-  function showMainMenu(panel) {
+  // Settings and Controls can be opened from the main menu or mid-match from the
+  // pause panel; closing returns to whichever opened it.
+  function openPanel(panel, state) {
+    world.panelReturn = world.state === "paused" ? "paused" : "menu";
+    if (world.panelReturn === "paused") pausePanel.classList.add("hidden");
+    else menu.classList.add("hidden");
+    panel.classList.remove("hidden");
+    world.state = state;
+    setMenuIndex(0);
+  }
+
+  function closePanel(panel) {
     panel.classList.add("hidden");
-    menu.classList.remove("hidden");
-    world.state = "menu";
-    pausePanel.classList.add("hidden");
     battleSplash.classList.add("hidden");
-    renderLobby();
+    if (world.panelReturn === "paused" && players.length) {
+      pausePanel.classList.remove("hidden");
+      world.state = "paused";
+    } else {
+      menu.classList.remove("hidden");
+      world.state = "menu";
+      renderLobby();
+    }
     setMenuIndex(0);
   }
 
@@ -1598,20 +1667,34 @@
       world.pausedThisFrame = true;
       pausePanel.classList.remove("hidden");
       setMenuIndex(0);
+      duckMusic(true);
+      sfx("card");
     } else if (!shouldPause && world.state === "paused") {
       world.state = "playing";
       pausePanel.classList.add("hidden");
+      duckMusic(false);
     }
+  }
+
+  function duckMusic(quiet) {
+    world.musicDucked = quiet;
+    applyMusicVolume();
+  }
+
+  function applyMusicVolume() {
+    if (musicAudio) musicAudio.volume = settings.musicVolume * (world.musicDucked ? 0.22 : 1);
   }
 
   function returnToMainMenu() {
     players = [];
     bullets = [];
     fields = [];
+    particles = [];
     hud.innerHTML = "";
     hudRefs = [];
-    stopAudio();
+    duckMusic(false);
     world.state = "menu";
+    world.panelReturn = "menu";
     world.winner = null;
     hideAllPanels();
     menu.classList.remove("hidden");
@@ -1682,7 +1765,9 @@
   // ------------------------------------------------------------------ render
   function render() {
     resize();
-    const inGame = !(world.state === "menu" || world.state === "settings" || world.state === "how");
+    const onMenuScreen = world.state === "title" || world.state === "menu" ||
+      ((world.state === "settings" || world.state === "how") && (world.panelReturn !== "paused" || !players.length));
+    const inGame = !onMenuScreen;
     const dpr = canvas.height / innerHeight;
     const hudReserve = inGame && hud.offsetHeight ? Math.min(150, hud.offsetHeight + 14) * dpr : 0;
     const scale = Math.min(canvas.width / world.width, (canvas.height - hudReserve) / world.height);
@@ -1699,7 +1784,7 @@
     ctx.rect(0, 0, world.width, world.height);
     ctx.clip();
 
-    if (world.state === "menu" || world.state === "settings" || world.state === "how") {
+    if (onMenuScreen) {
       drawMenuBackground();
       drawParticles();
     } else {
@@ -2492,7 +2577,7 @@
   function makeMusicAudio() {
     musicAudio = new Audio(soundtrack[currentTrack % soundtrack.length]);
     musicAudio.loop = false;
-    musicAudio.volume = settings.musicVolume;
+    musicAudio.volume = settings.musicVolume * (world.musicDucked ? 0.22 : 1);
     musicAudio.preload = "auto";
     musicAudio.addEventListener("ended", () => {
       currentTrack = (currentTrack + 1) % soundtrack.length;
@@ -2522,7 +2607,7 @@
   }
   function setMusicVolume(value) {
     settings.musicVolume = clamp(Number(value) / 100, 0, 1);
-    if (musicAudio) musicAudio.volume = settings.musicVolume;
+    applyMusicVolume();
   }
 
   function tone(freq, duration = 0.12, type = "sine", volume = 0.08, when = null, slideTo = null) {
@@ -2601,20 +2686,13 @@
     document.getElementById("pauseFullscreenBtn").addEventListener("click", toggleFullscreen);
     document.getElementById("pauseMusicBtn").addEventListener("click", toggleMusic);
     document.getElementById("pauseMenuBtn").addEventListener("click", returnToMainMenu);
-    document.getElementById("settingsBtn").addEventListener("click", () => {
-      menu.classList.add("hidden");
-      settingsPanel.classList.remove("hidden");
-      world.state = "settings";
-      setMenuIndex(0);
-    });
-    document.getElementById("howBtn").addEventListener("click", () => {
-      menu.classList.add("hidden");
-      howPanel.classList.remove("hidden");
-      world.state = "how";
-      setMenuIndex(0);
-    });
-    document.getElementById("settingsBack").addEventListener("click", () => showMainMenu(settingsPanel));
-    document.getElementById("howBack").addEventListener("click", () => showMainMenu(howPanel));
+    document.getElementById("settingsBtn").addEventListener("click", () => openPanel(settingsPanel, "settings"));
+    document.getElementById("howBtn").addEventListener("click", () => openPanel(howPanel, "how"));
+    document.getElementById("pauseSettingsBtn").addEventListener("click", () => openPanel(settingsPanel, "settings"));
+    document.getElementById("pauseHowBtn").addEventListener("click", () => openPanel(howPanel, "how"));
+    document.getElementById("settingsBack").addEventListener("click", () => closePanel(settingsPanel));
+    document.getElementById("howBack").addEventListener("click", () => closePanel(howPanel));
+    titleScreen.addEventListener("pointerdown", () => startFromTitle(true));
 
     // arena picker
     const levelSelect = document.getElementById("levelSelect");
@@ -2665,6 +2743,14 @@
     });
   }
 
+  async function enterFullscreen() {
+    try {
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+    } catch {
+      showToast("This browser blocked fullscreen");
+    }
+  }
+
   async function toggleFullscreen() {
     try {
       if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
@@ -2698,15 +2784,27 @@
     ensureAudio();
     if (!keys.has(e.code)) pressed.add(e.code);
     keys.add(e.code);
+    if (world.state === "title") {
+      startFromTitle(true);
+      e.preventDefault();
+      return;
+    }
     if (e.code === "KeyM") toggleMusic();
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter", "NumpadEnter", "Slash"].includes(e.code)) e.preventDefault();
   });
   addEventListener("keyup", e => keys.delete(e.code));
   addEventListener("blur", () => { keys.clear(); pressed.clear(); });
-  addEventListener("pointerdown", ensureAudio);
+  addEventListener("pointerdown", () => {
+    ensureAudio();
+    // a pad-started session gets music on the first real user gesture
+    if (world.state !== "title" && settings.music && (!musicAudio || musicAudio.paused)) startMusic();
+  });
   addEventListener("pagehide", stopAudio);
   addEventListener("beforeunload", stopAudio);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) stopMusic(); else if (world.state !== "menu") startMusic(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopMusic();
+    else if (world.state !== "title") startMusic();
+  });
   addEventListener("gamepadconnected", e => {
     const orphan = players.find(p => !p.bot && !p.scheme && (p.gamepadIndex === null || p.gamepadIndex === undefined));
     if (orphan && world.state !== "menu") {
@@ -2739,6 +2837,5 @@
   bindUi();
   renderLobby();
   syncMusicButtons();
-  setMenuIndex(0);
   requestAnimationFrame(tick);
 })();

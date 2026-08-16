@@ -79,6 +79,7 @@
     shake: 0,
     time: 0,
     menuIndex: 0,
+    quickIndex: -1,   // icon-row cursor; -1 is nothing selected
     joinedThisFrame: false,
     pausedThisFrame: false,
     windPhase: Math.random() * 10,
@@ -324,6 +325,10 @@
       world.joinedThisFrame = true;
     }
 
+    // While an icon is picked with the bumpers, the lobby lets go of A/B and
+    // left/right: those belong to the icon row until it is stepped off.
+    if (world.quickIndex >= 0) return;
+
     // per-slot input: cycle / lock / leave
     for (const slot of [...lobbySlots]) {
       if (slot.type === "bot") continue;
@@ -509,6 +514,10 @@
   // shows once a match is running.
   function syncChrome() {
     const showIcons = world.state === "menu" || world.state === "paused";
+    if (world.state === "playing" || world.state === "title") {
+      world.quickIndex = -1;
+      for (const el of document.querySelectorAll(".controller-focus")) el.classList.remove("controller-focus");
+    }
     const showTracks = players.length > 0 && world.state !== "menu" && world.state !== "title";
     if (world.chromeIcons !== showIcons) {
       world.chromeIcons = showIcons;
@@ -1892,30 +1901,117 @@
     const controls = visibleControls();
     if (!controls.length) return;
     world.menuIndex = clamp(world.menuIndex, 0, controls.length - 1);
-    const nav = menuNav(pads);
+
+    // The bumpers walk the icon row (how to play, sound, settings, fullscreen)
+    // from anywhere, so those are reachable without first locking in or
+    // hunting for them with the stick. Stepping off either end lets go again.
+    const quickMoved = updateQuickBar(pads);
+    // Any direction hands control back to whatever the screen normally does
+    // with the stick — picking a fighter in the lobby, the cursor elsewhere.
+    if (!quickMoved && world.quickIndex >= 0 && anyDirectionPressed(pads)) {
+      setQuickIndex(-1);
+      return;
+    }
+
+    const nav = quickMoved ? null : menuNav(pads);
     if (nav) {
+      if (world.quickIndex >= 0) setQuickIndex(-1);   // the stick takes over
       const focused = controls[world.menuIndex];
       const onValue = focused && (focused.matches("input[type='range']") || focused.matches("select"));
       // left/right tunes a slider or dropdown; anything else moves the cursor
       if (onValue && nav.x) adjustMenuControl(focused, nav.x);
-      else moveFocusSpatial({ x: nav.x, y: nav.y }, controls);
+      else if (!moveFocusSpatial({ x: nav.x, y: nav.y }, controls) && nav.y) scrollPanel(nav.y);
     }
     if (menuConfirm(pads)) {
-      const target = controls[world.menuIndex];
+      const target = quickTarget() || controls[world.menuIndex];
       if (target) {
         if (target.matches("input[type='checkbox']")) {
           target.checked = !target.checked;
           target.dispatchEvent(new Event("change"));
-        } else if (!target.matches("select")) {
+        } else if (target.matches("select")) {
+          // A steps a dropdown along, which is what pressing it looks like it
+          // should do; the arrows are still there for going back.
+          adjustMenuControl(target, 1);
+        } else {
           target.click();
         }
       }
     }
     if (menuBack(pads)) {
-      if (world.state === "settings") closePanel(settingsPanel);
+      if (world.quickIndex >= 0) setQuickIndex(-1);
+      else if (world.state === "settings") closePanel(settingsPanel);
       else if (world.state === "how") closePanel(howPanel);
       else if (world.state === "paused") togglePause(false);
     }
+  }
+
+  // The icon row, when it is on screen. Its own cursor is separate from the
+  // panel's so the two never fight over what is highlighted.
+  function quickControls() {
+    if (iconBar.classList.contains("hidden")) return [];
+    return [...iconBar.querySelectorAll("button")].filter((el) => !el.disabled && el.offsetParent !== null);
+  }
+
+  // Any stick or d-pad direction, whoever pressed it — used only to decide
+  // that the icon row should let go.
+  function anyDirectionPressed(pads) {
+    for (const sc of keyboardSchemes) {
+      if (pressed.has(sc.left) || pressed.has(sc.right) || pressed.has(sc.up) || pressed.has(sc.down)) return true;
+    }
+    for (const pad of pads) {
+      for (const b of [12, 13, 14, 15]) if (buttonEdge(pad, b)) return true;
+      if (axisEdge(pad, 0, 1) || axisEdge(pad, 0, -1) || axisEdge(pad, 1, 1) || axisEdge(pad, 1, -1)) return true;
+    }
+    return false;
+  }
+
+  function quickTarget() {
+    const quick = quickControls();
+    return world.quickIndex >= 0 ? quick[world.quickIndex] || null : null;
+  }
+
+  function updateQuickBar(pads) {
+    const quick = quickControls();
+    if (!quick.length) {
+      if (world.quickIndex >= 0) world.quickIndex = -1;
+      return false;
+    }
+    let dir = 0;
+    for (const pad of pads) {
+      if (buttonEdge(pad, 5)) dir = 1;
+      if (buttonEdge(pad, 4)) dir = -1;
+    }
+    if (pressed.has("BracketRight")) dir = 1;
+    if (pressed.has("BracketLeft")) dir = -1;
+    if (!dir) return false;
+    // -1 is "nothing selected", and it sits at both ends of the row: step off
+    // the last icon and the row lets go rather than wrapping straight round.
+    let i = world.quickIndex + dir;
+    if (i < -1) i = quick.length - 1;
+    if (i > quick.length - 1) i = -1;
+    setQuickIndex(i, quick);
+    return true;
+  }
+
+  function setQuickIndex(i, quick = quickControls()) {
+    world.quickIndex = i;
+    for (const el of document.querySelectorAll(".controller-focus")) el.classList.remove("controller-focus");
+    const target = i >= 0 ? quick[i] : null;
+    if (!target) {
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      return;
+    }
+    target.classList.add("controller-focus");
+    target.focus({ preventScroll: true });
+  }
+
+  // Long panels (Settings, How to Play) scroll when the cursor has run out of
+  // controls to move to, so the bottom of the page is reachable on a pad.
+  function scrollPanel(dy) {
+    const panel = world.state === "settings" ? settingsPanel
+      : world.state === "how" ? howPanel
+        : world.state === "paused" ? pausePanel : menu;
+    if (panel) panel.scrollBy({ top: dy * 90, behavior: "smooth" });
   }
 
   function visibleControls() {
@@ -1933,11 +2029,12 @@
   }
 
   function setMenuIndex(index, controls = visibleControls()) {
-    if (!controls.length) return;
-    world.menuIndex = (index + controls.length) % controls.length;
-    // clear the cursor everywhere: a panel we navigated away from would
-    // otherwise keep a stale highlight on one of its hidden buttons
+    // Clear first: a panel we just left would otherwise keep its highlight on
+    // a control nobody can see any more.
     for (const el of document.querySelectorAll(".controller-focus")) el.classList.remove("controller-focus");
+    if (!controls.length) return;
+    world.quickIndex = -1;
+    world.menuIndex = (index + controls.length) % controls.length;
     const target = controls[world.menuIndex];
     target.classList.add("controller-focus");
     target.focus({ preventScroll: true });
@@ -1996,6 +2093,7 @@
       if (score < bestScore) { bestScore = score; best = i; }
     });
     if (best >= 0) setMenuIndex(best, controls);
+    return best >= 0;
   }
 
   function padSlotLocked(pad) {
@@ -2008,9 +2106,10 @@
     if (pressed.has("Enter") || pressed.has("Space") || pressed.has("NumpadEnter")) return true;
     // a locked-in keyboard player confirms with their shoot key
     if (keyboardSchemes.some((sc, i) => pressed.has(sc.shoot) && schemeFreeForNav(sc, i))) return true;
-    if (world.state === "menu") {
+    if (world.state === "menu" && world.quickIndex < 0) {
       // In the lobby A locks your character first; once you're ready it confirms
-      // the focused button. Start always confirms.
+      // the focused button. Start always confirms. An icon picked with the
+      // bumpers is confirmable either way — that is the point of the row.
       return pads.some(pad => buttonEdge(pad, 9) || ((buttonEdge(pad, 0) || buttonEdge(pad, 7)) && padSlotLocked(pad)));
     }
     return pads.some(pad => buttonEdge(pad, 0) || buttonEdge(pad, 7) || buttonEdge(pad, 9));
@@ -2027,7 +2126,9 @@
 
   function adjustMenuControl(el, dir) {
     if (el.matches("select")) {
-      el.selectedIndex = clamp(el.selectedIndex + dir, 0, el.options.length - 1);
+      const n = el.options.length;
+      if (!n) return;
+      el.selectedIndex = (el.selectedIndex + dir + n) % n;
       el.dispatchEvent(new Event("change"));
     } else if (el.type === "range") {
       el.value = String(clamp(Number(el.value) + dir * Number(el.step || 1), Number(el.min), Number(el.max)));

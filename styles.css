@@ -1077,3 +1077,22 @@ h1.title-logo .logo-img {
   color: var(--mint);
   opacity: 0.85;
 }
+
+/* A dropdown reads as a cycler: the arrows say that left/right (or A on a pad)
+   steps through it, since a native option list can't be opened with a pad. */
+.cycler {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.cycler select { flex: 1; min-width: 0; }
+.cyc-arrow {
+  color: var(--muted, #9aa0b5);
+  font-size: 13px;
+  opacity: 0.5;
+  transition: opacity 0.12s, color 0.12s;
+  user-select: none;
+}
+.cycler:focus-within .cyc-arrow,
+.cycler:hover .cyc-arrow { opacity: 1; color: var(--accent, #ff4d8f); }

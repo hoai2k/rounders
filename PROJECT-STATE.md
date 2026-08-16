@@ -187,6 +187,10 @@ Pillars:
 - [x] Arcade title screen (flashing PRESS START, any input begins, keyboard/mouse
       start also enters fullscreen)
 - [x] Full controller menu navigation (D-pad move, A/Menu confirm, B/View back)
+- [x] Every menu control reachable on a pad: dropdowns cycle with ◀ ▶ / step with A
+      (Arena gets on-screen ◀ ▶ arrows), D-pad scrolls long panels when the cursor
+      has nowhere to go, and LB/RB cycle the corner icon row (how to play, sound,
+      settings, fullscreen) with the deselected state at both ends
 - [x] Pause menu: resume, settings, how-to-play, fullscreen, music, quit to menu —
       music ducks to 22% while paused
 - [x] Xbox controller diagram (inline SVG) on the How to Play screen

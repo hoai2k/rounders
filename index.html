@@ -42,7 +42,11 @@
       <h3 class="settings-group" data-str="settings.groupMatch"></h3>
       <label>
         <span data-str="settings.arena"></span>
-        <select id="levelSelect"></select>
+        <span class="cycler">
+          <span class="cyc-arrow" aria-hidden="true">◀</span>
+          <select id="levelSelect"></select>
+          <span class="cyc-arrow" aria-hidden="true">▶</span>
+        </span>
       </label>
       <label>
         <span data-str="settings.maxPlayers"></span>
@@ -236,6 +240,10 @@
         <div>
           <h3 data-str="how.pausingTitle"></h3>
           <p data-str-html="how.pausingHtml"></p>
+        </div>
+        <div>
+          <h3 data-str="how.menusTitle"></h3>
+          <p data-str-html="how.menusHtml"></p>
         </div>
       </div>
       <div class="menu-grid">

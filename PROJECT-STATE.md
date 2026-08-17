@@ -269,7 +269,9 @@ Pillars:
 ### 7. Audio & FX polish
 - [x] Kept: synth SFX, rumble
 - [x] New: per-mechanic SFX hooks (burn, chain, teleport, bounce pad), weather particles
-- [x] Soundtrack: 16 tracks in `assets/music/` (manifest in `js/music.js`).
+- [x] Soundtrack: 28 tracks in `assets/music/` (manifest in `js/music.js`;
+      the 12 uploaded 2026-08-17 — Bossa Nova, Calypso, Italian Accorion,
+      Salsa, Spy, Waltz — are wired into the battle shuffle).
       "Rounders Jazz 1" is the title/selection theme; every match rolls a random
       non-title track. Streamed via byte-range requests (`server.mjs` serves 206),
       with the next track warmed in the background so skips start instantly.

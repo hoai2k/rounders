@@ -10,6 +10,12 @@
   const names = [
     "Rounders African 1",
     "Rounders African 2",
+    "Rounders Bossa Nova 1",
+    "Rounders Bossa Nova 2",
+    "Rounders Calypso 1",
+    "Rounders Calypso 2",
+    "Rounders Italian Accorion 1",
+    "Rounders Italian Accorion 2",
     "Rounders Jazz 1",
     "Rounders Jazz 2",
     "Rounders Raga 1",
@@ -18,12 +24,18 @@
     "Rounders Reel 2",
     "Rounders Reggae 1",
     "Rounders Reggae 2",
+    "Rounders Salsa 1",
+    "Rounders Salsa 2",
     "Rounders Samba 1",
     "Rounders Samba 2",
+    "Rounders Spy 1",
+    "Rounders Spy 2",
     "Rounders Synth 1",
     "Rounders Synth 2",
     "Rounders Tango 1",
-    "Rounders Tango 2"
+    "Rounders Tango 2",
+    "Rounders Waltz 1",
+    "Rounders Waltz 2"
   ];
 
   const TITLE_TRACK = "Rounders Jazz 1";

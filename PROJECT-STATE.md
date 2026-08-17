@@ -418,6 +418,31 @@ Pillars:
       27% (was 35%), uncommons 30%, rares 25%, epics 14% (was 11%). Drafts are
       richer than before. If that reads as too generous, `RARITIES.common.weight`
       9 → 13 restores commons to ~35% without touching any card
+- [x] **Bullet-art config 2026-08-17**: new `js/bullet-art.js` is the one table
+      for how a card's round is drawn — scale, rotation, trail colour, and
+      whether it keeps a procedural round. Game, preview and bullet pane all
+      read it. Colours are derived from the sprites themselves by
+      `tools/bullet-colors.mjs` (`npm run bullet-colors`), so a venom round
+      trails green and a flaming one orange. Supernova is back to its
+      procedural star and now wins over any sprite the rest of the build
+      carries. Several bullet cards blend the two newest sprites 68/32 — chosen
+      by rendering plain-average, additive, aura-behind and newest-only at true
+      bullet size and looking; the rest of the build shows only in the trail
+- [x] **Card-combination audit** — `npm run audit-combos` (live match) and
+      `npm run audit-stats` (stat-space sweep). Findings are in the session
+      notes; headline: engine is stable across 100 live 12-card builds and
+      4000 stat builds with duplicates, but the damage tail one-shots and
+      `fireDelay` has no floor
+- [ ] **No floor on `fireDelay` / `reload`** — stacked Blood Money and Hair
+      Trigger reach a 0.0004s fire delay, so the whole magazine leaves the
+      barrel in a single frame. Not a crash (worst frame 33ms) but it turns
+      "fast gun" into "instant clip dump". A floor around 0.05s / 0.3s would
+      keep stacking worthwhile with diminishing returns
+- [ ] **Damage tail one-shots**: baseline volley is 36 vs 100 HP (3 hits, as
+      designed). Over 16-card builds the median is 49, p90 109, p99 225 and
+      the max 448. Supernova appears in 125% of the hottest 1% of builds (i.e.
+      often twice) and Glass Cannon in 108%; damage multipliers compose and
+      pellets multiply on top
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

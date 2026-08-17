@@ -6999,6 +6999,31 @@
     })),
     // how a fighter's round is drawn, for checking the bullet-art config
     bulletLook: p => bulletLookFor(p),
+    // strip a fighter back to a clean slate: no cards, baseline stats, full
+    // health. Lets a test run build after build without reloading the page.
+    stripCards(index) {
+      const p = players[index];
+      if (!p) return false;
+      p.cards = [];
+      p.stats = defaultStats();
+      p.hp = p.stats.maxHp;
+      p.ammo = p.stats.maxAmmo;
+      p.guardianCharges = 0; p.roundRevives = 0; p.hoverLeft = 0; p.freshPool = 0;
+      p.hovering = false; p.rebirth = null; p.activeCooldown = 0;
+      p.burstQueue = []; p.encoreQueue = [];
+      p.decayPool = 0; p.hotShield = 0; p.overShield = 0; p.shield = 0;
+      p.alive = true;
+      return true;
+    },
+    defaultStats,
+    // fire a fighter's Mythic on demand: bots never press the ability button,
+    // so a combination test has no other way to exercise the actives
+    fireActive(index) {
+      const p = players[index];
+      if (!p || !p.stats.active) return false;
+      p.activeCooldown = 0;
+      return Boolean(tryActive(p));
+    },
     // chronoshift tape: is the world running backwards, and how much is left
     rewind: () => ({ active: rewind.active, cursor: rewind.cursor, frames: history.length }),
     slabs: () => props.slabs.filter(s => !s.dead).map(s => ({

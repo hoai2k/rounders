@@ -9,6 +9,9 @@
     "intake-art": "node tools/intake-art.mjs",
     "mock-parts": "node tools/mock-parts.mjs",
     "audit-keys": "node tools/audit-keys.mjs",
-    "fitrig": "node tools/fitrig.mjs"
+    "fitrig": "node tools/fitrig.mjs",
+    "audit-combos": "node tools/audit-combos.mjs",
+    "audit-stats": "node tools/audit-stats.mjs",
+    "bullet-colors": "node tools/bullet-colors.mjs"
   }
 }

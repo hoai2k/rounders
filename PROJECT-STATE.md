@@ -276,6 +276,32 @@ Pillars:
       tennis serve from when it was Second Serve. Re-requested in
       `image-requests.md` §2. Breakthrough's painting already showed a fighter
       smashing through a stone wall and needs nothing
+- [x] **Card feel pass 2026-08-17 (5)**: **Mosh Pit renamed Sawblade**, and the
+      blade no longer orbits — one huge disc centred on the fighter, spinning on
+      its own axis, drawn behind them at the full radius it damages in and
+      stroked in near-black so it reads against a grey arena (shared helper
+      `ROUNDERS.drawSawblade`). **Bank Shot** keeps throwing sparks for the rest
+      of the flight after a cushion, not just at it, and arrives in a burst
+      scaled to how many cushions it took. **Hummingbird** gained its namesake:
+      tap jump again in mid-air and you hold station on blurred wings for 3
+      seconds, and shooting from the hover empties the whole magazine 60ms a
+      round. **Lemonade Stand** is lemon-yellow instead of generic heal-green,
+      with a glass of lemonade faded into the pool, rising bubbles, and heal
+      **"+10" ticks** banked and called out in whole numbers (the game had no
+      floating-text system at all; there is one now). **Berserker's Blood**
+      goes to +150% (was +60%), its rounds swell with the multiplier and drip
+      blood as they fly — a fleck at a scratch, a ribbon at death's door.
+      **Shrapnel Burst**'s shards lived 0.9s and winked out at the top of their
+      own hop; at 2.6s they finish the arc and reach the floor or a target.
+      **Comet Trail**'s tail is sized off the round's CURRENT radius, so it
+      thickens and lengthens with the comet and throws embers once it is
+      genuinely burning. **Phoenix Feather** now actually kills you: a fire
+      blast, a second of burning wreckage where you fell — the round will not
+      end over it — then you climb back out of that same spot at half health,
+      still alight
+- [x] **Mid-round grants sync their per-round counters**: `grantCard` refreshes
+      `guardianCharges`, `roundRevives`, `hoverLeft` and `freshPool`, so a card
+      taken mid-round no longer grants a save you cannot spend
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

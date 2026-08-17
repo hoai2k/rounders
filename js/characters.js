@@ -1110,9 +1110,146 @@
     ctx.restore();
   }
 
+  // Sawblade's disc, drawn at the FULL radius it damages in so the thing you
+  // can see is the thing that hurts. Spun on its own axis and stroked in near
+  // black all round, so it stays legible against a grey arena or a grey wall.
+  function drawSawblade(ctx, x, y, r, angle, art) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    if (art) {
+      // the painted blade still gets the outline, traced round its disc
+      ctx.drawImage(art, -r, -r, r * 2, r * 2);
+      ctx.strokeStyle = "rgba(8,8,12,0.9)";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, r - 1.5, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    const teeth = 16;
+    const g = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, r);
+    g.addColorStop(0, "#e6ebf5");
+    g.addColorStop(0.55, "#b3bccb");
+    g.addColorStop(1, "#7f8797");
+    ctx.fillStyle = g;
+    ctx.strokeStyle = "rgba(8,8,12,0.9)";
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    for (let i = 0; i < teeth; i += 1) {
+      const a1 = (i / teeth) * Math.PI * 2;
+      const a2 = ((i + 0.42) / teeth) * Math.PI * 2;
+      const a3 = ((i + 0.58) / teeth) * Math.PI * 2;
+      ctx.lineTo(Math.cos(a1) * r * 0.84, Math.sin(a1) * r * 0.84);
+      ctx.lineTo(Math.cos(a2) * r, Math.sin(a2) * r);
+      ctx.lineTo(Math.cos(a3) * r * 0.86, Math.sin(a3) * r * 0.86);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // hub and bolt holes, so the disc reads as spinning rather than shimmering
+    ctx.strokeStyle = "rgba(8,8,12,0.55)";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "#5c6472";
+    for (let i = 0; i < 5; i += 1) {
+      const a = (i / 5) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r * 0.4, Math.sin(a) * r * 0.4, r * 0.075, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#3a3f4d";
+    ctx.strokeStyle = "rgba(8,8,12,0.9)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Hummingbird's hover: a pair of wings beating far too fast to resolve, so
+  // they are drawn as overlapping blurred arcs sweeping through their stroke.
+  // Drawn behind the fighter, one set each side.
+  function drawHoverWings(ctx, x, y, r, phase) {
+    ctx.save();
+    ctx.translate(x, y);
+    for (const side of [-1, 1]) {
+      ctx.save();
+      ctx.scale(side, 1);
+      // three ghosts of the same wing at different points in the beat
+      for (let i = 0; i < 3; i += 1) {
+        const beat = Math.sin(phase - i * 0.5);
+        const tilt = beat * 0.75 - 0.35;
+        ctx.save();
+        ctx.translate(r * 0.55, -r * 0.25);
+        ctx.rotate(tilt);
+        ctx.globalAlpha = 0.34 - i * 0.09;
+        ctx.fillStyle = "#dff1ff";
+        ctx.beginPath();
+        ctx.ellipse(r * 0.62, 0, r * 0.7, r * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // A tall glass of lemonade, centred at (x, y) and `h` tall, drawn faded into
+  // the heal zone. Uses fx/lemonade.png when it lands, procedural until then.
+  function drawLemonade(ctx, x, y, h, t) {
+    const art = window.ROUNDERS.fxImage && window.ROUNDERS.fxImage("lemonade");
+    if (art) { ctx.drawImage(art, x - h * 0.6, y - h * 0.6, h * 1.2, h * 1.2); return; }
+    const w = h * 0.62;
+    ctx.save();
+    ctx.translate(x, y);
+    // the glass: a slight taper, the drink filling most of it
+    const top = -h * 0.5, bot = h * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, top);
+    ctx.lineTo(w * 0.38, top);
+    ctx.lineTo(w * 0.3, bot);
+    ctx.lineTo(-w * 0.4, bot);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,236,140,0.85)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(60,48,10,0.85)";
+    ctx.lineWidth = Math.max(1.5, h * 0.055);
+    ctx.stroke();
+    // the drink line, and a couple of ice cubes bobbing in it
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.47, top + h * 0.16);
+    ctx.lineTo(w * 0.35, top + h * 0.16);
+    ctx.strokeStyle = "rgba(60,48,10,0.5)";
+    ctx.lineWidth = Math.max(1, h * 0.035);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    for (let i = 0; i < 2; i += 1) {
+      const bob = Math.sin(t * 2 + i * 2.1) * h * 0.03;
+      ctx.fillRect(-w * 0.22 + i * w * 0.3, top + h * 0.26 + bob, w * 0.2, w * 0.2);
+    }
+    // a straw, and a lemon wedge on the rim
+    ctx.strokeStyle = "rgba(255,120,150,0.9)";
+    ctx.lineWidth = Math.max(1.5, h * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.05, bot - h * 0.06);
+    ctx.lineTo(w * 0.22, top - h * 0.18);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,226,60,0.95)";
+    ctx.strokeStyle = "rgba(60,48,10,0.8)";
+    ctx.lineWidth = Math.max(1, h * 0.03);
+    ctx.beginPath();
+    ctx.arc(-w * 0.5, top + h * 0.02, h * 0.15, -Math.PI / 2, Math.PI / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   window.ROUNDERS.CHARACTERS = CHARACTERS;
   window.ROUNDERS.drawCharacter = drawCharacter;
   window.ROUNDERS.drawIronHull = drawIronHull;
+  window.ROUNDERS.drawSawblade = drawSawblade;
+  window.ROUNDERS.drawHoverWings = drawHoverWings;
+  window.ROUNDERS.drawLemonade = drawLemonade;
   window.ROUNDERS.setProceduralCharacters = setProceduralCharacters;
   window.ROUNDERS.characterImage = { has: hasImage, get: getImage };
 })();

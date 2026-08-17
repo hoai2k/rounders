@@ -1,10 +1,10 @@
 # Image Generation Requests — Rounders
 
-**Three files outstanding: `fx/angel.png` (§1) and the two Second Defence
-files (§2).** Everything else the game asks for has been generated and is in
-the repo — all 84 cards have an emblem and a scene, all 29 painted bullets are
-in, and 17 of the 18 effect sheets. The prompts everything was made from live
-in `image-requests-history.md`, which is where a re-generation or a style
+**Six files outstanding: `fx/angel.png` and `fx/lemonade.png` (§1), the two
+Second Defence files (§2) and the two Sawblade files (§3).** Everything else the game asks for
+has been generated and is in the repo — all 84 cards have an emblem and a
+scene, all 29 painted bullets are in, and 17 of the 18 effect sheets. The
+prompts everything was made from live in `image-requests-history.md`, which is where a re-generation or a style
 question goes looking.
 
 > Audited 2026-08-17 after the 115-file delivery: **0 cards missing art** (84
@@ -18,7 +18,9 @@ question goes looking.
 > out through a stone wall and reads better under the new name than the old
 > one. Second Serve → **Second Defence** did not: both its files are a tennis
 > serve, and the card is now about your block snapping back, so §2 re-requests
-> them.
+> them. Mosh Pit → **Sawblade** is the same story for a different reason: the
+> art shows a small blade on an orbital track, and the blade no longer orbits,
+> so §3 re-requests it.
 
 The game ships with procedural fallbacks, so art can be dropped in
 incrementally: any missing file is fine and simply falls back.
@@ -47,13 +49,14 @@ incrementally: any missing file is fine and simply falls back.
 
 ---
 
-## 1. Effect art still outstanding (1 file)
+## 1. Effect art still outstanding (2 files)
 
 - **Path:** `assets/images/fx/<name>.png`
 
 | File | Size | Subject |
 |---|---|---|
 | `angel.png` | 256×256 (drawn ~52×60) | A tiny cartoon guardian angel seen head-on — round head, simple robe, two spread feathered wings, its own little halo above. Warm cream-gold on transparent; it rises and fades when Guardian Halo saves you, so keep it a clean readable silhouette |
+| `lemonade.png` | 256×256 (drawn ~106×106) | A tall glass of cloudy lemonade seen head-on — ice cubes, a pink-and-white striped straw, a lemon wedge on the rim, a couple of bubbles. Bright lemon yellow on transparent. It sits faded into the middle of Lemonade Stand's heal zone, so it must read at low opacity: strong shapes, dark outline, no fine detail |
 
 ---
 
@@ -84,6 +87,37 @@ files below **replace** what is already at those paths.
   > attacker — shield panels rushing inward and locking together, cyan-white,
   > with the impact flash still bright at the point of contact. The enemy is
   > recoiling. Read: hitting them is what put your guard back up.
+
+---
+
+## 3. Sawblade — re-art after the rename (2 files)
+
+The card used to be **Mosh Pit** and both files show a small blade riding a
+visible circular *track* around the fighter. The blade no longer orbits: it is
+now one huge disc centred on you, spinning on its own axis and filling the
+whole area it damages. Both files below **replace** what is already at those
+paths (already renamed `mosh-pit.png` → `sawblade.png`).
+
+**Card:** Sawblade · Rare · *"Mind the blade."*
+**Effect:** block = spinning saw (2s)
+
+- **Emblem** — `assets/images/cards/sawblade.png`, 256×256, transparent
+  background:
+
+  > A round cartoon brawler at the centre of one enormous circular sawblade
+  > that is much wider than they are — the blade behind them, teeth all round
+  > the outside, motion-blurred as it spins. Bright steel with a heavy dark
+  > outline so it reads against any background. Sparks where the teeth bite.
+  > The fighter looks delighted about it. No orbit, no track, no second blade.
+
+- **Scene** — `assets/images/cards/art/sawblade.png`, 512×384, opaque
+  full-bleed painting:
+
+  > A round cartoon brawler standing inside a colossal spinning sawblade — the
+  > disc is centred on them and several times their width, filling the frame
+  > behind them, teeth throwing sparks off the arena floor. An enemy is
+  > flinching back from the edge of it. Steel and hazard orange against a
+  > darker arena. Read: they ARE the blade, it is not circling them.
 
 ---
 

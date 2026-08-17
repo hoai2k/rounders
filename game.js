@@ -151,6 +151,12 @@
   let particles = [];
   let fields = [];
   let bolts = []; // lightning polylines {points, life, color}
+  // short-lived text that rises off a fighter: heal ticks and the like
+  let floats = [];
+  function floatText(x, y, text, color) {
+    floats.push({ x, y, text, color, life: 0.9, maxLife: 0.9 });
+    if (floats.length > 60) floats.shift();
+  }
   let decoys = []; // Body Double stand-ins {x, y, hp, owner, character, color, life}
   // Destructible / dynamic arena props, rebuilt every round from level data:
   //   breaks — Map(level platform → {hp,max,dead}) for platforms with `breakable`
@@ -206,7 +212,7 @@
       groundHug: 0, voidPull: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
-      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0,
+      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0, hover: 0,
       goldenShot: 0, killHeal: false,
       active: null, activeCooldown: 10,
       // gap-audit wave (CARD-GAP-AUDIT.md): offense & bullets
@@ -746,6 +752,7 @@
     particles = [];
     fields = [];
     bolts = [];
+    floats = [];
     world.weather = [];
     world.lightningTimer = level.lightning ? level.lightning.period : 0;
     world.lightningFlash = 0;
@@ -773,6 +780,7 @@
       p.pitBounces = 0;
       p.guardianCharges = p.stats.guardian;
       p.roundRevives = p.stats.revives;
+      p.rebirth = null;
       p.shield = p.stats.shield;
       p.shieldDelay = 0;
       p.shieldFlash = 0;
@@ -994,6 +1002,12 @@
     c.apply(p);
     p.hp = p.stats.maxHp;
     p.ammo = p.stats.maxAmmo;
+    // per-round counters derived from stats have to move with them, or a card
+    // taken mid-round (drafts, the debug hook) grants a save you cannot spend
+    p.guardianCharges = p.stats.guardian;
+    p.roundRevives = p.stats.revives;
+    if (p.stats.hover > 0) p.hoverLeft = p.stats.hover;
+    if (p.stats.freshCoat > 0) p.freshPool = p.stats.maxHp * p.stats.freshCoat;
   }
 
   // Each chooser gets a full stage washed in their color: their character
@@ -1895,6 +1909,7 @@
     const plats = activePlatforms(level, world.time);
     const wind = windForce();
     for (const p of players) {
+      if (p.rebirth) tickRebirth(p, dt);
       if (!p.alive) continue;
       p.fireTimer = Math.max(0, p.fireTimer - dt);
       p.blockCooldown = Math.max(0, p.blockCooldown - dt);
@@ -2081,7 +2096,28 @@
       const chillJump = p.chillTimer > 0 ? 0.75 : 1;
       if (p.input.jumpPressed && !stunned) {
         const canWallJump = !p.grounded && p.wallTimer > 0 && p.wallCooldown <= 0;
-        if (canWallJump) {
+        // Hummingbird: tap jump a second time in the air and you stop dead,
+        // wings blurring, for as long as this jump's budget lasts. Tapping
+        // again drops you out of it. Checked before the ordinary air jump so
+        // the hover is what the second press buys.
+        let usedOnHover = false;
+        if (p.stats.hover > 0 && !p.grounded && !canWallJump) {
+          if (p.hovering) {
+            p.hovering = false;
+            usedOnHover = true;
+            puff(p.x, p.y + p.stats.radius * 0.5, "#ffffff", 8);
+          } else if (p.hoverLeft > 0) {
+            p.hovering = true;
+            usedOnHover = true;
+            p.vy = 0;
+            p.vx *= 0.25;
+            sfx("jump");
+            puff(p.x, p.y, "#d8f0ff", 12, 160);
+          }
+        }
+        if (usedOnHover) {
+          // the press bought the hover, not a jump
+        } else if (canWallJump) {
           // Kick up and away from the wall. It costs no air jump, so a wall can
           // be climbed by steering back into it and jumping again — the push is
           // deliberately small enough that air control gets you back in ~0.15s.
@@ -2124,7 +2160,27 @@
       if (p.input.blockPressed && !stunned && !tryActive(p)) tryBlock(p);
       if (p.input.shoot && !stunned) tryShoot(p);
 
+      // Hummingbird: hovering holds you in place, wings blurring, until this
+      // jump's budget runs out or you touch down. Gravity is cancelled rather
+      // than fought, so the hover is dead still and easy to shoot from.
+      if (p.stats.hover > 0) {
+        if (p.grounded) { p.hoverLeft = p.stats.hover; p.hovering = false; }
+        if (p.hovering) {
+          p.hoverLeft -= dt;
+          if (p.hoverLeft <= 0) { p.hovering = false; p.hoverLeft = 0; }
+          else {
+            p.vy = Math.sin(world.time * 9) * 12;      // a small idling bob
+            p.vx *= Math.pow(0.02, dt);
+            p.wingPhase = (p.wingPhase || 0) + dt * 46;
+            if (Math.random() < dt * 30) {
+              puffOne(p.x + rand(-18, 18), p.y + p.stats.radius * 0.7, "rgba(220,240,255,0.6)");
+            }
+          }
+        }
+      }
+
       p.vy += levelGravity() * dt;
+      if (p.hovering) p.vy -= levelGravity() * dt;    // the hover pays for itself
       // Tailwind: holding jump in mid-air spends a float budget to hang, and
       // the budget refills once you touch down again
       if (p.stats.floatTime > 0) {
@@ -2508,7 +2564,11 @@
         ox: from ? from.x : p.x, oy: from ? from.y : p.y,
         vx: Math.cos(a) * speed + p.vx * 0.18,
         vy: Math.sin(a) * speed + p.vy * 0.08,
-        r: (5.5 + Math.min(9, p.stats.damage / 22)) * p.stats.bulletSize,
+        // Berserker's Blood: a raging round is visibly fatter, so how close
+        // its owner is to death can be read off the bullet itself
+        r: (5.5 + Math.min(9, p.stats.damage / 22)) * p.stats.bulletSize
+           * (1 + (rageMul - 1) * 0.55),
+        rage: rageMul - 1,
         damage: p.stats.damage * rageMul * mul
           * (golden ? (pellets > 1 ? 2 : 3) : 1)
           * (empower ? 1 + 0.75 * empower : 1),
@@ -2577,6 +2637,16 @@
     p.empowerShot = 0;
     const angle = Math.atan2(p.aimY, p.aimX);
     fireVolley(p, { golden, empower, angle });
+    // Hummingbird: shooting from the hover empties the magazine in one buzzing
+    // string of rounds — the rest of the ammo goes off 60ms apart and the
+    // reload starts immediately, so the hover is a burst you commit to
+    if (p.hovering && p.ammo > 0) {
+      const rest = p.ammo;
+      p.ammo = 0;
+      for (let i = 1; i <= rest; i += 1) p.burstQueue.push({ t: i * 0.06, mul: 1 });
+      p.reloadTimer = p.stats.reload;
+      p.fireTimer = Math.max(p.fireTimer, rest * 0.06 + 0.05);
+    }
     // Triple Tap: the echoes follow on their own, aimed wherever you are then
     if (p.stats.burstFire) {
       for (let i = 1; i <= p.stats.burstFire; i += 1) {
@@ -2872,6 +2942,11 @@
                 puffOne(o.x, o.y - o.stats.radius - 8, "#ffffff");
               }
             }
+            if (b.banked) {
+              // it arrives with everything it picked up off the cushions
+              burst(p.x, p.y, "#ffe169", 16 + b.banked * 8, 300 + b.banked * 80);
+              burst(p.x, p.y, "#ffb03a", 10, 220);
+            }
             if (b.dazzle && p.dazzleImmune <= 0) {
               p.stunTimer = Math.max(p.stunTimer, Math.min(0.7, 0.4 * b.dazzle));
               p.dazzleImmune = 2;
@@ -3105,7 +3180,9 @@
         bullets.push({
           owner: b.owner, x: b.x, y: b.y - 4, prevX: b.x, prevY: b.y, ox: b.x, oy: b.y,
           vx: Math.cos(a) * 520 + rand(-60, 60), vy: Math.sin(a) * 520,
-          r: Math.max(4, b.r * 0.55), damage: b.damage * 0.4, life: 0.9,
+          // long enough to finish the arc and reach the floor or a target —
+          // at 0.9s they used to wink out at the top of their own hop
+          r: Math.max(4, b.r * 0.55), damage: b.damage * 0.4, life: 2.6,
           gravity: 1500, drag: 0.997, restitution: 0.6,
           bounces: 0, explosive: 0, homing: 0, pierce: 0,
           poison: b.poison, burn: b.burn, chill: 0, chain: 0, shards: 0, grow: 0,
@@ -3145,11 +3222,14 @@
     b.hitIds = new Set(); // a fresh bounce can hit the same target again
     b.vx += rand(-18, 18);
     b.vy += rand(-18, 18);
-    // Bank Shot: every cushion makes the ball smarter and meaner
+    // Bank Shot: every cushion makes the ball smarter and meaner, and it stays
+    // visibly charged for the rest of its flight — the sparks do not stop at
+    // the cushion, so a round that has banked is obvious on sight
     if (b.bankShot) {
       b.homing = Math.max(b.homing, 0.9 * b.bankShot);
       b.damage *= 1 + 0.3 * b.bankShot;
-      puff(b.x, b.y, "#ffe169", 5);
+      b.banked = (b.banked || 0) + 1;
+      puff(b.x, b.y, "#ffe169", 10);
     }
   }
 
@@ -3207,11 +3287,22 @@
       if (f.type === "boom" || f.type === "guardian") continue;   // drawn only
       // Lemonade Stand: a stationary fizz that heals anyone inside, owner too
       if (f.type === "heal") {
+        f.ticked = f.ticked || new Map();
         for (const p of players) {
           if (!p.alive) continue;
           if (Math.hypot(p.x - f.x, p.y - f.y) < f.r) {
+            const before = p.hp;
             healPlayer(p, f.hps * dt);
-            if (Math.random() < dt * 8) puffOne(p.x + rand(-12, 12), p.y - rand(0, 20), "#c8ff6e");
+            // bank the trickle and call it out in whole numbers, so the heal
+            // reads as "+10" ticks rather than a health bar creeping upward
+            const owed = (f.ticked.get(p) || 0) + (p.hp - before);
+            if (owed >= 10) {
+              floatText(p.x, p.y - p.stats.radius - 14, `+${Math.round(owed)}`, "#ffe45c");
+              f.ticked.set(p, 0);
+            } else {
+              f.ticked.set(p, owed);
+            }
+            if (Math.random() < dt * 8) puffOne(p.x + rand(-12, 12), p.y - rand(0, 20), "#ffe45c");
           }
         }
         continue;
@@ -3231,21 +3322,24 @@
       }
       // Mosh Pit: the blade rides an orbit around its owner
       if (f.type === "saw") {
+        // One huge blade centred on the fighter and spinning on its own axis,
+        // not a small one riding an orbit — so the thing you can see IS the
+        // area it hurts in.
         const o = f.owner;
         if (!o || !o.alive) { f.life = -1; continue; }
-        f.angle += dt * 7;
-        f.x = o.x + Math.cos(f.angle) * f.r;
-        f.y = o.y + Math.sin(f.angle) * f.r;
+        f.angle += dt * 9;
+        f.x = o.x;
+        f.y = o.y;
         for (const p of players) {
           if (!p.alive || p === o || p.spawnGrace > 0 || p.sawGrace > 0) continue;
-          if (Math.hypot(p.x - f.x, p.y - f.y) < p.stats.radius + 18) {
+          if (Math.hypot(p.x - f.x, p.y - f.y) < p.stats.radius + f.r) {
             hurt(p, f.dmg, o, p.x - o.x, p.y - o.y - 60);
             p.sawGrace = 0.35;
           }
         }
         for (const dcy of decoys) {
           if (dcy.hp <= 0 || dcy.owner === o) continue;
-          if (Math.hypot(dcy.x - f.x, dcy.y - f.y) < 26 + 18) dcy.hp -= f.dmg * dt * 8;
+          if (Math.hypot(dcy.x - f.x, dcy.y - f.y) < 26 + f.r) dcy.hp -= f.dmg * dt * 8;
         }
         continue;
       }
@@ -3536,13 +3630,18 @@
     p.hp -= amount;
     if (p.hp <= 0) {
       if (p.roundRevives > 0) {
+        // Phoenix Feather: you genuinely die — a fire blast, then a second of
+        // burning wreckage — and only then rise back out of the same spot.
         p.roundRevives -= 1;
-        p.hp = p.stats.maxHp * 0.5;
-        p.spawnGrace = 0.75;
-        p.vy = -760;
+        p.alive = false;
+        p.hp = 0;
+        p.rebirth = { t: 1, x: p.x, y: p.y };
+        burst(p.x, p.y, "#ff9e3d", 54, 660);
+        flames(p.x, p.y, 26, 24, 1.5);
+        smoke(p.x, p.y, 12, 20, 1.3);
+        world.shake = Math.max(world.shake, 11);
         showToast(str("toast.revive", { name: p.name }));
-        burst(p.x, p.y, "#ff9e3d", 48, 620);
-        sfx("mythic");
+        sfx("boom");
       } else {
         p.alive = false;
         p.hp = 0;
@@ -3559,10 +3658,41 @@
     }
   }
 
+  // Phoenix Feather's second beat: the pyre keeps burning for a second where
+  // they fell, then they climb back out of the ground on the same spot.
+  function tickRebirth(p, dt) {
+    const rb = p.rebirth;
+    rb.t -= dt;
+    // the wreckage smoulders the whole time
+    if (Math.random() < dt * 34) flames(rb.x + rand(-20, 20), rb.y + rand(-6, 14), 1, 6, 0.9);
+    if (Math.random() < dt * 16) smoke(rb.x + rand(-16, 16), rb.y, 1, 10, 1.1);
+    if (rb.t > 0) return;
+    // up they come, out of the fire, at half health and briefly untouchable
+    p.rebirth = null;
+    p.alive = true;
+    p.hp = p.stats.maxHp * 0.5;
+    p.x = rb.x;
+    p.y = rb.y;
+    p.vx = 0;
+    p.vy = -760;
+    p.spawnGrace = 0.9;
+    p.grounded = false;
+    p.groundPlatform = null;
+    p.jumpsLeft = 1 + p.stats.extraJumps;
+    burst(rb.x, rb.y, "#ffcf4d", 44, 560);
+    flames(rb.x, rb.y, 20, 18, 1.4);
+    smoke(rb.x, rb.y, 8, 16, 1.2);
+    p.burnTimer = Math.max(p.burnTimer || 0, 1.2);   // they come back still alight
+    world.shake = Math.max(world.shake, 8);
+    sfx("mythic");
+  }
+
   function checkRoundEnd() {
     if (world.state !== "playing") return;
-    const alive = players.filter(p => p.alive);
-    if (alive.length === 1) endRound(alive[0]);
+    // someone rising out of a Phoenix Feather is down, not out — the round
+    // must not be called over their smoking crater
+    const alive = players.filter(p => p.alive || p.rebirth);
+    if (alive.length === 1 && alive[0].alive) endRound(alive[0]);
     else if (alive.length === 0) {
       showToast(str("round.nobodySurvived"));
       resetRound();
@@ -4427,6 +4557,7 @@
       drawTide(level);
       drawParticles();
       drawBoltsAll();
+      drawFloats();
       if (world.lightningFlash > 0) {
         ctx.fillStyle = `rgba(255,244,200,${world.lightningFlash * 1.4})`;
         ctx.fillRect(0, 0, world.width, world.height);
@@ -5117,6 +5248,8 @@
       // Juggernaut wears its bulk: a studded iron shell sitting just proud of
       // the body, so the fighter reads as armoured rather than merely large
       if (p.stats.ironHull > 0) window.ROUNDERS.drawIronHull(ctx, r, p.stats.ironHull, world.time + p.botSeed);
+      // Hummingbird holding station: wings beating far too fast to resolve
+      if (p.hovering) window.ROUNDERS.drawHoverWings(ctx, 0, 0, r, p.wingPhase || 0);
 
       // shadow
       ctx.fillStyle = "rgba(0,0,0,0.28)";
@@ -5311,6 +5444,40 @@
           });
         }
       }
+      if (b.rage > 0) {
+        // Berserker's Blood: the round bleeds as it flies. A scratch leaves the
+        // odd fleck; at death's door it trails a steady ribbon of red.
+        const bleed = clamp(b.rage / 1.5, 0, 1);
+        const drops = bleed > 0.66 ? 3 : bleed > 0.33 ? 2 : 1;
+        for (let i = 0; i < drops; i += 1) {
+          if (Math.random() > 0.18 + bleed * 0.72) continue;
+          particles.push({
+            x: b.x + rand(-b.r, b.r), y: b.y + rand(-b.r * 0.6, b.r),
+            vx: rand(-18, 18) - b.vx * 0.04, vy: rand(-10, 30),
+            life: rand(0.4, 0.9), maxLife: 0.9, r: rand(1.4, 2.2 + bleed * 2.2),
+            color: Math.random() < 0.35 ? "#ff4d5f" : "#a80f22"
+          });
+        }
+        ctx.shadowColor = "#c41228";
+        ctx.shadowBlur = 6 + bleed * 16;
+      }
+      if (b.banked) {
+        // a banked round keeps throwing sparks all the way home, brighter for
+        // each cushion it has taken
+        ctx.shadowColor = "#ffe169";
+        ctx.shadowBlur = 12 + b.banked * 6;
+        const n = Math.min(3, b.banked);
+        for (let i = 0; i < n; i += 1) {
+          if (Math.random() > 0.75) continue;
+          const a = Math.random() * Math.PI * 2, rr = b.r * rand(0.5, 1.6);
+          particles.push({
+            x: b.x + Math.cos(a) * rr, y: b.y + Math.sin(a) * rr,
+            vx: rand(-22, 22) - b.vx * 0.06, vy: rand(-22, 22) - b.vy * 0.06,
+            life: rand(0.25, 0.5), maxLife: 0.5, r: rand(1.4, 2.8),
+            color: Math.random() < 0.5 ? "#ffe169" : "#ffb03a", spark: true
+          });
+        }
+      }
       if (b.empowered) {
         // it is carrying a block: draw the parry bubble around the round
         const rr = b.r * 2.6 + 4;
@@ -5348,6 +5515,24 @@
       // grown bullets read bigger the farther they've flown
       const growF = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 1300) : 1;
       const r = b.r * growF;
+      // Comet Trail: the tail is sized off the CURRENT radius, so the trail
+      // thickens and lengthens along with the head instead of staying a thin
+      // thread behind a swelling comet
+      if (b.grow && growF > 1.03) {
+        const heat = (growF - 1) / 0.7;
+        ctx.shadowColor = "#ff9e3d";
+        ctx.shadowBlur = 8 + heat * 22;
+        const n = 1 + Math.round(heat * 3);
+        for (let i = 0; i < n; i += 1) {
+          particles.push({
+            x: b.x + rand(-r, r), y: b.y + rand(-r, r),
+            vx: rand(-30, 30) - b.vx * 0.05, vy: rand(-30, 30) - b.vy * 0.05,
+            life: 0.25 + heat * 0.45, maxLife: 0.7,
+            r: (1.4 + heat * 3.2) * (0.6 + Math.random() * 0.8),
+            color: Math.random() < 0.5 ? "#ffcf4d" : "#ff7a26", flame: true
+          });
+        }
+      }
       const art = b.art !== undefined ? b.art : (b.art = bulletArtFor(b.owner));
       if (art) {
         // painted rounds are drawn pointing along their flight
@@ -5586,31 +5771,41 @@
         }
         ctx.restore();
       } else if (f.type === "heal") {
+        // Lemonade Stand: a faded lemon-yellow pool with a tall glass sitting
+        // in the middle of it, so the zone reads as the card and not as a
+        // generic green heal circle
         const a = clamp(f.life / 3, 0.15, 1);
         ctx.save();
         const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
-        g.addColorStop(0, `rgba(200,255,110,${0.16 * a})`);
-        g.addColorStop(1, "rgba(200,255,110,0)");
+        g.addColorStop(0, `rgba(255,232,120,${0.42 * a})`);
+        g.addColorStop(0.75, `rgba(255,220,80,${0.22 * a})`);
+        g.addColorStop(1, "rgba(255,206,48,0)");
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = `rgba(200,255,110,${0.5 * a})`;
+        ctx.strokeStyle = `rgba(255,228,92,${0.55 * a})`;
         ctx.lineWidth = 2.5;
         ctx.setLineDash([10, 8]);
         ctx.lineDashOffset = -world.time * 40;
         ctx.beginPath();
         ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
         ctx.stroke();
-        // little rising pluses
-        for (let i = 0; i < 3; i += 1) {
-          const t = (world.time * 0.7 + i / 3) % 1;
-          const px = f.x + Math.sin(i * 7.3 + world.time) * f.r * 0.5;
-          const py = f.y + f.r * 0.4 - t * f.r * 0.9;
-          ctx.globalAlpha = (1 - t) * 0.8 * a;
-          ctx.fillStyle = "#c8ff6e";
-          ctx.fillRect(px - 1.5, py - 5, 3, 10);
-          ctx.fillRect(px - 5, py - 1.5, 10, 3);
+        ctx.setLineDash([]);
+        // the glass itself, faded into the pool
+        ctx.globalAlpha = 0.7 * a;
+        window.ROUNDERS.drawLemonade(ctx, f.x, f.y, f.r * 0.62, world.time);
+        ctx.globalAlpha = 1;
+        // bubbles rising through the zone
+        for (let i = 0; i < 5; i += 1) {
+          const t = (world.time * 0.55 + i / 5) % 1;
+          const px = f.x + Math.sin(i * 7.3 + world.time * 0.8) * f.r * 0.66;
+          const py = f.y + f.r * 0.5 - t * f.r * 1.1;
+          ctx.globalAlpha = (1 - t) * 0.7 * a;
+          ctx.fillStyle = "#fff3b0";
+          ctx.beginPath();
+          ctx.arc(px, py, 2 + (1 - t) * 2, 0, Math.PI * 2);
+          ctx.fill();
         }
         ctx.restore();
       } else if (f.type === "stink") {
@@ -5639,29 +5834,9 @@
         }
         ctx.restore();
       } else if (f.type === "saw") {
-        ctx.save();
-        ctx.translate(f.x, f.y);
-        ctx.rotate(world.time * 18);
-        const blade = fxImage("sawblade");
-        if (blade) { ctx.drawImage(blade, -20, -20, 40, 40); ctx.restore(); continue; }
-        ctx.fillStyle = "#c8ccd8";
-        ctx.strokeStyle = "#3a3f4d";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let i = 0; i < 10; i += 1) {
-          const a1 = (i / 10) * Math.PI * 2;
-          const a2 = ((i + 0.5) / 10) * Math.PI * 2;
-          ctx.lineTo(Math.cos(a1) * 18, Math.sin(a1) * 18);
-          ctx.lineTo(Math.cos(a2) * 11, Math.sin(a2) * 11);
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = "#3a3f4d";
-        ctx.beginPath();
-        ctx.arc(0, 0, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        // Drawn at the FULL radius it hurts in, spinning on its own axis and
+        // sitting behind the fighter (drawFields runs before drawPlayersAll).
+        window.ROUNDERS.drawSawblade(ctx, f.x, f.y, f.r, world.time * 9, fxImage("sawblade"));
       } else {
         const alpha = clamp(f.life / 0.18, 0, 1);
         ctx.strokeStyle = `rgba(255,255,255,${0.3 * alpha})`;
@@ -5721,6 +5896,8 @@
     }
     for (const b of bolts) b.life -= dt;
     bolts = bolts.filter(b => b.life > 0);
+    for (const f of floats) { f.life -= dt; f.y -= 30 * dt; }
+    floats = floats.filter(f => f.life > 0);
   }
 
   // The strike itself is instantaneous, but it CLEARS in the direction it
@@ -5748,6 +5925,21 @@
       }
     }
     ctx.lineCap = "butt";
+  }
+
+  function drawFloats() {
+    ctx.save();
+    ctx.font = "800 17px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(10,10,16,0.75)";
+    for (const f of floats) {
+      ctx.globalAlpha = clamp(f.life / (f.maxLife * 0.5), 0, 1);
+      ctx.strokeText(f.text, f.x, f.y);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.restore();
   }
 
   // While the world unwinds, say so: a cold wash over the arena, a rewind

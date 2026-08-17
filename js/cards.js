@@ -324,9 +324,9 @@
 
     card("berserkers-blood", "Berserker's Blood", "rare",
       "Pain is a power source.",
-      "The lower your health, the harder you hit — up to +60% damage at death's door.",
-      ["up to +60% damage at low HP"], ["damage", "clutch"],
-      p => { p.stats.rage += 0.6; }),
+      "The lower your health, the harder you hit — up to +150% damage at death's door, and the rounds swell and drip as you bleed.",
+      ["up to +150% damage at low HP", "wounded rounds grow and drip"], ["damage", "clutch"],
+      p => { p.stats.rage += 1.5; }),
 
     card("aegis-bubble", "Aegis Bubble", "rare",
       "Bring your own weather.",
@@ -336,9 +336,13 @@
 
     card("hummingbird", "Hummingbird", "rare",
       "Blink and you'll miss all of it.",
-      "A blur of light, fast shots: a bigger magazine, much higher fire rate and speed, lower damage.",
-      ["−40% fire delay", "+2 ammo", "+10% speed", "−20% damage"], ["firerate"],
-      p => { p.stats.fireDelay *= 0.6; p.stats.maxAmmo += 2; p.stats.speed *= 1.1; p.stats.damage *= 0.8; }),
+      "Faster, lighter shots — and tap jump again in mid-air to HOVER on humming wings for 3 seconds. Shoot while hovering and the whole magazine goes at once.",
+      ["jump twice to hover 3s", "hovering: empty the magazine in one burst",
+       "−40% fire delay", "+2 ammo", "−20% damage"], ["firerate", "mobility"],
+      p => {
+        p.stats.fireDelay *= 0.6; p.stats.maxAmmo += 2; p.stats.damage *= 0.8;
+        p.stats.hover += 3;              // seconds of hover per jump; stacks
+      }),
 
     card("lemonade-stand", "Lemonade Stand", "rare",
       "Fresh squeezed. Slightly radioactive.",
@@ -346,10 +350,10 @@
       ["block plants a heal zone (10 HP/s)"], ["block", "sustain"],
       p => { p.stats.healField += 1; }),
 
-    card("mosh-pit", "Mosh Pit", "rare",
+    card("sawblade", "Sawblade", "rare",
       "Mind the blade.",
-      "Blocking spins a sawblade around you for 2 seconds, shredding anyone it touches.",
-      ["block = orbiting saw (2s)"], ["block", "aoe"],
+      "Blocking wraps you in a huge spinning sawblade for 2 seconds, shredding anyone who comes near.",
+      ["block = spinning saw (2s)"], ["block", "aoe"],
       p => { p.stats.sawBlock += 1; }),
 
     card("bank-shot", "Bank Shot", "rare",

@@ -847,15 +847,29 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 .card-btns b[data-b="X"], .cw-btnbadge[data-b="X"] { --btn-face: #3b82e0; --btn-ink: #05132a; width: 19px; padding: 0; }
 .card-btns b[data-b="Y"], .cw-btnbadge[data-b="Y"] { --btn-face: #f2c31c; --btn-ink: #2a2004; width: 19px; padding: 0; }
 
-/* bumpers are wide flat pills; sticks are rounded caps */
+/* bumpers are wide flat pills */
 .card-btns b[data-b="LB"], .card-btns b[data-b="RB"],
-.card-btns b[data-b="LS"], .card-btns b[data-b="RS"],
-.cw-btnbadge[data-b="LB"], .cw-btnbadge[data-b="RB"],
-.cw-btnbadge[data-b="LS"], .cw-btnbadge[data-b="RS"] {
+.cw-btnbadge[data-b="LB"], .cw-btnbadge[data-b="RB"] {
   --btn-face: #cfd6e2;
   --btn-ink: #171b26;
   min-width: 25px;
   font-size: 9.5px;
+}
+
+/* The sticks are pressed straight down, so they read as a perfect circle —
+   equal width and height with no min-width to stretch them, which is what
+   separates a stick click from a bumper at a glance. */
+.card-btns b[data-b="LS"], .card-btns b[data-b="RS"],
+.cw-btnbadge[data-b="LS"], .cw-btnbadge[data-b="RS"] {
+  --btn-face: #cfd6e2;
+  --btn-ink: #171b26;
+  width: 21px;
+  height: 21px;
+  min-width: 0;
+  padding: 0;
+  font-size: 8.5px;
+  letter-spacing: 0;
+  border-radius: 50%;
 }
 
 /* The triggers are not pills. A real Xbox trigger is a paddle: a generously
@@ -884,13 +898,15 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 }
 .card-btns b[data-b="RT"], .cw-btnbadge[data-b="RT"] { border-radius: 0 0 10px 0; }
 .card-btns b[data-b="LT"], .cw-btnbadge[data-b="LT"] { border-radius: 0 0 0 10px; }
-.cw-btnbadge[data-b="LT"], .cw-btnbadge[data-b="RT"] { height: 22px; vertical-align: -6px; }
+.cw-btnbadge[data-b="LT"], .cw-btnbadge[data-b="RT"] { height: 22px; }
 
 /* the workbench's inline badges sit in a line of text, so they need a hair
    more room and a baseline nudge */
 .cw-btnbadge {
   display: inline-grid;
-  vertical-align: -4px;
+  /* centred on the text rather than nudged by a per-shape magic number, so a
+     round stick badge and a taller trigger badge line up with each other */
+  vertical-align: middle;
   height: 20px;
 }
 .cw-btnbadge[data-b="A"], .cw-btnbadge[data-b="B"],

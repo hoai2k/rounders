@@ -445,11 +445,14 @@ Pillars:
       notes; headline: engine is stable across 100 live 12-card builds and
       4000 stat builds with duplicates, but the damage tail one-shots and
       `fireDelay` has no floor
-- [ ] **No floor on `fireDelay` / `reload`** — stacked Blood Money and Hair
-      Trigger reach a 0.0004s fire delay, so the whole magazine leaves the
-      barrel in a single frame. Not a crash (worst frame 33ms) but it turns
-      "fast gun" into "instant clip dump". A floor around 0.05s / 0.3s would
-      keep stacking worthwhile with diminishing returns
+- [x] **Fire-rate floors** (`GAMEPLAY.gun.minFireDelay` 0.05s, `minReload`
+      0.3s). Stacked Blood Money and Hair Trigger reached a 0.0004s delay, so a
+      whole magazine left the barrel inside one frame. The floor is applied at
+      the point of use, not to the stat, so a card still reports what it does —
+      it simply stops buying speed past the floor. Measured: the extreme build
+      now plays at 0.050s and empties 10 rounds over 663ms instead of a single
+      frame; worst sustained DPS across 4000 builds falls 7603 → 3695, and peak
+      rounds in the air in a live 12-card audit falls 329 → 33
 - [ ] **Damage tail one-shots**: baseline volley is 36 vs 100 HP (3 hits, as
       designed). Over 16-card builds the median is 49, p90 109, p99 225 and
       the max 448. Supernova appears in 125% of the hottest 1% of builds (i.e.

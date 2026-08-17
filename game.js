@@ -197,6 +197,14 @@
   const DUCK = { none: 1, draft: 0.55, paused: 0.22 };
 
   // ------------------------------------------------------------------ stats
+  // A fighter's REAL trigger and reload timings. Cards multiply these stats
+  // down without limit — four stacked Blood Moneys reach 0.0004s — so the
+  // engine floors them at the point of use (js/gameplay.js gun.minFireDelay /
+  // gun.minReload). The stats themselves are left untouched, so a card still
+  // reports what it does; it simply stops buying speed past the floor.
+  const fireDelayOf = p => Math.max(GP.gun.minFireDelay, p.stats.fireDelay);
+  const reloadOf = p => Math.max(GP.gun.minReload, p.stats.reload);
+
   function defaultStats() {
     // Baselines live in js/gameplay.js — edit numbers there, not here.
     const F = GP.fighter, G = GP.gun, B = GP.block;
@@ -2637,7 +2645,7 @@
 
   function tryShoot(p) {
     if (p.fireTimer > 0 || p.reloadTimer > 0 || p.ammo <= 0) return;
-    p.fireTimer = p.stats.fireDelay;
+    p.fireTimer = fireDelayOf(p);
     // Golden Gun stacks by widening the golden window: one copy gilds the first
     // round of the magazine, two gild the first two, and so on
     const golden = p.stats.goldenShot > 0 && p.ammo > p.stats.maxAmmo - p.stats.goldenShot;
@@ -2660,7 +2668,7 @@
       const rest = p.ammo;
       p.ammo = 0;
       for (let i = 1; i <= rest; i += 1) p.burstQueue.push({ t: i * 0.06, mul: 1 });
-      p.reloadTimer = p.stats.reload;
+      p.reloadTimer = reloadOf(p);
       p.fireTimer = Math.max(p.fireTimer, rest * 0.06 + 0.05);
     }
     // Triple Tap: the echoes follow on their own, aimed wherever you are then
@@ -2679,7 +2687,7 @@
     // Panic Button: the empty click doubles as the block button. Stacking arms
     // it earlier — two copies cover the last two rounds in the magazine.
     if (p.ammo < p.stats.autoBlock) tryBlock(p, true);
-    if (p.ammo <= 0) p.reloadTimer = p.stats.reload;
+    if (p.ammo <= 0) p.reloadTimer = reloadOf(p);
   }
 
   function updateBullets(dt) {
@@ -5479,7 +5487,7 @@
     const start = r + 4;                      // first pip sits past the body edge
     const reloading = p.reloadTimer > 0;
     const filled = reloading
-      ? (1 - clamp(p.reloadTimer / Math.max(0.01, p.stats.reload), 0, 1)) * n
+      ? (1 - clamp(p.reloadTimer / Math.max(0.01, reloadOf(p)), 0, 1)) * n
       : p.ammo;
     for (let i = 0; i < n; i += 1) {
       const d = start + i * gap;

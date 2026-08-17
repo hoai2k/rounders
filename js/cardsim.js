@@ -37,6 +37,12 @@
 
   // How this card's round is drawn, from js/bullet-art.js — the same table the
   // game reads, so the preview, the bullet pane and the match all agree.
+  // Same floors the engine applies (js/gameplay.js gun.minFireDelay /
+  // gun.minReload), so the preview never shows a rate the match will not run at
+  const GUN = () => (window.ROUNDERS.GAMEPLAY || { gun: {} }).gun;
+  const fireDelayOf = st => Math.max(GUN().minFireDelay ?? 0, st.fireDelay);
+  const reloadOf = st => Math.max(GUN().minReload ?? 0, st.reload);
+
   function bulletLook(cardId) {
     const k = (window.ROUNDERS.BULLET_ART || {})[cardId] || {};
     return {
@@ -568,7 +574,7 @@
         const rest = who.ammo;
         who.ammo = 0;
         for (let i = 1; i <= rest; i += 1) who.queue.push({ t: i * 0.06, mul: 1 });
-        who.reloadT = who.stats.reload;
+        who.reloadT = reloadOf(who.stats);
         who.fireT = Math.max(who.fireT, rest * 0.06 + 0.05);
       }
       // Berserker's Blood: how far past hurt the shooter is, 0 at full health
@@ -887,7 +893,7 @@
       if (shooter.fireT <= 0 && shooter.reloadT <= 0 && shooter.ammo > 0 && shooter.stunT <= 0 && t > 0.7 &&
           (!shooter.stats.empowerBlock || shooter.empower > 0)) {
         fire(shooter);
-        shooter.fireT = Math.max(0.55, shooter.stats.fireDelay);
+        shooter.fireT = Math.max(0.55, fireDelayOf(shooter.stats));
       }
       // the receiver blocks incoming fire when blocking is what's on show
       if (plan.blockDemo) {
@@ -1414,7 +1420,7 @@
       }
       // ammo pips
       const n = Math.min(10, Math.round(who.stats.maxAmmo));
-      const filled = who.reloadT > 0 ? (1 - who.reloadT / who.stats.reload) * n : who.ammo;
+      const filled = who.reloadT > 0 ? (1 - who.reloadT / reloadOf(who.stats)) * n : who.ammo;
       for (let i = 0; i < n; i += 1) {
         ctx.beginPath();
         ctx.arc(x + 3 + i * 7, y - 10, i < filled ? 2.6 : 1.8, 0, Math.PI * 2);

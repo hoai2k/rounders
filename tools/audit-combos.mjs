@@ -107,7 +107,10 @@ const report = await page.evaluate(async ({ ROUNDS, CARDS_PER_BUILD }) => {
     }
     // 1/45s is the engine's own step clamp; well past that is a real stutter
     if (worstDt > 0.12) note("frame stutter", ids, `worst frame ${Math.round(worstDt * 1000)}ms`);
-    if (dmgDealt <= 0) note("build dealt no damage", ids, "target never lost health");
+    // NOTE: no "dealt no damage" check here. The fight window is well under a
+    // second, which is not long enough for bots to close and connect, so it
+    // fired on most builds and meant nothing. Damage balance is what
+    // tools/audit-stats.mjs is for.
   }
   return { findings, seenPeak };
 }, { ROUNDS, CARDS_PER_BUILD });

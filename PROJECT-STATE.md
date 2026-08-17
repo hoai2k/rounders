@@ -67,6 +67,12 @@ Pillars:
       walls/towers everywhere (wall-jump finally has terrain), perches,
       overhangs, and asymmetric silhouettes. Per-round prop state resets in
       `resetRound`
+- [x] **Loose-slab physics** (AUDIT.md §5 L10): a platform cut off its chains
+      becomes a free rigid body — corner-contact solver with torque, so it
+      teeters, tumbles, and settles honestly; bullets/explosions kick and spin
+      it, players shove it, ride it, get crushed under it, and wall-kick off
+      it; it floats in water. Sleeps when still, wakes on impulse; rebuilt
+      per round in `resetProps`
 - [x] **Scale & ballistics pass** (AUDIT.md §5 follow-up): per-level playfield
       sizes (`size:{w,h}` — 1460×820 tight up to 2000×1000 grand, ROUNDS-style
       scale variety); default bullets retuned for lobbing (speed 1180, gravity

@@ -1,4 +1,4 @@
-// Rounders — card set (87 cards, designed from scratch).
+// Rounders — card set (77 cards, designed from scratch).
 // Cards mutate player.stats via apply(). The engine implements every mechanic
 // referenced here (burn, chill, pierce, chain, shards, thorns, regen, rage,
 // adrenaline, guardian, goldenShot, killHeal, stormBlock, warpBlock, shield,
@@ -31,7 +31,8 @@
   }
 
   const CARDS = [
-    // ------------------------------------------------------------- COMMON (15)
+    // -------------------------------------------------------- COMMON (11)
+
     card("bubblegum-rounds", "Bubblegum Rounds", "common",
       "Chews through magazines.",
       "Carry 2 extra bullets per magazine, but each one hits a little softer.",
@@ -74,12 +75,6 @@
       ["+38% jump speed & height", "+8% air control"], ["movement"],
       p => { p.stats.jump *= 1.38; p.stats.airAccel *= 1.08; }),
 
-    card("longshot", "Longshot", "common",
-      "Practically a laser.",
-      "Bullets fly twice as fast and drop less over distance — great for cross-map duels.",
-      ["+100% bullet speed", "−15% bullet drop"], ["accuracy"],
-      p => { p.stats.bulletSpeed *= 2; p.stats.bulletGravity *= 0.85; }),
-
     card("brick-wall", "Brick Wall", "common",
       "You shall not pass. Probably.",
       "Extra health, and you barely budge when shot — knockback against you drops by 40%.",
@@ -104,36 +99,31 @@
       ["+50% acceleration", "+35% braking"], ["movement"],
       p => { p.stats.accel *= 1.5; p.stats.brake *= 1.35; }),
 
-    card("tailwind", "Tailwind", "common",
+    // ------------------------------------------------------ UNCOMMON (18)
+
+    card("longshot", "Longshot", "uncommon",
+      "Practically a laser.",
+      "Bullets fly twice as fast and drop less over distance — great for cross-map duels.",
+      ["+100% bullet speed", "−15% bullet drop"], ["accuracy"],
+      p => { p.stats.bulletSpeed *= 2; p.stats.bulletGravity *= 0.85; }),
+
+    card("tailwind", "Tailwind", "uncommon",
       "The sky likes you today.",
       "Steer far better while airborne, and hold the jump button to hang in the air for up to 2 seconds.",
       ["+50% air control", "hold jump to float (2s)"], ["movement"],
       p => { p.stats.airAccel *= 1.5; p.stats.floatTime += 2; }),
 
-    card("boxing-glove", "Boxing Glove", "common",
-      "Float like a truck.",
-      "Your shots hit like a haymaker — they send people flying, and a block stops the damage but not the punch. They hit a little softer for it.",
-      ["+300% knockback dealt", "shoves through blocks", "+10% bullet size", "−10% damage"], ["control"],
-      p => { p.stats.kbDeal += 3; p.stats.bulletSize *= 1.1; p.stats.damage *= 0.9; }),
-
-    card("sugar-rush", "Sugar Rush", "common",
+    card("sugar-rush", "Sugar Rush", "uncommon",
       "Hits taste like candy.",
       "Landing a hit makes you giddy: double move speed for 2.5 seconds.",
       ["+100% speed for 2.5s after a hit"], ["movement"],
       p => { p.stats.sugarRush += 1; }),
 
-    // ---------------------------------------------------------- UNCOMMON (24)
     card("ricochet-romance", "Ricochet Romance", "uncommon",
       "Every wall is a matchmaker.",
       "Your bullets bounce off walls and floors up to 2 times before breaking.",
       ["+2 wall bounces"], ["projectile"],
       p => { p.stats.bounces += 2; }),
-
-    card("wasp-venom", "Wasp Venom", "uncommon",
-      "The sting is just the beginning.",
-      "Hits inject venom that deals damage over 3 seconds. Sting them again and the doses ADD UP. Direct damage drops.",
-      ["poison on hit (3s)", "doses stack", "−15% damage"], ["dot"],
-      p => { p.stats.poison += 1; p.stats.damage *= 0.85; }),
 
     card("cinder-shot", "Cinder Shot", "uncommon",
       "Leave a little warmth behind.",
@@ -153,12 +143,6 @@
       ["light homing", "−8% bullet speed"], ["accuracy"],
       p => { p.stats.homing += 0.6; p.stats.bulletSpeed *= 0.92; }),
 
-    card("popcorn-payload", "Popcorn Payload", "uncommon",
-      "Pop pop pop.",
-      "Bullets pop on impact, flinging 10 hot kernels up into the air. They rain back down for more damage, and anything that misses bounces twice more before it gives up.",
-      ["impacts pop into 10 kernels", "kernels rain down & bounce twice", "−10% damage"], ["aoe"],
-      p => { p.stats.popcorn += 10; p.stats.damage *= 0.9; }),
-
     card("leech-lunch", "Leech Lunch", "uncommon",
       "Eat what you hit.",
       "Heal for 25% of every point of bullet damage you deal.",
@@ -170,12 +154,6 @@
       "Fire a tight twin shot. Each bullet is weaker than a single would be.",
       ["+1 pellet", "−25% damage per pellet", "slight spread"], ["multishot"],
       p => { p.stats.pellets += 1; p.stats.damage *= 0.75; p.stats.spread += 0.05; }),
-
-    card("bodyguard", "Bodyguard", "uncommon",
-      "Personal space, enforced.",
-      "Blocking releases a shockwave that shoves nearby opponents away and swats any bullet caught in it off in a random direction. Extra health too.",
-      ["block shockwave", "scatters bullets in range", "+15% health"], ["block"],
-      p => { p.stats.blockPush += 1; p.stats.maxHp *= 1.15; }),
 
     card("lowrider", "Lowrider", "uncommon",
       "Keeps a low profile.",
@@ -194,12 +172,6 @@
       "Blocking instantly refills your magazine.",
       ["block = full reload", "+0.25s block cooldown"], ["block", "ammo"],
       p => { p.stats.blockReload += 1; p.stats.blockCooldown += 0.25; }),
-
-    card("panic-button", "Panic Button", "uncommon",
-      "Insurance you fire.",
-      "Firing the last bullet in your magazine automatically triggers your block — and everything attached to it.",
-      ["last bullet auto-blocks", "+0.3s reload"], ["block", "clutch"],
-      p => { p.stats.autoBlock += 1; p.stats.reload += 0.3; }),
 
     card("triple-tap", "Triple Tap", "uncommon",
       "Once more, with feeling. Twice.",
@@ -231,18 +203,49 @@
       ["air jumps explode (15 dmg)"], ["movement", "aoe"],
       p => { p.stats.jumpBlast += 1; }),
 
-    // -------------------------------------------------------------- RARE (26)
+    card("fresh-coat", "Fresh Coat", "uncommon",
+      "Still has the sticker on.",
+      "Start each round with a +50% health overcoat. It shatters the first time you're hit.",
+      ["+50% HP shell until first hit"], ["defense"],
+      p => { p.stats.freshCoat += 0.5; }),
+
+    // ---------------------------------------------------------- RARE (24)
+
+    card("boxing-glove", "Boxing Glove", "rare",
+      "Float like a truck.",
+      "Your shots hit like a haymaker — they send people flying, and a block stops the damage but not the punch. They hit a little softer for it.",
+      ["+300% knockback dealt", "shoves through blocks", "+10% bullet size", "−10% damage"], ["control"],
+      p => { p.stats.kbDeal += 3; p.stats.bulletSize *= 1.1; p.stats.damage *= 0.9; }),
+
+    card("wasp-venom", "Wasp Venom", "rare",
+      "The sting is just the beginning.",
+      "Hits inject venom that deals damage over 3 seconds. Sting them again and the doses ADD UP. Direct damage drops.",
+      ["poison on hit (3s)", "doses stack", "−15% damage"], ["dot"],
+      p => { p.stats.poison += 1; p.stats.damage *= 0.85; }),
+
+    card("popcorn-payload", "Popcorn Payload", "rare",
+      "Pop pop pop.",
+      "Bullets pop on impact, flinging 10 hot kernels up into the air. They rain back down for more damage, and anything that misses bounces twice more before it gives up.",
+      ["impacts pop into 10 kernels", "kernels rain down & bounce twice", "−10% damage"], ["aoe"],
+      p => { p.stats.popcorn += 10; p.stats.damage *= 0.9; }),
+
+    card("bodyguard", "Bodyguard", "rare",
+      "Personal space, enforced.",
+      "Blocking releases a shockwave that shoves nearby opponents away and swats any bullet caught in it off in a random direction. Extra health too.",
+      ["block shockwave", "scatters bullets in range", "+15% health"], ["block"],
+      p => { p.stats.blockPush += 1; p.stats.maxHp *= 1.15; }),
+
+    card("panic-button", "Panic Button", "rare",
+      "Insurance you fire.",
+      "Firing the last bullet in your magazine automatically triggers your block — and everything attached to it.",
+      ["last bullet auto-blocks", "+0.3s reload"], ["block", "clutch"],
+      p => { p.stats.autoBlock += 1; p.stats.reload += 0.3; }),
+
     card("drill-rounds", "Drill Rounds", "rare",
       "Through, not around.",
       "Your bullets bore straight through walls and floors and keep flying, so cover stops being cover. Stacks drill deeper.",
       ["bullets drill through walls", "−12% damage"], ["projectile"],
       p => { p.stats.wallPierce += 1; p.stats.damage *= 0.88; }),
-
-    card("breakthrough", "Breakthrough", "epic",
-      "Make your own door.",
-      "Shots chew a square bite out of whatever terrain they strike — two into a thick wall opens a permanent gap anyone can shoot or climb through. People still just get hit.",
-      ["impacts bite squares out of terrain", "thick walls take 2 hits", "−10% damage"], ["projectile", "control"],
-      p => { p.stats.holePunch += 1; p.stats.damage *= 0.9; }),
 
     card("thorn-jacket", "Thorn Jacket", "rare",
       "Hug at your own risk.",
@@ -280,27 +283,11 @@
       ["+5 HP/s regeneration", "+10% health"], ["sustain"],
       p => { p.stats.regen += 5; p.stats.maxHp *= 1.1; }),
 
-    card("berserkers-blood", "Berserker's Blood", "rare",
-      "Pain is a power source.",
-      "The lower your health, the harder you hit — up to +150% damage at death's door, and the rounds swell and drip as you bleed.",
-      ["up to +150% damage at low HP", "wounded rounds grow and drip"], ["damage", "clutch"],
-      p => { p.stats.rage += 1.5; }),
-
     card("aegis-bubble", "Aegis Bubble", "rare",
       "Bring your own weather.",
       "A regenerating energy shield absorbs 30 damage before your health is touched. It recharges after 3.5 seconds without being hit.",
       ["+30 regenerating shield"], ["defense"],
       p => { p.stats.shield += 30; }),
-
-    card("hummingbird", "Hummingbird", "rare",
-      "Blink and you'll miss all of it.",
-      "Faster, lighter shots — and tap jump again in mid-air to HOVER on humming wings for 3 seconds. Shoot while hovering and the whole magazine goes at once.",
-      ["jump twice to hover 3s", "hovering: empty the magazine in one burst",
-       "−40% fire delay", "+2 ammo", "−20% damage"], ["firerate", "mobility"],
-      p => {
-        p.stats.fireDelay *= 0.6; p.stats.maxAmmo += 2; p.stats.damage *= 0.8;
-        p.stats.hover += 3;              // seconds of hover per jump; stacks
-      }),
 
     card("lemonade-stand", "Lemonade Stand", "rare",
       "Fresh squeezed. Slightly radioactive.",
@@ -331,12 +318,6 @@
       "Damage you take is paid off over 3 seconds instead of all at once — time enough to turn the fight.",
       ["damage taken drips over 3s", "+10% health"], ["defense"],
       p => { p.stats.decay += 1; p.stats.maxHp *= 1.1; }),
-
-    card("fresh-coat", "Fresh Coat", "rare",
-      "Still has the sticker on.",
-      "Start each round with a +50% health overcoat. It shatters the first time you're hit.",
-      ["+50% HP shell until first hit"], ["defense"],
-      p => { p.stats.freshCoat += 0.5; }),
 
     card("blood-money", "Blood Money", "rare",
       "Everything costs something.",
@@ -374,7 +355,30 @@
       ["enemy bullets veer away from you"], ["defense"],
       p => { p.stats.repel += 1; }),
 
-    // -------------------------------------------------------------- EPIC (13)
+    // ---------------------------------------------------------- EPIC (17)
+
+    card("breakthrough", "Breakthrough", "epic",
+      "Make your own door.",
+      "Shots chew a square bite out of whatever terrain they strike — two into a thick wall opens a permanent gap anyone can shoot or climb through. People still just get hit.",
+      ["impacts bite squares out of terrain", "thick walls take 2 hits", "−10% damage"], ["projectile", "control"],
+      p => { p.stats.holePunch += 1; p.stats.damage *= 0.9; }),
+
+    card("berserkers-blood", "Berserker's Blood", "epic",
+      "Pain is a power source.",
+      "The lower your health, the harder you hit — up to +150% damage at death's door, and the rounds swell and drip as you bleed.",
+      ["up to +150% damage at low HP", "wounded rounds grow and drip"], ["damage", "clutch"],
+      p => { p.stats.rage += 1.5; }),
+
+    card("hummingbird", "Hummingbird", "epic",
+      "Blink and you'll miss all of it.",
+      "Faster, lighter shots — and tap jump again in mid-air to HOVER on humming wings for 3 seconds. Shoot while hovering and the whole magazine goes at once.",
+      ["jump twice to hover 3s", "hovering: empty the magazine in one burst",
+       "−40% fire delay", "+2 ammo", "−20% damage"], ["firerate", "mobility"],
+      p => {
+        p.stats.fireDelay *= 0.6; p.stats.maxAmmo += 2; p.stats.damage *= 0.8;
+        p.stats.hover += 3;              // seconds of hover per jump; stacks
+      }),
+
     card("cluster-bomb", "Party Favor", "epic",
       "One explosion is never enough.",
       "Bullets explode on impact AND split into bomblets. Reloads take longer.",
@@ -453,7 +457,14 @@
       ["twin ghost shot 1s later (50% dmg each)", "fires from where you stood", "+0.1s fire delay"], ["firerate"],
       p => { p.stats.encore += 1; p.stats.fireDelay += 0.1; }),
 
-    // ---------------------------------------------------------- LEGENDARY (5)
+    card("dragons-hoard", "Dragon's Hoard", "epic",
+      "Never enough. Always more.",
+      "A vast magazine, fast reloads, and a damage bonus. Pure greed, no downside.",
+      ["+4 ammo", "−25% reload", "+10% damage"], ["ammo"],
+      p => { p.stats.maxAmmo += 4; p.stats.reload *= 0.75; p.stats.damage *= 1.1; }),
+
+    // ------------------------------------------------------ LEGENDARY (4)
+
     card("supernova", "Supernova", "legendary",
       "Astronomers hate this one trick.",
       "Fire fat white-hot slugs that detonate in a colossal blast and hit twice as hard. Reloads are slow.",
@@ -468,12 +479,6 @@
       ["1st shot per magazine ×3 damage", "+0.15s reload"], ["damage"],
       p => { p.stats.goldenShot += 1; p.stats.reload += 0.15; }),
 
-    card("dragons-hoard", "Dragon's Hoard", "legendary",
-      "Never enough. Always more.",
-      "A vast magazine, fast reloads, and a damage bonus. Pure greed, no downside.",
-      ["+4 ammo", "−25% reload", "+10% damage"], ["ammo"],
-      p => { p.stats.maxAmmo += 4; p.stats.reload *= 0.75; p.stats.damage *= 1.1; }),
-
     card("grim-harvest", "Grim Harvest", "legendary",
       "Waste nothing.",
       "Heal for 45% of the bullet damage you deal, and knockouts restore you to full health.",
@@ -486,7 +491,8 @@
       ["block = lightning nova", "block shockwave"], ["block", "aoe"],
       p => { p.stats.stormBlock += 1; p.stats.blockPush += 1; }),
 
-    // ------------------------------------------------------------- MYTHIC (3)
+    // --------------------------------------------------------- MYTHIC (3)
+
     card("starfall-protocol", "Starfall Protocol", "mythic",
       "The sky picks a side.",
       "ACTIVE (Y / LB): call a volley of 5 meteors crashing down toward your aim point. 12s cooldown. Passive: +10% damage.",

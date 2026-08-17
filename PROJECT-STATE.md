@@ -396,6 +396,28 @@ Pillars:
 - [x] **Trigger badges mirror**: RT rounds only at bottom-right, LT only at
       bottom-left — one swept corner each, so left and right read apart at
       badge size without reading the letters. Text centred in the shape
+- [x] **Rarity pass 2026-08-17** after the rework, 12 cards moved. Promoted for
+      power they gained this session: **Boxing Glove** common → **rare** (it is
+      the only card that ignores blocking, which is a rarity-defining
+      property), **Wasp Venom** → rare (stacking doses out-damage Black Mamba's
+      flat 2×, and that is Epic), **Popcorn Payload** → rare (10 kernels beats
+      Shrapnel Burst's 3 shards), **Bodyguard** → rare (bullet scatter is
+      defensive tech nothing else has), **Panic Button** → rare (a genuinely
+      free block is a free proc of your whole block package every magazine),
+      **Berserker's Blood** → **epic** (+150% with no downside; Glass Cannon is
+      Rare at +75% for −30% health), **Hummingbird** → epic (four effects plus
+      a unique movement mode). No-downside commons that outclassed the tier:
+      **Sugar Rush**, **Longshot**, **Tailwind** → uncommon. Demoted:
+      **Dragon's Hoard** legendary → **epic** (pure numbers, no identity — the
+      only Legendary without a unique mechanic) and **Fresh Coat** rare →
+      **uncommon** (the shell shatters on the first hit, so over a round it is
+      worth less than Stone Soup, a Common). Now **11 C / 18 U / 24 R / 17 E /
+      4 L / 3 M**. The card file is regrouped to match and its section counts,
+      which had gone stale after the cuts, are correct again
+- [ ] **Draft mix shifted with it** — measured over 6000 dealt cards: commons
+      27% (was 35%), uncommons 30%, rares 25%, epics 14% (was 11%). Drafts are
+      richer than before. If that reads as too generous, `RARITIES.common.weight`
+      9 → 13 restores commons to ~35% without touching any card
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

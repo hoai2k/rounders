@@ -175,6 +175,19 @@ Pillars:
       (30 damage + a launch clear of it, on a short grace, so a careless
       player is chewed repeatedly); Event Horizon is wider (380px), hungrier
       (−1500 pull) and swirls with layered arms and debris spiralling in
+- [x] **Effect legibility pass 2026-08-17 (3)**: Guardian Halo now haloes and
+      gilds the fighter it saves and sends a little angel rising away (art
+      requested as `fx/angel.png`, procedural until then); Storm Caller /
+      Chain Letter in a duel earth their bolt on the nearest ledge above head
+      height — top of it, or halfway up a towering one — and come back,
+      catching the victim twice (nothing tall nearby: it just arcs off into
+      the sky); Skylight's bores were centred on the face they struck so the
+      rings hung in open air — the centre is now pulled inside the slab and
+      the scorched rim is clipped to it; Body Double's decoy was spawned
+      exactly under its owner and so was invisible — it now stands clear;
+      Magnet Suit deflects hard enough to actually turn shots away (0% of
+      shots landing in the preview, was 100%) and crackles with a visible
+      magnetic field
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

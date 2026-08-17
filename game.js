@@ -326,7 +326,12 @@
     const src = platform.holeSrc;
     if (!src || platform.isCrate) return false;      // crates already break
     const list = props.holes.get(src) || [];
-    const lx = wx - platform.x, ly = wy - platform.y;
+    // The impact point is on the slab's FACE, so a hole centred there sticks
+    // out into thin air and reads as a floating ring. Pull the centre inside
+    // the slab (and just centre it on an axis thinner than the hole).
+    const fit = (v, size) => size < r * 2 ? size / 2 : clamp(v, r, size - r);
+    const lx = fit(wx - platform.x, platform.w);
+    const ly = fit(wy - platform.y, platform.h);
     // widen an overlapping hole instead of stacking dozens of little ones
     for (const h of list) {
       if (Math.hypot(h.lx - lx, h.ly - ly) < Math.max(h.r, r) * 0.75) {
@@ -2230,8 +2235,10 @@
     burst(p.x, p.y, "#ffffff", 14, 240);
     // Body Double: the decoy stands where you blocked — before a warp moves you
     if (p.stats.decoy) {
+      // set a step to the side, so the copy is a separate body rather than
+      // a second drawing hidden underneath you
       decoys.push({
-        x: p.x, y: p.y, hp: 20 * p.stats.decoy, maxHp: 20 * p.stats.decoy,
+        x: p.x - (p.facing || 1) * 26, y: p.y, hp: 20 * p.stats.decoy, maxHp: 20 * p.stats.decoy,
         owner: p, character: p.character, color: p.color, life: 6, wobble: Math.random() * 6,
         isDecoy: true
       });
@@ -2538,17 +2545,25 @@
         if (!q.alive || q === b.owner || !q.stats.repel) continue;
         const dx = b.x - q.x, dy = b.y - q.y;
         const d = Math.hypot(dx, dy);
-        if (d > 1 && d < 280) {
+        if (d > 1 && d < 340) {
           const cur = Math.atan2(b.vy, b.vx);
           const away = Math.atan2(dy, dx);
           let diff = away - cur;
           while (diff > Math.PI) diff -= Math.PI * 2;
           while (diff < -Math.PI) diff += Math.PI * 2;
-          const maxTurn = Math.min(q.stats.repel * 1.1, 2.6) * (1 - d / 280) * dt;
+          // a real shove: the old rate was too gentle to turn a fast round
+          // aside before it arrived, so the card looked inert
+          const maxTurn = Math.min(q.stats.repel * 3.4, 7) * (1 - d / 340) * dt;
           const a = cur + clamp(diff, -maxTurn, maxTurn);
           const sp = Math.hypot(b.vx, b.vy);
           b.vx = Math.cos(a) * sp;
           b.vy = Math.sin(a) * sp;
+          if (Math.random() < dt * 30) {
+            particles.push({
+              x: b.x, y: b.y, vx: rand(-30, 30), vy: rand(-30, 30),
+              life: 0.25, maxLife: 0.25, r: rand(1.2, 2.4), color: "#9fd8ff", spark: true
+            });
+          }
         }
       }
       b.prevX = b.x; b.prevY = b.y;
@@ -2771,11 +2786,42 @@
       hurt(best, damage * 0.55 * b.chain, b.owner, best.x - victim.x, best.y - victim.y);
       sfx("chain");
     } else {
-      // duel fallback: the arc doubles back on the victim for a smaller zap
-      boltVisual(victim.x, victim.y - 80, victim.x, victim.y, "#ffe95e", 0.18);
-      hurtRaw(victim, damage * 0.25 * b.chain, b.owner);
-      sfx("chain");
+      // Nobody else to jump to, so the bolt goes looking for something to
+      // earth itself on: it strikes the top of a nearby wall and comes back,
+      // catching the victim on the way out AND the way home. With nothing
+      // tall enough around, it simply flies up and away into the sky.
+      const perch = nearestPerch(victim);
+      if (perch) {
+        boltVisual(victim.x, victim.y, perch.x, perch.y, "#ffe95e", 0.26);
+        hurtRaw(victim, damage * 0.35 * b.chain, b.owner);
+        // the return leg lands a beat later, so it reads as there-and-back
+        bolts.push({ delay: 0.12, from: { x: perch.x, y: perch.y }, to: { x: victim.x, y: victim.y },
+          victim, damage: damage * 0.35 * b.chain, owner: b.owner, pending: true, life: 0.3, points: [], color: "#ffe95e" });
+        sfx("chain");
+      } else {
+        // no perch: it arcs up and out into nowhere
+        boltVisual(victim.x, victim.y, victim.x + rand(-60, 60), -40, "#ffe95e", 0.22);
+        sfx("chain");
+      }
     }
+  }
+
+  // The nearest bit of terrain above head height that a stray bolt could
+  // strike — its top edge, or halfway up if the thing is towering.
+  function nearestPerch(victim) {
+    const plats = activePlatforms(currentLevel(), world.time);
+    const headY = victim.y - victim.stats.radius;
+    let best = null, bestD = Infinity;
+    for (const pl of plats) {
+      if (pl.y >= headY - 10) continue;                       // not above their head
+      const px = clamp(victim.x, pl.x, pl.x + pl.w);
+      const d = Math.hypot(px - victim.x, pl.y - victim.y);
+      if (d < bestD && d < 420) { bestD = d; best = { x: px, y: pl.y }; }
+    }
+    if (!best) return null;
+    const rise = victim.y - best.y;
+    // a very tall wall gets struck halfway up rather than at its distant top
+    return rise > 320 ? { x: best.x, y: victim.y - rise / 2 } : best;
   }
 
   function explodeBullet(b) {
@@ -2966,7 +3012,7 @@
         if (f.life <= 0) resolveLightningStrike(f.x);
         continue;
       }
-      if (f.type === "boom") continue;   // drawn only; its damage already landed
+      if (f.type === "boom" || f.type === "guardian") continue;   // drawn only
       // Lemonade Stand: a stationary fizz that heals anyone inside, owner too
       if (f.type === "heal") {
         for (const p of players) {
@@ -3256,6 +3302,16 @@
       p.hp = p.stats.maxHp * 0.25;
       p.spawnGrace = Math.max(p.spawnGrace, 0.5);
       burst(p.x, p.y, "#ffd700", 36, 480);
+      // someone up there really did owe you one
+      fields.push({ type: "guardian", owner: p, x: p.x, y: p.y, r: p.stats.radius, life: 1.6 });
+      for (let i = 0; i < 14; i += 1) {
+        particles.push({
+          x: p.x + rand(-20, 20), y: p.y + rand(-16, 16),
+          vx: rand(-30, 30), vy: rand(-90, -30),
+          life: rand(0.6, 1.1), maxLife: 1.1, r: rand(1.5, 3.2),
+          color: Math.random() < 0.5 ? "#fff3b0" : "#ffd700", spark: true
+        });
+      }
       showToast(str("toast.guardianSave", { name: p.name }));
       sfx("mythic");
       return;
@@ -4502,9 +4558,13 @@
     ctx.clip("evenodd");
     fn();
     ctx.restore();
-    // a scorched rim so a fresh hole reads as bored, not as a gap in the art
+    // a scorched rim so a fresh hole reads as bored, not as a gap in the art —
+    // clipped to the slab, so no part of the ring floats off its edge
     for (const h of holes) {
       ctx.save();
+      ctx.beginPath();
+      ctx.rect(box.x, box.y, box.w, box.h);
+      ctx.clip();
       ctx.strokeStyle = "rgba(20,16,12,0.75)";
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -4797,6 +4857,35 @@
       const r = p.stats.radius;
       ctx.save();
       ctx.translate(p.x, p.y);
+
+      // Magnet Suit: a crackling magnetic field, so the deflection has a
+      // visible cause rather than bullets mysteriously swerving
+      if (p.stats.repel) {
+        const t2 = world.time;
+        ctx.save();
+        for (let i = 0; i < 2; i += 1) {
+          const rr = r + 14 + i * 12 + Math.sin(t2 * 5 + i) * 3;
+          ctx.strokeStyle = `rgba(159,216,255,${0.35 - i * 0.12})`;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 10]);
+          ctx.lineDashOffset = -t2 * (60 + i * 40);
+          ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        // little arcs of static skittering around the rim
+        ctx.strokeStyle = "rgba(200,236,255,0.85)";
+        ctx.lineWidth = 1.8;
+        for (let i = 0; i < 3; i += 1) {
+          const a0 = t2 * (2.2 + i) + i * 2.1;
+          const rr = r + 10 + i * 7;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a0) * rr, Math.sin(a0) * rr);
+          ctx.lineTo(Math.cos(a0 + 0.3) * (rr + 5), Math.sin(a0 + 0.3) * (rr + 5));
+          ctx.lineTo(Math.cos(a0 + 0.55) * rr, Math.sin(a0 + 0.55) * rr);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
 
       // shadow
       ctx.fillStyle = "rgba(0,0,0,0.28)";
@@ -5165,6 +5254,54 @@
           ctx.stroke();
         }
         ctx.restore();
+      } else if (f.type === "guardian") {
+        const k = 1 - Math.max(0, f.life) / 1.6;      // 0 at the save, 1 at the end
+        const o = f.owner;
+        const px = o && o.alive ? o.x : f.x;
+        const py = o && o.alive ? o.y : f.y;
+        ctx.save();
+        // the glow around the fighter who was spared
+        const glow = ctx.createRadialGradient(px, py, 0, px, py, f.r * 2.6);
+        glow.addColorStop(0, `rgba(255,240,180,${(1 - k) * 0.55})`);
+        glow.addColorStop(0.6, `rgba(255,215,90,${(1 - k) * 0.25})`);
+        glow.addColorStop(1, "rgba(255,200,60,0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath(); ctx.arc(px, py, f.r * 2.6, 0, Math.PI * 2); ctx.fill();
+        // the halo, tilted, hanging over their head
+        ctx.strokeStyle = `rgba(255,226,120,${1 - k})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.ellipse(px, py - f.r - 16 - k * 6, f.r * 0.72, f.r * 0.24, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.8})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(px, py - f.r - 16 - k * 6, f.r * 0.72, f.r * 0.24, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        // the angel: rises, spreads its wings and thins away to nothing
+        const ay = py - 20 - k * 130;
+        const av = (1 - k) * 0.85;
+        const scale = 0.7 + k * 0.5;
+        ctx.globalAlpha = av;
+        ctx.translate(px, ay);
+        ctx.scale(scale, scale);
+        const ang = window.ROUNDERS.fxImage && window.ROUNDERS.fxImage("angel");
+        if (ang) {
+          ctx.drawImage(ang, -26, -30, 52, 60);
+        } else {
+          // procedural stand-in until assets/images/fx/angel.png lands
+          ctx.fillStyle = "rgba(255,248,214,0.95)";
+          ctx.beginPath(); ctx.arc(0, -12, 7, 0, Math.PI * 2); ctx.fill();       // head
+          ctx.beginPath(); ctx.ellipse(0, 6, 7, 14, 0, 0, Math.PI * 2); ctx.fill();  // robe
+          ctx.strokeStyle = "rgba(255,248,214,0.95)";
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(-14, 2, 12, -1.2, 0.9); ctx.stroke();          // wings
+          ctx.beginPath(); ctx.arc(14, 2, 12, Math.PI - 0.9, Math.PI + 1.2); ctx.stroke();
+          ctx.strokeStyle = "rgba(255,226,120,0.95)";
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.ellipse(0, -22, 8, 3, 0, 0, Math.PI * 2); ctx.stroke();  // its own halo
+        }
+        ctx.restore();
       } else if (f.type === "boom") {
         // A detonation you cannot miss: white core, a bloom of hot colour and
         // two expanding shockwave spheres, all sized by the charge.
@@ -5308,6 +5445,16 @@
   }
 
   function updateBolts(dt) {
+    for (const bo of bolts) {
+      if (!bo.pending) continue;
+      bo.delay -= dt;
+      if (bo.delay > 0) { bo.life = Math.max(bo.life, 0.05); continue; }
+      bo.pending = false;
+      // the bolt comes back off the wall and catches them a second time
+      boltVisual(bo.from.x, bo.from.y, bo.to.x, bo.to.y, bo.color, 0.24);
+      if (bo.victim && bo.victim.alive) hurtRaw(bo.victim, bo.damage, bo.owner);
+      bo.life = 0;
+    }
     for (const b of bolts) b.life -= dt;
     bolts = bolts.filter(b => b.life > 0);
   }

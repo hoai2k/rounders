@@ -109,7 +109,7 @@ that only changes reload speed should not change the shot's appearance.
 | Cinder Shot | `cinder-shot.png` | A glowing ember lump trailing sparks, orange-hot core |
 | Permafrost | `permafrost.png` | A pale blue ice shard with frost spikes |
 | Magnet Fingers | `magnet-fingers.png` | A round with small horseshoe-magnet fins, faint red/blue pole tint |
-| Black Mamba | `black-mamba.png` | A matte-black fanged dart dripping green |
+| Black Mamba | `black-mamba.png` | A coiled black snake striking head-first — flat viper head, bared fangs, venom bead at the tip, body tapering into a short curved tail. Matte black scales with green underbelly glow |
 | Popcorn Payload | `popcorn-payload.png` | A kernel mid-pop, half corn half burst |
 | Cluster Bomb / Party Favor | `cluster-bomb.png` | A tiny party popper round with confetti flecks |
 | Supernova | `supernova.png` | A blinding white-hot star core with a compressed corona |
@@ -128,7 +128,7 @@ that only changes reload speed should not change the shot's appearance.
 | Pocket Void | `pocket-void.png` | A pure black sphere with a violet event-horizon rim |
 | Golden Gun | `golden-gun.png` | A gleaming solid-gold bullet, engraved band |
 
-## 3. Effect art (18 files) — NEW
+## 3. Effect art (19 files) — NEW
 
 Every combat effect is procedural canvas today. These are the ones that would
 gain most from painted art. All are **transparent PNGs**, drawn as a single
@@ -158,6 +158,7 @@ cells) — otherwise a single image the engine animates by scaling/fading.
 | `dust-puff.png` | 128×128 | A pale drifting dust/rubble puff for impacts and bore-through |
 | `stun-stars.png` | 192×96 | Three cartoon stars circling, for a dazzled fighter |
 | `muzzle-flash.png` | 128×128 | A short bright star-burst flash, drawn pointing right |
+| `angel.png` | 256×256 (52×60 drawn) | A tiny cartoon guardian angel seen head-on — round head, simple robe, two spread feathered wings, its own little halo above. Warm cream-gold on transparent; it rises and fades when Guardian Halo saves you, so keep it a clean readable silhouette |
 
 ---
 

@@ -148,7 +148,7 @@
     // a skip shot off the floor: reliable to stage, and it reads as a bounce
     // far better than a bank off a floating slab, which lands anywhere
     else if (on("bounces") || on("bankShot")) { plan.skip = true; watch.push("the shot skips off the floor instead of dying on it"); }
-    if (on("chain")) { plan.secondTarget = true; watch.push("lightning arcs from the victim to the next fighter"); }
+    if (on("chain")) { plan.secondTarget = true; watch.push("with nobody else to jump to, the bolt earths on the wall above and comes back — hitting them twice"); }
     if (on("homing") || on("steer")) { plan.aimUp = -0.6; watch.push("fired well off-target, the bullet curves back onto them"); }
     if (on("helium")) { plan.aimUp = 0.12; watch.push("the bullet falls upward instead of dropping"); }
     if (on("grow")) watch.push("the bullet swells and hits harder the farther it flies");
@@ -254,7 +254,7 @@
     const walls = () => {
       const list = [{ x: -40, y: GROUND, w: W + 80, h: 90, ground: true }];
       // Skylight's pillar is chunky, so a bored hole is unmistakable
-      if (plan.wall === "thin") list.push({ x: 350, y: 118, w: plan.stats.holePunch ? 46 : 26, h: GROUND - 118, holes: pillarHoles });
+      if (plan.wall === "thin") list.push({ x: 336, y: 118, w: plan.stats.holePunch ? 92 : 26, h: GROUND - 118, holes: pillarHoles });
       if (plan.wall === "bounce") list.push({ x: 360, y: 60, w: 30, h: 120 });
       for (const s of slabs) list.push({ x: s.x - s.w / 2, y: s.y - s.h / 2, w: s.w, h: s.h, slab: true });
       return list;
@@ -439,7 +439,16 @@
       who.blockT = st.blockDuration + 0.25;   // held a beat longer so it reads
       who.blockCd = st.blockCooldown;
       puff(who.x, who.y, "#ffffff", 12, 200);
-      if (st.decoy) decoys.push({ x: who.x, y: who.y, hp: 20, maxHp: 20, character: who.character, color: who.color, owner: who });
+      if (st.decoy) {
+        // stood clearly apart from its owner, or the two just overlap and the
+        // copy reads as a smudge rather than a second body
+        decoys.push({
+          x: who.x - (who.facing || 1) * 74, y: who.y,
+          hp: 20 * st.decoy, maxHp: 20 * st.decoy,
+          character: who.character, color: who.color, owner: who
+        });
+        who.vx += (who.facing || 1) * 260;
+      }
       if (st.warpBlock) { who.x = Math.max(60, Math.min(W - 60, who.x + who.facing * 110)); puff(who.x, who.y, who.color, 14, 240); }
       if (st.blockDash) who.vx += who.facing * 320;
       if (st.blockReload) { who.ammo = st.maxAmmo; who.reloadT = 0; float(who.x, who.y - 56, "RELOADED", "#ffe169"); }
@@ -625,12 +634,13 @@
         // repel: the holder bends incoming shots away
         if (foe.stats.repel) {
           const dx = b.x - foe.x, dy = b.y - foe.y, d = Math.hypot(dx, dy);
-          if (d > 1 && d < 150) {
+          if (d > 1 && d < 190) {
             const cur = Math.atan2(b.vy, b.vx), away = Math.atan2(dy, dx);
             let dif = away - cur;
             while (dif > Math.PI) dif -= Math.PI * 2;
             while (dif < -Math.PI) dif += Math.PI * 2;
-            const rate = Math.min(foe.stats.repel * 1.3, 3) * (1 - d / 150) * dt;
+            const rate = Math.min(foe.stats.repel * 4.2, 8) * (1 - d / 190) * dt;
+            if (Math.random() < dt * 26) parts.push({ x: b.x, y: b.y, vx: rand(-24, 24), vy: rand(-24, 24), life: 0.25, max: 0.25, r: rand(1.2, 2.2), color: "#9fd8ff", spark: true });
             const ang = cur + Math.max(-rate, Math.min(rate, dif));
             const sp = Math.hypot(b.vx, b.vy);
             b.vx = Math.cos(ang) * sp; b.vy = Math.sin(ang) * sp;
@@ -662,8 +672,11 @@
             if (through) continue;
           }
           if (b.holePunch && !w.ground && w.holes) {
-            const lx = b.x - w.x, ly = b.y - w.y;
             const r = 30 + 8 * (b.holePunch - 1);
+            // centre the bore inside the slab, not on the face it struck
+            const fit = (v, size) => size < r * 2 ? size / 2 : Math.max(r, Math.min(size - r, v));
+            const lx = fit(b.x - w.x, w.w);
+            const ly = fit(b.y - w.y, w.h);
             const near = w.holes.find(h => Math.hypot(h.lx - lx, h.ly - ly) < Math.max(h.r, r) * 0.75);
             if (near) near.r = Math.min(w.h * 0.4, Math.hypot(near.r, r));
             else if (w.holes.length < 6) w.holes.push({ lx, ly, r });
@@ -726,7 +739,18 @@
           if (b.silence) { who.silenceT = 1.5; float(who.x, who.y - 60, "SILENCED", "#b8b8c8"); }
           if (b.chain) {
             const third = [a, bb].find(q => q !== who && q !== b.owner);
-            if (third) { parts.push({ bolt: true, x1: who.x, y1: who.y, x2: third.x, y2: third.y, life: 0.22, max: 0.22, color: "#ffe95e" }); damage(third, dmg * 0.55, b.owner, 0, 0, false); }
+            if (third) {
+              parts.push({ bolt: true, x1: who.x, y1: who.y, x2: third.x, y2: third.y, life: 0.22, max: 0.22, color: "#ffe95e" });
+              damage(third, dmg * 0.55, b.owner, 0, 0, false);
+            } else {
+              // nobody else to jump to: the bolt earths itself on the ledge
+              // above and comes straight back, catching them twice
+              const perch = { x: who.x + rand(-30, 30), y: Math.max(24, who.y - 150) };
+              parts.push({ bolt: true, x1: who.x, y1: who.y, x2: perch.x, y2: perch.y, life: 0.3, max: 0.3, color: "#ffe95e" });
+              parts.push({ bolt: true, x1: perch.x, y1: perch.y, x2: who.x, y2: who.y, life: 0.42, max: 0.42, color: "#fff6a8" });
+              damage(who, dmg * 0.35, b.owner, 0, 0, false);
+              damage(who, dmg * 0.35, b.owner, 0, 0, false);
+            }
           }
           if (b.empowered) { blockEffects(b.owner, who.x, who.y); b.empowered = 0; }
           b.hit.add(who);
@@ -845,6 +869,18 @@
       const ch = who.character;
       ctx.save();
       ctx.translate(who.x, who.y);
+      if (who.stats.repel) {
+        ctx.save();
+        for (let i = 0; i < 2; i += 1) {
+          ctx.strokeStyle = `rgba(159,216,255,${0.4 - i * 0.15})`;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 10]);
+          ctx.lineDashOffset = -t * (60 + i * 40);
+          ctx.beginPath(); ctx.arc(0, 0, who.stats.radius + 14 + i * 12, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
       if (who.chillT > 0) { ctx.shadowColor = "#8fd8ff"; ctx.shadowBlur = 16; }
       if (who.burnT > 0) { ctx.shadowColor = "#ff7a26"; ctx.shadowBlur = 18 + Math.sin(t * 22) * 6; }
       if (who.stunT > 0) ctx.rotate(Math.sin(t * 40) * 0.07);
@@ -934,10 +970,13 @@
         ctx.fillRect(w.x, w.y, w.w, 3);
         ctx.restore();
         if (holes) for (const h of holes) {
+          ctx.save();
+          ctx.beginPath(); ctx.rect(w.x, w.y, w.w, w.h); ctx.clip();
           ctx.strokeStyle = "rgba(20,16,12,0.75)"; ctx.lineWidth = 2.5;
           ctx.beginPath(); ctx.arc(w.x + h.lx, w.y + h.ly, h.r, 0, Math.PI * 2); ctx.stroke();
           ctx.strokeStyle = "rgba(255,210,150,0.3)"; ctx.lineWidth = 1.2;
           ctx.beginPath(); ctx.arc(w.x + h.lx, w.y + h.ly, h.r - 2, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
         }
       }
       // fields
@@ -1184,7 +1223,7 @@
         shooter: { hp: a.hp, maxHp: a.maxHp, ammo: a.ammo },
         target: { hp: bb.hp, maxHp: bb.maxHp, shield: bb.shield, temp: bb.temp },
         bullets: bullets.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), vx: Math.round(b.vx), vy: Math.round(b.vy), hug: Boolean(b.hug) })),
-        fields: fields.length, cycle,
+        fields: fields.length, cycle, pillarHoles: pillarHoles.length,
         pos: { ax: Math.round(a.x), ay: Math.round(a.y), bx: Math.round(bb.x), by: Math.round(bb.y) }
       })
     };

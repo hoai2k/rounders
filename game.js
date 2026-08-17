@@ -135,8 +135,8 @@
   const playerColors = ["#ff5277", "#52d7ff", "#ffe169", "#74f08b"];
 
   const keyboardSchemes = [
-    { left: "KeyA", right: "KeyD", up: "KeyW", down: "KeyS", jump: "KeyW", shoot: "KeyF", block: "KeyG", label: "Keyboard 1 (WASD + F/G)" },
-    { left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp", down: "ArrowDown", jump: "ArrowUp", shoot: "Slash", block: "Period", label: "Keyboard 2 (Arrows + / .)" }
+    { left: "KeyA", right: "KeyD", up: "KeyW", down: "KeyS", jump: "KeyW", shoot: "KeyF", block: "KeyG", special: "KeyH", label: "Keyboard 1 (WASD + F/G)" },
+    { left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp", down: "ArrowDown", jump: "ArrowUp", shoot: "Slash", block: "Period", special: "Comma", label: "Keyboard 2 (Arrows + / .)" }
   ];
   // any directional key on a scheme takes that keyboard's slot
   const schemeJoinKeys = sc => [sc.left, sc.right, sc.up, sc.down];
@@ -159,6 +159,15 @@
   // holes: Map<source platform/mover/hung object, [{lx, ly, r}]> in platform-LOCAL
   // coordinates, so a hole bored in a moving platform rides along with it.
   const props = { breaks: new Map(), hungs: [], crates: [], slabs: [], holes: new Map() };
+
+  // Chronoshift rewinds the WHOLE board, so the world keeps a short film of
+  // itself: one frame per tick, capped at REWIND_MAX seconds of game time.
+  // Rewinding replays that film backwards at half speed, which is why holding
+  // the button for 6 real seconds undoes 3 seconds of the fight.
+  const REWIND_MAX = 3;          // seconds of game time that can be undone
+  const REWIND_RATE = 0.5;       // history consumed per second of real time
+  let history = [];
+  const rewind = { active: false, owner: null, cursor: 0, spent: 0, carry: 0 };
   let last = performance.now();
   let toastTimer = 0;
   let audioCtx = null;
@@ -198,7 +207,7 @@
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
       guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0,
-      goldenShot: false, killHeal: false,
+      goldenShot: 0, killHeal: false,
       active: null, activeCooldown: 10,
       // gap-audit wave (CARD-GAP-AUDIT.md): offense & bullets
       kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0, wallPierce: 0, holePunch: 0,
@@ -252,6 +261,45 @@
       hazardGrace: 0, pitBounces: 0,
       blinkClock: Math.random() * 4
     };
+  }
+
+  // One frame of the whole board, cheap enough to keep 180 of.
+  function snapshot(dt) {
+    return {
+      dt,
+      players: players.map(p => ({
+        x: p.x, y: p.y, vx: p.vx, vy: p.vy, hp: p.hp, alive: p.alive,
+        aimX: p.aimX, aimY: p.aimY, facing: p.facing, ammo: p.ammo,
+        reloadTimer: p.reloadTimer, blockTimer: p.blockTimer, hitFlash: p.hitFlash,
+        poisonTimer: p.poisonTimer, burnTimer: p.burnTimer, chillTimer: p.chillTimer,
+        shield: p.shield, temp: p.hotShield, over: p.overShield, decayPool: p.decayPool
+      })),
+      bullets: bullets.map(b => ({
+        ref: b, x: b.x, y: b.y, vx: b.vx, vy: b.vy, life: b.life, damage: b.damage
+      })),
+      crates: props.crates.map(c => ({ ref: c, x: c.x, y: c.y, vx: c.vx, vy: c.vy, hp: c.hp, dead: c.dead })),
+      slabs: props.slabs.map(sl => ({ ref: sl, x: sl.x, y: sl.y, angle: sl.angle, dead: sl.dead }))
+    };
+  }
+
+  function restore(frame) {
+    frame.players.forEach((snap, i) => {
+      const p = players[i];
+      if (!p) return;
+      Object.assign(p, {
+        x: snap.x, y: snap.y, vx: snap.vx, vy: snap.vy, hp: snap.hp, alive: snap.alive,
+        aimX: snap.aimX, aimY: snap.aimY, facing: snap.facing, ammo: snap.ammo,
+        reloadTimer: snap.reloadTimer, blockTimer: snap.blockTimer,
+        poisonTimer: snap.poisonTimer, burnTimer: snap.burnTimer, chillTimer: snap.chillTimer,
+        shield: snap.shield, hotShield: snap.temp, overShield: snap.over, decayPool: snap.decayPool
+      });
+    });
+    // bullets that had already broken come back; ones not yet fired go away
+    bullets = frame.bullets.map(sb => Object.assign(sb.ref, {
+      x: sb.x, y: sb.y, vx: sb.vx, vy: sb.vy, life: sb.life, damage: sb.damage
+    }));
+    for (const sc of frame.crates) Object.assign(sc.ref, { x: sc.x, y: sc.y, vx: sc.vx, vy: sc.vy, hp: sc.hp, dead: sc.dead });
+    for (const ss of frame.slabs) Object.assign(ss.ref, { x: ss.x, y: ss.y, angle: ss.angle, dead: ss.dead });
   }
 
   function emptyInput() {
@@ -736,6 +784,9 @@
       p.spawnGrace = 1.6;
     });
     decoys = [];
+    history = [];
+    rewind.active = false;
+    rewind.owner = null;
     world.roundFreeze = 1.1;
     arenaName.textContent = level.name;
     arenaTag.textContent = level.tagline;
@@ -1090,6 +1141,7 @@
     input.jump ||= keys.has(scheme.jump);
     input.shoot ||= keys.has(scheme.shoot);
     input.block ||= keys.has(scheme.block);
+    input.special ||= keys.has(scheme.special);
     input.pause ||= keys.has("Escape") || keys.has("KeyP");
     input.leftPressed ||= pressed.has(scheme.left);
     input.rightPressed ||= pressed.has(scheme.right);
@@ -1341,8 +1393,58 @@
       return;
     }
 
+    // ---- Chronoshift: hold the button and the whole board runs backwards
+    const rewinder = players.find(p =>
+      p.alive && p.stats.active === "chronoshift" && p.activeCooldown <= 0 && p.input.special);
+    if (rewinder || rewind.active) {
+      if (rewinder && !rewind.active) {
+        rewind.active = true;
+        rewind.owner = rewinder;
+        rewind.cursor = history.length - 1;
+        rewind.spent = 0;
+        rewind.carry = 0;
+        sfx("teleport");
+        showToast(str("toast.chronoshift", { name: rewinder.name }));
+      }
+      const holder = rewind.owner;
+      const stillHeld = rewinder && rewinder === holder;
+      // consume history at half real time, and never more than the budget
+      const canRewind = stillHeld && rewind.cursor > 0 && rewind.spent < REWIND_MAX;
+      if (canRewind) {
+        // whole frames only, with the remainder carried to the next tick —
+        // paying a frame off partially would unwind it at full speed
+        let left = dt * REWIND_RATE + rewind.carry;
+        let undone = 0;
+        while (rewind.cursor > 0 && rewind.spent < REWIND_MAX) {
+          const frame = history[rewind.cursor];
+          if (left < frame.dt) break;
+          left -= frame.dt;
+          rewind.spent += frame.dt;
+          undone += frame.dt;
+          rewind.cursor -= 1;
+        }
+        rewind.carry = left;
+        restore(history[Math.max(0, rewind.cursor)]);
+        history.length = Math.max(1, rewind.cursor + 1);
+        // update() already pushed the clock forward by dt at the top; take that
+        // back as well as the tape we just unwound, so the clock really reverses
+        world.time -= dt + undone;
+        updateParticles(dt);
+        updateHud();
+        return;                                  // the world does not advance
+      }
+      // let go, ran out of tape, or died mid-rewind: hand time back and start
+      // the cooldown from here
+      rewind.active = false;
+      if (holder) holder.activeCooldown = holder.stats.activeCooldown;
+      rewind.owner = null;
+    }
+
     const step = Math.min(dt, 1 / 45);
     world.lastStep = step;
+    history.push(snapshot(step));
+    // 3 seconds of tape at 60fps, with headroom for slower frames
+    while (history.length > 260) history.shift();
     updateArena(step);
     updateProps(step);
     updatePlayers(step);
@@ -1812,7 +1914,10 @@
       if (p.hotShield > 0) p.hotShield = Math.max(0, p.hotShield - 10 * dt);
       // Payment Plan: the pool of deferred damage drips into your health bar
       if (p.decayPool > 0) {
-        const bite = Math.min(p.decayPool, Math.max(p.decayPool / 3, 3) * dt);
+        // one copy spreads the bill over 3s; each extra copy stretches it out
+        // further, buying more time to turn the fight around
+        const over = 3 * (p.stats.decay || 1);
+        const bite = Math.min(p.decayPool, Math.max(p.decayPool / over, 3 / over) * dt);
         p.decayPool -= bite;
         applyDamage(p, bite, p.decayAttacker, true);
         if (Math.random() < dt * 10) puffOne(p.x + rand(-12, 12), p.y + rand(-12, 12), "#c88fff");
@@ -2319,6 +2424,26 @@
     sfx("mythic");
     burst(p.x, p.y, "#ff4d8f", 30, 480);
     const aim = Math.atan2(p.aimY, p.aimX);
+    // Mythic stacking: a duplicate cannot give you a second ability, so it
+    // sharpens the one you have — shorter cooldown, longer-lived effect.
+    const stacks = p.stats.activeStacks || 1;
+    if (p.stats.active === "eventHorizon") {
+      // thrown, not placed: it flies like a round and plants where it hits
+      const a2 = Math.atan2(p.aimY, p.aimX);
+      bullets.push({
+        owner: p, x: p.x + Math.cos(a2) * 34, y: p.y + Math.sin(a2) * 34,
+        prevX: p.x, prevY: p.y, ox: p.x, oy: p.y,
+        vx: Math.cos(a2) * 820, vy: Math.sin(a2) * 820,
+        r: 16, damage: 12, life: 4, gravity: 260, drag: 1, restitution: 0,
+        bounces: 0, explosive: 0, homing: 0, pierce: 0, poison: 0, burn: 0,
+        chill: 0, chain: 0, shards: 0, grow: 0, groundHug: 0, voidPull: 0,
+        wallPierce: 0, holePunch: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0,
+        boomerang: 0, steer: 0, empowered: 0, golden: false, isShard: true,
+        singularity: stacks, hitIds: new Set(), color: "#c88fff"
+      });
+      showToast(str("toast.eventHorizon", { name: p.name }));
+      return true;
+    }
     if (p.stats.active === "starfall") {
       const tx = clamp(p.x + p.aimX * 420, 120, world.width - 120);
       for (let i = 0; i < 5; i += 1) {
@@ -2333,26 +2458,11 @@
         });
       }
       showToast(str("toast.starfall", { name: p.name }));
-    } else if (p.stats.active === "eventHorizon") {
-      fields.push({
-        type: "blackhole", owner: p,
-        x: clamp(p.x + p.aimX * 320, 150, world.width - 150),
-        y: clamp(p.y + p.aimY * 260, 150, world.height - 150),
-        r: 380, life: 3.4, force: -1500, dps: 16
-      });
-      showToast(str("toast.eventHorizon", { name: p.name }));
     } else if (p.stats.active === "chronoshift") {
-      const past = p.trail[0];
-      if (past) {
-        burst(p.x, p.y, "#8fd8ff", 24, 380);
-        p.x = past.x; p.y = past.y;
-        p.vx = 0; p.vy = 0;
-        p.hp = Math.min(p.stats.maxHp, p.hp + 35);
-        p.spawnGrace = Math.max(p.spawnGrace, 0.4);
-        burst(p.x, p.y, "#8fd8ff", 24, 380);
-        sfx("teleport");
-      }
-      showToast(str("toast.chronoshift", { name: p.name }));
+      // handled by the rewind branch in update(): it runs while the button is
+      // HELD, so there is nothing to do on the press itself
+      p.activeCooldown = 0;
+      return false;
     }
     return true;
   }
@@ -2448,7 +2558,9 @@
   function tryShoot(p) {
     if (p.fireTimer > 0 || p.reloadTimer > 0 || p.ammo <= 0) return;
     p.fireTimer = p.stats.fireDelay;
-    const golden = p.stats.goldenShot && p.ammo === p.stats.maxAmmo;
+    // Golden Gun stacks by widening the golden window: one copy gilds the first
+    // round of the magazine, two gild the first two, and so on
+    const golden = p.stats.goldenShot > 0 && p.ammo > p.stats.maxAmmo - p.stats.goldenShot;
     p.ammo -= 1;
     if (p.stats.bloodMoney) {
       // the pact never finishes you off, but it always collects
@@ -2474,11 +2586,10 @@
       // encore covering the ground you just left
       p.encoreQueue.push({ t: 1 * i, angle, mul: 0.5, pellets: 2, from: { x: p.x, y: p.y } });
     }
-    if (p.ammo <= 0) {
-      p.reloadTimer = p.stats.reload;
-      // Panic Button: the empty click doubles as the block button
-      if (p.stats.autoBlock) tryBlock(p);
-    }
+    // Panic Button: the empty click doubles as the block button. Stacking arms
+    // it earlier — two copies cover the last two rounds in the magazine.
+    if (p.ammo < p.stats.autoBlock) tryBlock(p);
+    if (p.ammo <= 0) p.reloadTimer = p.stats.reload;
   }
 
   function updateBullets(dt) {
@@ -2751,7 +2862,9 @@
               if (o.stats.hotStreak) o.hotShield = 25 * o.stats.hotStreak;
               if (o.stats.blockRefresh && o.refreshLock <= 0) {
                 o.blockCooldown = 0;
-                o.refreshLock = 1;
+                // stacking shortens the lockout, so a second copy lets the
+                // refresh keep up with a faster trigger finger
+                o.refreshLock = 1 / o.stats.blockRefresh;
                 puffOne(o.x, o.y - o.stats.radius - 8, "#ffffff");
               }
             }
@@ -2859,7 +2972,21 @@
     return rise > 320 ? { x: best.x, y: victim.y - rise / 2 } : best;
   }
 
+  function plantSingularity(b) {
+    const stacks = b.singularity || 1;
+    fields.push({
+      type: "blackhole", owner: b.owner, singularity: true,
+      x: clamp(b.x, 90, world.width - 90),
+      y: clamp(b.y, 90, world.height - 90),
+      r: 380, life: 7 + (stacks - 1) * 2.5, force: -1500, dps: 16
+    });
+    burst(b.x, b.y, "#c88fff", 40, 520);
+    world.shake = Math.max(world.shake, 12);
+    sfx("mythic");
+  }
+
   function explodeBullet(b) {
+    if (b.singularity) { plantSingularity(b); return; }
     // Stink Bomb: the impact lingers as a poisonous, slowing cloud
     if (b.stink) {
       fields.push({
@@ -3092,8 +3219,33 @@
         }
         continue;
       }
+      // A planted singularity does not care who threw it: stand too close and
+      // it takes you as well. It also hauls anything loose on the board.
+      if (f.type === "blackhole" && f.singularity) {
+        for (const c of props.crates) {
+          if (c.dead) continue;
+          const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+          const dx = f.x - cx, dy = f.y - cy, d = Math.hypot(dx, dy) || 1;
+          if (d < f.r) {
+            const t2 = 1 - d / f.r;
+            c.vx += (dx / d) * 900 * t2 * dt;
+            c.vy += (dy / d) * 700 * t2 * dt;
+          }
+        }
+        for (const sl of props.slabs) {
+          if (sl.dead) continue;
+          const dx = f.x - sl.x, dy = f.y - sl.y, d = Math.hypot(dx, dy) || 1;
+          if (d < f.r) {
+            const t2 = 1 - d / f.r;
+            sl.vx += (dx / d) * 620 * t2 * dt;
+            sl.vy += (dy / d) * 480 * t2 * dt;
+            sl.va += 0.6 * t2 * dt;
+            wakeSlab(sl);
+          }
+        }
+      }
       for (const p of players) {
-        if (!p.alive || p === f.owner) continue;
+        if (!p.alive || (p === f.owner && !f.singularity)) continue;
         const dx = p.x - f.x, dy = p.y - f.y;
         const d = Math.hypot(dx, dy) || 1;
         if (d < f.r) {
@@ -4211,6 +4363,34 @@
       drawArenaFeatures(level);
       drawPlatforms(level);
       drawFields();
+      // Chronoshift: the future being unwound, drawn as fading ghosts of every
+      // fighter and every round at points further along the tape
+      if (rewind.active && history.length) {
+        ctx.save();
+        for (let g = 1; g <= 5; g += 1) {
+          const idx = Math.min(history.length - 1, rewind.cursor + g * 7);
+          const frame = history[idx];
+          if (!frame || idx <= rewind.cursor) continue;
+          const a = 0.42 * (1 - g / 6);
+          ctx.globalAlpha = a;
+          frame.players.forEach((snap, i) => {
+            const p = players[i];
+            if (!p || !snap.alive) return;
+            ctx.save();
+            ctx.translate(snap.x, snap.y);
+            drawCharacter(ctx, p.character, p.stats.radius, { t: world.time, aimX: snap.aimX, aimY: snap.aimY });
+            ctx.restore();
+          });
+          for (const sb of frame.bullets) {
+            if (sb.life <= 0) continue;
+            ctx.fillStyle = sb.ref.color || "#8fd8ff";
+            ctx.beginPath();
+            ctx.arc(sb.x, sb.y, sb.ref.r || 6, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
       drawDecoys();
       drawBullets();
       drawPlayersAll();
@@ -4222,6 +4402,7 @@
         ctx.fillRect(0, 0, world.width, world.height);
       }
       if (world.state === "card-show") drawCardShows();
+      drawRewindOverlay();
       if (world.roundFreeze > 0 && world.state === "playing") drawCountdown();
       if (world.state === "ended") drawWinner();
       // vignette
@@ -5529,6 +5710,29 @@
     }
   }
 
+  // While the world unwinds, say so: a cold wash over the arena, a rewind
+  // glyph, and how much of the tape is left.
+  function drawRewindOverlay() {
+    if (!rewind.active) return;
+    ctx.save();
+    ctx.fillStyle = "rgba(80,170,255,0.10)";
+    ctx.fillRect(0, 0, world.width, world.height);
+    // scanlines, for the tape-being-scrubbed feel
+    ctx.strokeStyle = "rgba(143,216,255,0.10)";
+    ctx.lineWidth = 2;
+    for (let y = (world.time * 220) % 14; y < world.height; y += 14) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(world.width, y); ctx.stroke();
+    }
+    const left = Math.max(0, REWIND_MAX - (rewind.spent || 0));
+    ctx.fillStyle = "rgba(143,216,255,0.95)";
+    ctx.font = "900 34px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("◀◀ REWIND", world.width / 2, 74);
+    ctx.font = "700 20px system-ui, sans-serif";
+    ctx.fillText(`${left.toFixed(1)}s of tape left`, world.width / 2, 104);
+    ctx.restore();
+  }
+
   function drawCountdown() {
     ctx.fillStyle = "rgba(0,0,0,0.2)";
     ctx.fillRect(0, 0, world.width, world.height);
@@ -6356,13 +6560,19 @@
       .filter(pl => pl.holes && pl.holes.length)
       .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, holes: pl.holes.map(h => ({ ...h })), spans: pl.holes.map(h => holeSpans(pl, h)) })),
     bullets: () => bullets.map(b => ({
-      x: Math.round(b.x), y: Math.round(b.y), ghost: Boolean(b.ghost),
-      damage: Math.round(b.damage), empowered: b.empowered || 0, explosive: b.explosive
+      x: Math.round(b.x), y: Math.round(b.y), vx: Math.round(b.vx), ghost: Boolean(b.ghost),
+      damage: Math.round(b.damage), empowered: b.empowered || 0, explosive: b.explosive,
+      singularity: b.singularity || 0
     })),
+    // chronoshift tape: is the world running backwards, and how much is left
+    rewind: () => ({ active: rewind.active, cursor: rewind.cursor, frames: history.length }),
     slabs: () => props.slabs.filter(s => !s.dead).map(s => ({
       x: Math.round(s.x), y: Math.round(s.y), w: s.w, h: s.h, brick: Boolean(s.brickOwner)
     })),
-    fields: () => fields.map(f => ({ type: f.type, x: Math.round(f.x), y: Math.round(f.y), r: Math.round(f.r || 0) })),
+    fields: () => fields.map(f => ({
+      type: f.type, x: Math.round(f.x), y: Math.round(f.y), r: Math.round(f.r || 0),
+      singularity: Boolean(f.singularity), life: +(f.life || 0).toFixed(2)
+    })),
     particles: () => ({
       total: particles.length,
       flame: particles.filter(x => x.flame).length,

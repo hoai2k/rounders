@@ -59,7 +59,7 @@
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
       guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0,
-      goldenShot: false, killHeal: false,
+      goldenShot: 0, killHeal: false,
       active: null, activeCooldown: 10,
       kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0, wallPierce: 0, holePunch: 0,
       steer: 0, helium: 0, boomerang: 0, encore: 0, burstFire: 0,
@@ -98,6 +98,10 @@
       chain: on("chain"), homing: on("homing") || on("steer"), grow: on("grow"),
       helium: on("helium"), boomerang: on("boomerang"), stink: on("stink"),
       voidPull: on("voidPull"), shards: st.shards > 0, bounces: st.bounces > 0,
+      // not a bullet stat, but it changes what the round LOOKS like: an
+      // empowered shot flies gold inside a block bubble, so the viewer has to
+      // show that or it disagrees with the preview
+      empowered: st.empowerBlock > 0,
       pellets: st.pellets, speed: st.bulletSpeed, damage: st.damage
     };
   }
@@ -348,7 +352,7 @@
       const st = who.stats;
       const nPellets = opts.pellets || st.pellets;
       const from = opts.from || null;
-      const golden = st.goldenShot && who.ammo === st.maxAmmo;
+      const golden = st.goldenShot > 0 && who.ammo > st.maxAmmo - st.goldenShot;
       who.ammo = Math.max(0, who.ammo - 1);
       const target = enemies(who)[0];
       let ang = angleOverride;
@@ -1285,6 +1289,28 @@
       ctx.beginPath(); ctx.arc(0, 0, r * 1.9, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#ffffff";
       ctx.beginPath(); ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      return;
+    }
+    if (spec.empowered) {
+      // Return to Sender: gold, sparkling, wrapped in the block it carries
+      ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 20;
+      ctx.fillStyle = "#ffd700";
+      ctx.strokeStyle = "#8a6200"; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#fff3b0";
+      for (let i = 0; i < 6; i += 1) {
+        const a2 = (i / 6) * Math.PI * 2 + 0.4;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a2) * r * 1.6, Math.sin(a2) * r * 1.6, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const rr = r * 2.6 + 3;
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fill();
       ctx.restore();
       return;
     }

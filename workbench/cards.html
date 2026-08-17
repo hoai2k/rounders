@@ -212,18 +212,6 @@
     <script src="../js/gameplay.js"></script>
     <script src="../js/cardsim.js"></script>
     <script>
-      // scene missing -> try the emblem -> give up and say so
-      function cwArtFallback(img) {
-        const emblem = img.dataset.emblem;
-        if (emblem && img.src !== emblem) {
-          img.classList.add("emblem");
-          img.src = emblem;
-          return;
-        }
-        img.classList.add("missing");
-        img.parentElement.classList.add("no-art");
-      }
-
       (() => {
         "use strict";
         const { CARDS, RARITIES, RARITY_ORDER, CARD_SIM, cardArtUrl, cardSceneUrl } = window.ROUNDERS;
@@ -266,10 +254,9 @@
               <span class="card-pip">${rar.name[0]}</span>
               <span class="rarity">${rar.name}</span>
               <span class="card-art">
-                <img class="cw-art-img" alt="" loading="lazy" decoding="async"
-                     src="${cardSceneUrl(c.id)}"
-                     data-emblem="${cardArtUrl(c.id)}"
-                     onerror="cwArtFallback(this)" />
+                <img class="cw-art-img" alt="" decoding="async"
+                     data-scene="${cardSceneUrl(c.id)}"
+                     data-emblem="${cardArtUrl(c.id)}" />
               </span>
               <strong class="card-name">${c.name}</strong>
               <em class="card-tagline">${c.tagline}</em>
@@ -295,6 +282,86 @@
             const i = visible().findIndex(c => c.id === el.dataset.id);
             if (i >= 0) select(i, true);
           });
+          for (const img of grid.querySelectorAll(".cw-art-img")) {
+            img.addEventListener("load", artSettled);
+            img.addEventListener("error", artFailed);
+            artObserver.observe(img);
+          }
+        }
+
+        // ------------------------------------------------------ art loading
+        // 84 scenes is ~16MB, so the browser must not be told to want them all
+        // at once: nothing carries a src until it is on screen, and whenever a
+        // slot frees we hand it to whichever waiting card is nearest the middle
+        // of the panel. Scroll anywhere and that view jumps the queue.
+        const ART_PARALLEL = 6;
+        const waiting = new Set();
+        let inFlight = 0;
+
+        const artObserver = new IntersectionObserver(entries => {
+          for (const e of entries) {
+            const img = e.target;
+            if (img.dataset.done) continue;
+            if (e.isIntersecting) {
+              waiting.add(img);
+            } else if (waiting.delete(img) === false && img.dataset.started) {
+              // scrolled past before it arrived — drop the request so it stops
+              // holding a connection ahead of what you are actually looking at
+              img.removeAttribute("src");
+              delete img.dataset.started;
+              inFlight = Math.max(0, inFlight - 1);
+            }
+          }
+          pumpArt();
+        }, { root: pick, rootMargin: "320px 0px" });
+
+        // the observer only speaks on entry and exit; a fast scroll can leave a
+        // stale ordering behind, so re-sort on every settle of the scroller too
+        let pumpTimer = 0;
+        pick.addEventListener("scroll", () => {
+          clearTimeout(pumpTimer);
+          pumpTimer = setTimeout(pumpArt, 60);
+        }, { passive: true });
+
+        function pumpArt() {
+          if (inFlight >= ART_PARALLEL || !waiting.size) return;
+          const mid = pick.scrollTop + pick.clientHeight / 2;
+          const near = img => Math.abs((img.closest(".card")?.offsetTop || 0) - mid);
+          const queue = [...waiting].sort((a, b) => near(a) - near(b));
+          while (inFlight < ART_PARALLEL && queue.length) {
+            const img = queue.shift();
+            waiting.delete(img);
+            img.dataset.started = "1";
+            img.fetchPriority = "high";
+            inFlight += 1;
+            img.src = img.dataset.scene;
+          }
+        }
+
+        function artSettled(e) {
+          const img = e.currentTarget;
+          if (!img.getAttribute("src")) return;      // an abort, not an arrival
+          img.dataset.done = "1";
+          delete img.dataset.started;
+          inFlight = Math.max(0, inFlight - 1);
+          artObserver.unobserve(img);
+          pumpArt();
+        }
+
+        // scene missing -> try the emblem -> give up and say so
+        function artFailed(e) {
+          const img = e.currentTarget;
+          if (!img.getAttribute("src")) return;
+          const emblem = img.dataset.emblem;
+          if (emblem && !img.dataset.triedEmblem) {
+            img.dataset.triedEmblem = "1";
+            img.classList.add("emblem");
+            img.src = emblem;                        // still occupying its slot
+            return;
+          }
+          img.classList.add("missing");
+          img.parentElement.classList.add("no-art");
+          artSettled(e);
         }
 
         // ------------------------------------------------------- selection

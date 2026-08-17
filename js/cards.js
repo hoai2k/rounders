@@ -457,7 +457,7 @@
 
     card("pocket-void", "Pocket Void", "epic",
       "Litter, but cosmic.",
-      "Wherever a bullet breaks it tears open a vortex that drags players in — and its heart mauls them like an arena hazard, over and over if they cannot get clear.",
+      "Every bullet impact tears open a vortex that drags players in, and its heart mauls them like an arena hazard.",
       ["impacts open a black hole", "core deals hazard damage", "−10% damage"], ["control", "aoe"],
       p => { p.stats.voidPull += 1; p.stats.damage *= 0.9; }),
 
@@ -504,7 +504,7 @@
       "The first word is the last word.",
       "The first shot of every magazine deals TRIPLE damage and gleams gold.",
       ["1st shot per magazine ×3 damage", "+0.15s reload"], ["damage"],
-      p => { p.stats.goldenShot = true; p.stats.reload += 0.15; }),
+      p => { p.stats.goldenShot += 1; p.stats.reload += 0.15; }),
 
     card("dragons-hoard", "Dragon's Hoard", "legendary",
       "Never enough. Always more.",
@@ -529,18 +529,22 @@
       "The sky picks a side.",
       "ACTIVE (Y / LB): call a volley of 5 meteors crashing down toward your aim point. 12s cooldown. Passive: +10% damage.",
       ["ACTIVE: meteor volley", "12s cooldown", "+10% damage"], ["active", "aoe"],
-      p => { p.stats.active = "starfall"; p.stats.activeCooldown = 12; p.stats.damage *= 1.1; }),
+      // STACKING: a second Mythic cannot grant a second ability, so it sharpens
+      // this one — the cooldown drops and the passive stacks as usual.
+      p => { p.stats.active = "starfall"; p.stats.activeStacks = (p.stats.activeStacks || 0) + 1;
+             p.stats.activeCooldown = 12 / p.stats.activeStacks; p.stats.damage *= 1.1; }),
 
     card("event-horizon", "Event Horizon", "mythic",
       "Everything falls. Eventually.",
-      "ACTIVE (Y / LB): tear open a vast black hole at your aim point. It hauls enemies in for 3.4s and mauls them like a hazard every time they reach its heart. 14s cooldown. Passive: +10% health.",
-      ["ACTIVE: huge black hole (3.4s)", "hazard damage at its core", "14s cooldown", "+10% health"], ["active", "control"],
-      p => { p.stats.active = "eventHorizon"; p.stats.activeCooldown = 14; p.stats.maxHp *= 1.1; }),
+      "ACTIVE (Y): hurl a singularity that plants itself wherever it lands. For 7 seconds it drags in players, crates and loose slabs — you included, if you stand too close — and mauls anything that reaches its heart. 14s cooldown. Passive: +10% health.",
+      ["ACTIVE: thrown black hole (7s)", "drags players AND objects", "hazard damage at its core", "14s cooldown", "+10% health"], ["active", "control"],
+      p => { p.stats.active = "eventHorizon"; p.stats.activeStacks = (p.stats.activeStacks || 0) + 1;
+             p.stats.activeCooldown = 14 / p.stats.activeStacks; p.stats.maxHp *= 1.1; }),
 
     card("chronoshift", "Chronoshift", "mythic",
       "You were never there.",
-      "ACTIVE (Y / LB): rewind to where you were 2 seconds ago and heal 35 HP. 10s cooldown. Passive: +8% speed.",
-      ["ACTIVE: rewind 2s + heal 35", "10s cooldown", "+8% speed"], ["active", "clutch"],
+      "ACTIVE (hold Y): run the whole board backwards at half speed — every fighter, every bullet — for up to 3 seconds of the fight. Let go and time restarts from there. 10s cooldown, counted from release. Passive: +8% speed.",
+      ["ACTIVE: hold to rewind the world", "up to 3s of the fight, at half speed", "10s cooldown from release", "+8% speed"], ["active", "clutch"],
       p => { p.stats.active = "chronoshift"; p.stats.activeCooldown = 10; p.stats.speed *= 1.08; })
   ];
 

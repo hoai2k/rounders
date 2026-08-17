@@ -221,6 +221,37 @@ Pillars:
       Defence**; **Gag Order, Cold Shoulder and Overflow cut** (their effects
       were not pulling their weight). The engine still carries `silence`,
       `chillAura` and `overflow` support, unused, in case they come back
+- [x] **Mythic rework 2026-08-17**: **Chronoshift** no longer teleports its
+      holder — hold **Y** and the whole board runs backwards. The world keeps a
+      rolling film of itself (one frame per tick, `REWIND_MAX = 3` seconds of
+      game time) and the rewind consumes it at half real time, so a full tape
+      costs six seconds of holding. Every fighter, bullet, crate and slab is
+      restored, the clock genuinely counts down, ghost trails show where
+      everything is retreating to, and the cooldown only starts when you let
+      go. **Event Horizon** is thrown rather than placed: it flies out as a
+      round at 820px/s and plants where it lands, then spends 7 seconds
+      dragging in every fighter — its caster included, if they stood too close
+      — plus crates and slabs, mauling anything that reaches the core
+- [x] **Mythic stacking**: a duplicate cannot grant a second ability, so it
+      sharpens the one you hold — cooldown divided by the stack count, and an
+      Event Horizon that lives 2.5s longer per copy
+- [x] **Stacking audit of the non-obvious stats**: four cards silently ignored
+      a second copy and now do not. **Golden Gun** widens the golden window
+      (copy *n* gilds the first *n* rounds of the magazine) instead of setting
+      a flag; **Panic Button** arms earlier (`ammo < autoBlock`, so two copies
+      cover the last two rounds); **Second Defence** shortens its lockout to
+      `1 / stacks`; **Payment Plan** stretches the bill over `3 × stacks`
+      seconds. `guardian`, `revives`, `scavenge`, `freshCoat` and `bloodMoney`
+      were already counted and were left alone
+- [x] **Keyboard special**: moving the ability off the block button left
+      keyboard players with no way to fire a Mythic at all. **H** (Keyboard 1)
+      and **,** (Keyboard 2) now do what pad **Y** does
+- [x] **Workbench art priority**: no card carries a `src` until it scrolls into
+      view, and whenever one of six loading slots frees it goes to whichever
+      waiting card is nearest the middle of the panel — so scrolling anywhere
+      makes that view jump the queue instead of waiting behind 16MB of scenes
+      queued at page load. A card scrolled past before its art arrives has the
+      request dropped rather than left holding a connection
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

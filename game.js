@@ -2794,6 +2794,12 @@
     }
     if (b.explosive) {
       fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: 95 + b.explosive * 20, life: 0.14, force: 760 });
+      // the visible detonation: a white core that flashes out into expanding
+      // shockwave spheres, scaled by the size of the charge
+      fields.push({
+        type: "boom", owner: b.owner, x: b.x, y: b.y,
+        r: (105 + b.explosive * 12) * 1.35, life: 0.5, power: b.explosive
+      });
       // The player the bullet actually hit is not immune to its own blast —
       // that read as "the explosion did nothing" in a duel, where there is
       // nobody else for the splash to catch (a legendary Supernova was just
@@ -2951,6 +2957,7 @@
         if (f.life <= 0) resolveLightningStrike(f.x);
         continue;
       }
+      if (f.type === "boom") continue;   // drawn only; its damage already landed
       // Lemonade Stand: a stationary fizz that heals anyone inside, owner too
       if (f.type === "heal") {
         for (const p of players) {
@@ -4944,7 +4951,32 @@
     const t = world.time;
     for (const b of bullets) {
       ctx.save();
-      if (b.golden || b.empowered) { ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 16; }
+      if (b.golden || b.empowered) {
+        // the golden shot announces itself: hard glow plus a sparkle trail
+        ctx.shadowColor = "#ffd700";
+        ctx.shadowBlur = 26 + Math.sin(t * 24) * 8;
+        if (Math.random() < 0.9) {
+          const a = Math.random() * Math.PI * 2, rr = b.r * rand(0.6, 1.8);
+          particles.push({
+            x: b.x + Math.cos(a) * rr, y: b.y + Math.sin(a) * rr,
+            vx: rand(-28, 28) - b.vx * 0.05, vy: rand(-28, 28) - b.vy * 0.05,
+            life: rand(0.45, 0.8), maxLife: 0.8, r: rand(1.8, 3.6),
+            color: Math.random() < 0.5 ? "#fff3b0" : "#ffd700", spark: true
+          });
+        }
+      }
+      // a big charge flies as a white-hot core with a corona (Supernova)
+      if (b.explosive >= 2) {
+        ctx.shadowColor = "#fff0c0";
+        ctx.shadowBlur = 30 + Math.sin(t * 20) * 10;
+        if (Math.random() < 0.5) {
+          particles.push({
+            x: b.x + rand(-6, 6), y: b.y + rand(-6, 6),
+            vx: rand(-40, 40), vy: rand(-40, 40),
+            life: 0.3, maxLife: 0.3, r: rand(1.5, 3.5), color: "#ffe9a8", spark: true
+          });
+        }
+      }
       if (b.meteor) { ctx.shadowColor = "#ff9e3d"; ctx.shadowBlur = 20; }
       // helium shots trail tiny rising bubbles; a returning boomerang glints
       if (b.gravity < 0 && Math.random() < 0.25) {
@@ -4956,6 +4988,20 @@
       // grown bullets read bigger the farther they've flown
       const growF = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 1300) : 1;
       const r = b.r * growF;
+      if (b.explosive >= 2) {
+        // white-hot centre, hot rim, so it reads as a star and not a pellet
+        const cg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.9);
+        cg.addColorStop(0, "rgba(255,255,255,1)");
+        cg.addColorStop(0.45, "rgba(255,240,190,0.95)");
+        cg.addColorStop(0.75, "rgba(255,170,70,0.55)");
+        cg.addColorStop(1, "rgba(255,120,40,0)");
+        ctx.fillStyle = cg;
+        ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.72, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        continue;
+      }
       const ang = Math.atan2(b.vy, b.vx);
       ctx.fillStyle = b.color;
       ctx.strokeStyle = "#15121c";
@@ -5058,6 +5104,38 @@
           ctx.beginPath();
           ctx.arc(0, 0, 24 + i * 26, i * 2, i * 2 + Math.PI * 1.3);
           ctx.stroke();
+        }
+        ctx.restore();
+      } else if (f.type === "boom") {
+        // A detonation you cannot miss: white core, a bloom of hot colour and
+        // two expanding shockwave spheres, all sized by the charge.
+        const k = 1 - Math.max(0, f.life) / 0.5;         // 0 at the flash, 1 at the end
+        const R = f.r * (0.25 + k * 0.95);
+        ctx.save();
+        const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
+        g.addColorStop(0, `rgba(255,255,255,${(1 - k) * 0.95})`);
+        g.addColorStop(0.35, `rgba(255,226,150,${(1 - k) * 0.7})`);
+        g.addColorStop(0.7, `rgba(255,140,50,${(1 - k) * 0.4})`);
+        g.addColorStop(1, "rgba(255,90,30,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.9})`;
+        ctx.lineWidth = 5 * (1 - k) + 1;
+        ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = `rgba(255,190,90,${(1 - k) * 0.55})`;
+        ctx.lineWidth = 3 * (1 - k) + 1;
+        ctx.beginPath(); ctx.arc(f.x, f.y, R * 0.62, 0, Math.PI * 2); ctx.stroke();
+        // spikes of light for the really big bangs
+        if (f.power >= 1.5) {
+          ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.5})`;
+          ctx.lineWidth = 2;
+          for (let i = 0; i < 8; i += 1) {
+            const a = (i / 8) * Math.PI * 2 + k;
+            ctx.beginPath();
+            ctx.moveTo(f.x + Math.cos(a) * R * 0.5, f.y + Math.sin(a) * R * 0.5);
+            ctx.lineTo(f.x + Math.cos(a) * R * 1.25, f.y + Math.sin(a) * R * 1.25);
+            ctx.stroke();
+          }
         }
         ctx.restore();
       } else if (f.type === "heal") {
@@ -5385,6 +5463,7 @@
       // sparks and debris fall; fire and smoke are buoyant and rise instead
       if (p.smoke) { p.vy -= 60 * dt; p.vx *= Math.pow(0.9, dt * 60); }
       else if (p.flame) p.vy -= 130 * dt;
+      else if (p.spark) { p.vx *= Math.pow(0.94, dt * 60); p.vy = p.vy * Math.pow(0.94, dt * 60) + 40 * dt; }
       else p.vy += 360 * dt;
     }
     particles = particles.filter(p => p.life > 0);
@@ -5414,6 +5493,17 @@
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r * a * 0.5, 0, Math.PI * 2);
         ctx.fill();
+        continue;
+      }
+      if (p.spark) {
+        ctx.save();
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * (0.4 + a * 0.8), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
         continue;
       }
       ctx.fillStyle = p.color;

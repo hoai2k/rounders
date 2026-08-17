@@ -512,11 +512,11 @@
     // ---------------------------------------------------------- LEGENDARY (5)
     card("supernova", "Supernova", "legendary",
       "Astronomers hate this one trick.",
-      "Every bullet detonates in a huge explosion and hits far harder. Reloads are slow.",
-      ["huge explosion on hit", "+30% damage", "+0.3s reload"], ["aoe", "damage"],
+      "Fire fat white-hot slugs that detonate in a colossal blast and hit twice as hard. Reloads are slow.",
+      ["colossal explosion on hit", "+100% damage", "+50% bullet size", "+0.3s reload"], ["aoe", "damage"],
       // the biggest bang in the set: it must out-hit epic Party Favor, whose
       // point-blank shards otherwise stack past it
-      p => { p.stats.explosive += 2.8; p.stats.damage *= 1.3; p.stats.reload += 0.3; }),
+      p => { p.stats.explosive += 2.8; p.stats.damage *= 2; p.stats.bulletSize *= 1.5; p.stats.reload += 0.3; }),
 
     card("golden-gun", "Golden Gun", "legendary",
       "The first word is the last word.",

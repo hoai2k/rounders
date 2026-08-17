@@ -93,7 +93,8 @@
       color: st.goldenShot ? "#ffd700" : "#ff5277",
       golden: Boolean(st.goldenShot),
       pierce: st.pierce > 0, wallPierce: st.wallPierce > 0, holePunch: st.holePunch > 0,
-      explosive: st.explosive > 0, burn: on("burn"), poison: on("poison"), chill: on("chill"),
+      explosive: st.explosive > 0, explosivePower: st.explosive,
+      burn: on("burn"), poison: on("poison"), chill: on("chill"),
       chain: on("chain"), homing: on("homing") || on("steer"), grow: on("grow"),
       helium: on("helium"), boomerang: on("boomerang"), stink: on("stink"),
       voidPull: on("voidPull"), shards: st.shards > 0, bounces: st.bounces > 0,
@@ -725,6 +726,7 @@
       // fields
       for (const f of fields) {
         f.life -= dt;
+        if (f.type === "boom") continue;     // visual only
         if (f.type === "heal") { const o = f.owner; if (Math.hypot(o.x - f.x, o.y - f.y) < f.r) heal(o, f.hps * dt); }
         if (f.type === "saw") {
           f.angle += dt * 7;
@@ -801,6 +803,7 @@
           }
         }
         fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: radius, life: 0.22 });
+        fields.push({ type: "boom", owner: b.owner, x: b.x, y: b.y, r: radius * 1.5, life: 0.5, power: b.explosive });
         puff(b.x, b.y, "#ff9e3d", 26, 420);
       }
       if (b.shards && !b.isShard) {
@@ -957,6 +960,30 @@
         } else if (f.type === "stink") {
           ctx.fillStyle = `rgba(110,190,60,${0.22 * Math.min(1, f.life)})`;
           ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
+        } else if (f.type === "boom") {
+          const k = 1 - Math.max(0, f.life) / 0.5;
+          const R = f.r * (0.25 + k * 0.95);
+          const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
+          g.addColorStop(0, `rgba(255,255,255,${(1 - k) * 0.95})`);
+          g.addColorStop(0.35, `rgba(255,226,150,${(1 - k) * 0.7})`);
+          g.addColorStop(0.7, `rgba(255,140,50,${(1 - k) * 0.4})`);
+          g.addColorStop(1, "rgba(255,90,30,0)");
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.9})`;
+          ctx.lineWidth = 5 * (1 - k) + 1;
+          ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, Math.PI * 2); ctx.stroke();
+          if (f.power >= 1.5) {
+            ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.5})`;
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 8; i += 1) {
+              const a2 = (i / 8) * Math.PI * 2 + k;
+              ctx.beginPath();
+              ctx.moveTo(f.x + Math.cos(a2) * R * 0.5, f.y + Math.sin(a2) * R * 0.5);
+              ctx.lineTo(f.x + Math.cos(a2) * R * 1.25, f.y + Math.sin(a2) * R * 1.25);
+              ctx.stroke();
+            }
+          }
         } else if (f.type === "nova") {
           const k = 1 - Math.max(0, f.life) / 0.5;
           ctx.save();
@@ -1024,10 +1051,36 @@
       const tRot = tweak && tweak.rotation ? tweak.rotation * Math.PI / 180 : 0;
       for (const b of bullets) {
         ctx.save();
-        if (b.golden || b.empowered) { ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 12; }
+        if (b.golden || b.empowered) {
+          ctx.shadowColor = "#ffd700";
+          ctx.shadowBlur = 22;
+          if (Math.random() < 0.8) {
+            const ang = Math.random() * Math.PI * 2, rr = b.r * rand(0.6, 1.8);
+            parts.push({
+              x: b.x + Math.cos(ang) * rr, y: b.y + Math.sin(ang) * rr,
+              vx: rand(-24, 24), vy: rand(-24, 24),
+              life: 0.6, max: 0.6, r: rand(1.8, 3.4),
+              color: Math.random() < 0.5 ? "#fff3b0" : "#ffd700", spark: true
+            });
+          }
+        }
+        if (b.explosive >= 2) { ctx.shadowColor = "#fff0c0"; ctx.shadowBlur = 26; }
         ctx.fillStyle = b.color; ctx.strokeStyle = "#15121c"; ctx.lineWidth = 2;
         const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 600) : 1;
         const r = b.r * gr * tScale;
+        if (b.explosive >= 2) {
+          const cg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.9);
+          cg.addColorStop(0, "rgba(255,255,255,1)");
+          cg.addColorStop(0.45, "rgba(255,240,190,0.95)");
+          cg.addColorStop(0.75, "rgba(255,170,70,0.55)");
+          cg.addColorStop(1, "rgba(255,120,40,0)");
+          ctx.fillStyle = cg;
+          ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.9, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.72, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+          continue;
+        }
         if (tRot || b.art) {
           // a tweaked round is drawn in its own frame, turned to its flight
           // path plus the tweak, so rotation is visible on a moving bullet
@@ -1123,7 +1176,41 @@
       ctx.restore();
       return;
     }
-    if (spec.golden || spec.explosive) { ctx.shadowColor = spec.golden ? "#ffd700" : "#ff7a3d"; ctx.shadowBlur = 14; }
+    // a colossal charge is drawn as the white-hot star it is
+    if (spec.explosivePower >= 2) {
+      ctx.shadowColor = "#fff0c0"; ctx.shadowBlur = 26;
+      const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.9);
+      cg.addColorStop(0, "rgba(255,255,255,1)");
+      cg.addColorStop(0.45, "rgba(255,240,190,0.95)");
+      cg.addColorStop(0.75, "rgba(255,170,70,0.55)");
+      cg.addColorStop(1, "rgba(255,120,40,0)");
+      ctx.fillStyle = cg;
+      ctx.beginPath(); ctx.arc(0, 0, r * 1.9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      return;
+    }
+    if (spec.golden) {
+      // the golden round, gleaming, with its sparkle halo
+      ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 22;
+      ctx.fillStyle = "#ffd700";
+      ctx.strokeStyle = "#8a6200"; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath(); ctx.arc(-r * 0.3, -r * 0.3, r * 0.32, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#fff3b0";
+      for (let i = 0; i < 6; i += 1) {
+        const a2 = (i / 6) * Math.PI * 2 + 0.4;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a2) * r * 1.7, Math.sin(a2) * r * 1.7, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      return;
+    }
+    if (spec.explosive) { ctx.shadowColor = "#ff7a3d"; ctx.shadowBlur = 14; }
     const color = spec.burn ? "#ff9e3d" : spec.poison ? "#63d43a" : spec.chill ? "#8fd8ff" : spec.color;
     ctx.fillStyle = color;
     ctx.strokeStyle = "#15121c";

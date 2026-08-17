@@ -157,6 +157,15 @@ Pillars:
       drops to 27% HP, snaps back 138px, recovers to 99%)
 - [x] **Detail pane shows the card face** again — the two-pane rewrite had left
       the right-hand side text-only, so the selected card had no artwork
+- [x] **Supernova & Golden Gun made to look the part 2026-08-17**: Supernova
+      now +100% damage and +50% bullet size, flying as a white-hot star (white
+      core, hot corona, sparking) and detonating in a real blast — a white
+      flash blooming into expanding shockwave spheres with spikes of light,
+      scaled by charge (new visual-only `boom` field). Golden Gun's first
+      round gleams hard and trails golden sparkles. New buoyant `spark`
+      particle kind (drifts rather than falling). All mirrored in the preview
+      sim and the bullet viewer; painted rounds for both are already requested
+      in `image-requests.md` §2
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

@@ -57,6 +57,14 @@ Pillars:
       (low-HP speed), guardian save, golden first shot, kill-heal, storm block,
       warp block, 3 active Mythic abilities (Starfall Protocol, Event Horizon, Chronoshift)
 - [x] File: `js/cards.js`
+- [x] **Card gap audit vs ROUNDS** (`CARD-GAP-AUDIT.md`): all 67 vanilla ROUNDS
+      cards mapped against our 55 — ~40 covered, structural gaps identified
+      (block depth, reload economy, triggered buffs, area denial, steered
+      bullets, knockback offense); 12 gap-closing cards proposed (55 → 67) plus
+      10 original beyond-ROUNDS ideas. Implementation not started
+- [ ] Implement the 12 proposed cards from `CARD-GAP-AUDIT.md` §4 (needs new
+      stats: `kbDeal`, zone entities, empower/steered-bullet flags) + art
+      prompts in `image-requests.md` + balance pass
 
 ### 3. Arena system — 25 levels with themes & personality
 - [x] Level schema: name, theme blurb, full palette (sky gradient, platform colors,

@@ -143,6 +143,20 @@ Pillars:
       meteor trails, incendiary rounds in flight, Firecracker Heels, and
       contact with *hot* hazards only — the arena's own hazard colour decides,
       so lava burns and ice spikes don't. Mirrored in the preview sim
+- [x] **Mythic / block previews made legible 2026-08-17**: three staging bugs,
+      not just faint drawing — Event Horizon's +10% health tripped the
+      "defensive" test, so the caster became the *target* and the black hole
+      spawned on itself (fields skip their owner, so it pulled nobody); Crown
+      of Storms' 170px nova fired with the attacker 425px away; Chronoshift
+      merely healed. Now: a Mythic's caster holds its own preview (Chronoshift
+      excepted — it takes the fire), block effects with a radius stage the
+      fighters close enough to be caught, the vortex opens between the two and
+      hauls the victim in, the nova is a crown of forked bolts with an
+      expanding ring, and Chronoshift walks in under fire then snaps back with
+      a ghost + "◀ 2s" trail and the health restored (measured: walks 212px,
+      drops to 27% HP, snaps back 138px, recovers to 99%)
+- [x] **Detail pane shows the card face** again — the two-pane rewrite had left
+      the right-hand side text-only, so the selected card had no artwork
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

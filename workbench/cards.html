@@ -100,6 +100,12 @@
         overflow-y: auto;
         padding: 14px 18px 40px;
       }
+      /* the selected card, shown large with its own art, beside its details */
+      .cw-detail { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 12px; }
+      .cw-facewrap { flex: none; width: clamp(150px, 15vw, 210px); --cardw: 100%; }
+      .cw-facewrap .card { margin: 0; width: 100%; animation: none; transform: none; cursor: default; }
+      .cw-facewrap .card-desc { -webkit-line-clamp: unset; overflow: visible; }
+      .cw-detail-text { flex: 1; min-width: 0; }
       .cw-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
       .cw-head h2 { margin: 0; font-size: 20px; color: var(--rcol, #fff); }
       .cw-head .cw-rar {
@@ -155,9 +161,14 @@
       </aside>
 
       <section class="cw-view">
-        <div class="cw-head" id="head"></div>
-        <p class="cw-desc" id="desc"></p>
-        <div class="cw-pills" id="pills"></div>
+        <div class="cw-detail">
+          <div class="cw-facewrap" id="face"></div>
+          <div class="cw-detail-text">
+            <div class="cw-head" id="head"></div>
+            <p class="cw-desc" id="desc"></p>
+            <div class="cw-pills" id="pills"></div>
+          </div>
+        </div>
 
         <div class="cw-prev-head">
           <strong>Preview</strong>
@@ -279,6 +290,8 @@
             `<h2>${c.name}</h2><span class="cw-rar">${rar.name}</span>` +
             `<em>${c.tagline}</em>` +
             `<span class="cw-count">${index + 1} / ${visible().length}${c.tags && c.tags.length ? " · " + c.tags.join(", ") : ""}</span>`;
+          // the card face itself, exactly as the game draws it
+          document.getElementById("face").innerHTML = cardHtml(c);
           descEl.textContent = c.description;
           pillsEl.innerHTML = c.effects.map(s => `<span>${s}</span>`).join("");
 

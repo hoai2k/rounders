@@ -123,11 +123,20 @@
 
     // Who holds the card decides who we point the camera at: a shield or block
     // power is shown on the RECEIVER, taking fire and surviving it.
-    const holder = (blocky || defensive) && !on("empowerBlock") ? "target" : "shooter";
+    // A Mythic's caster is the star of its own preview. Chronoshift is the
+    // exception: it has to be the one taking fire for the rewind to mean
+    // anything, so it holds the card on the receiving end.
+    let holder;
+    if (s.active) holder = s.active === "chronoshift" ? "target" : "shooter";
+    else holder = (blocky || defensive) && !on("empowerBlock") ? "target" : "shooter";
 
     const plan = {
       card, stats: s, base: b, holder,
       wall: false, secondTarget: false, aimUp: 0, blockDemo: blocky,
+      // effects that go off AROUND the blocker need someone standing in them,
+      // or the nova fires into empty air and reads as nothing happening
+      close: on("stormBlock") || on("blockPush") || on("frostBlock") ||
+        on("sawBlock") || on("reloadPulse") || on("chillAura") || on("jumpBlast"),
       movementDemo: movement && !blocky && !defensive && holder === "shooter",
       watch
     };
@@ -188,7 +197,10 @@
     if (s.maxHp > b.maxHp * 1.02) watch.push("a longer health bar");
     if (s.fireDelay < b.fireDelay * 0.98 || s.maxAmmo > b.maxAmmo) watch.push("faster, fuller volleys");
     if (s.bulletSpeed > b.bulletSpeed * 1.05) watch.push("a flatter, faster shot");
-    if (s.active) watch.push("the ability fires on its own here");
+    if (s.active === "eventHorizon") watch.unshift("the black hole opens beside them and drags them in, crushing as it goes");
+    else if (s.active === "chronoshift") watch.unshift("they take fire, then rewind to where they stood 2s ago and get the health back");
+    else if (s.active === "starfall") watch.unshift("a volley of meteors comes down on them");
+    else if (s.active) watch.unshift("the ability fires on its own here");
     if (movement) watch.push("the fighter runs and jumps so the movement reads");
 
     if (!watch.length) watch.push("the numbers on the card, applied to a real exchange");
@@ -229,7 +241,7 @@
     function reset() {
       const holderIsTarget = plan.holder === "target";
       a = makeFighter(120, !holderIsTarget, "#ff5277", chA, 1);
-      bb = makeFighter(plan.wall ? 600 : 545, holderIsTarget, "#52d7ff", chB, -1);
+      bb = makeFighter(plan.wall ? 600 : plan.close ? 300 : 545, holderIsTarget, "#52d7ff", chB, -1);
       a.temp = a.holder ? a.stats.maxHp * a.stats.freshCoat : 0;
       bb.temp = bb.holder ? bb.stats.maxHp * bb.stats.freshCoat : 0;
       bullets = []; fields = []; parts = []; floaters = []; decoys = []; slabs = [];
@@ -395,9 +407,21 @@
       if (st.frostBlock) { for (const e of enemies(who)) if (Math.hypot(e.x - x, e.y - y) < 150) e.chillT = 2.5; puff(x, y, "#8fd8ff", 16, 240); }
       if (st.healField) fields.push({ type: "heal", owner: who, x, y, r: 86, life: 3, hps: 10 * st.healField });
       if (st.stormBlock) {
+        // a crown of lightning: a bright ring plus forked bolts to everyone in
+        // it, held long enough to actually see
+        fields.push({ type: "nova", owner: who, x, y, r: 170, life: 0.5 });
+        for (let i = 0; i < 9; i += 1) {
+          const ang = (i / 9) * Math.PI * 2;
+          parts.push({
+            bolt: true, x1: x, y1: y,
+            x2: x + Math.cos(ang) * 150, y2: y + Math.sin(ang) * 150,
+            life: 0.32, max: 0.32, color: "#ffe95e"
+          });
+        }
         for (const e of enemies(who)) if (Math.hypot(e.x - x, e.y - y) < 170) {
-          parts.push({ bolt: true, x1: x, y1: y, x2: e.x, y2: e.y, life: 0.25, max: 0.25, color: "#ffe95e" });
+          parts.push({ bolt: true, x1: x, y1: y, x2: e.x, y2: e.y, life: 0.45, max: 0.45, color: "#fff6a8" });
           damage(e, 30, who, e.x - x, e.y - y - 60, false);
+          float(e.x, e.y - 60, "ZAP", "#ffe95e");
         }
       }
     }
@@ -424,6 +448,11 @@
       t += dt;
       for (const who of [a, bb]) {
         who.queue = who.queue || [];
+        // 2 seconds of position history, so Chronoshift has somewhere to go
+        who.past = who.past || [];
+        who.past.push({ x: who.x, y: who.y });
+        if (who.past.length > Math.round(2 / (1 / 60))) who.past.shift();
+        if (who.rewind) { who.rewind.life -= dt; if (who.rewind.life <= 0) who.rewind = null; }
         who.fireT = Math.max(0, who.fireT - dt);
         who.blockT = Math.max(0, who.blockT - dt);
         who.blockCd = Math.max(0, who.blockCd - dt);
@@ -493,6 +522,13 @@
       // --- scripted beats -------------------------------------------------
       const shooter = plan.holder === "target" ? a : a;   // A always shoots
       const victim = bb;
+      // Chronoshift needs a path worth undoing: its holder walks in while
+      // taking fire, so the rewind visibly snaps them back to where they stood
+      if (plan.stats.active === "chronoshift" && !plan._active) {
+        const h = plan.holder === "target" ? bb : a;
+        const foe = enemies(h)[0];
+        h.vx += Math.sign(foe.x - h.x) * h.stats.speed * SCALE * dt * 3.2;
+      }
       if (plan.movementDemo) {
         // the holder runs and hops so speed / jump / stomp read on screen
         const h = plan.holder === "target" ? bb : a;
@@ -509,11 +545,37 @@
         if (inc && bb.blockCd <= 0) doBlock(bb);
       }
       // a mythic active fires itself once, mid-cycle
-      if (plan.stats.active && !plan._active && t > 1.4) {
+      const activeHolder = plan.holder === "target" ? bb : a;
+      const activeReady = plan.stats.active === "chronoshift"
+        ? (activeHolder.hp < activeHolder.maxHp * 0.7 || t > 3.4)
+        : t > 1.4;
+      if (plan.stats.active && !plan._active && activeReady) {
         plan._active = true;
         const who = plan.holder === "target" ? bb : a;
-        if (plan.stats.active === "eventHorizon") fields.push({ type: "void", owner: who, x: victim.x, y: victim.y - 20, r: 120, life: 2.4 });
-        else if (plan.stats.active === "chronoshift") { heal(who, 35); who.x -= who.facing * 90; puff(who.x, who.y, "#8fd8ff", 20, 300); float(who.x, who.y - 56, "REWIND +35", "#8fd8ff"); }
+        if (plan.stats.active === "eventHorizon") {
+          // opened on the OTHER fighter, off to their far side, so they are
+          // visibly hauled across the floor into it and crushed
+          const foe = enemies(who)[0];
+          // opened between the two of them (and kept fully in frame), so the
+          // victim is hauled bodily across the floor into it
+          fields.push({
+            type: "void", owner: who,
+            x: Math.max(180, Math.min(W - 180, (who.x + foe.x) / 2 + 70)),
+            y: foe.y - 30,
+            r: 165, life: 3
+          });
+          float(foe.x, foe.y - 70, "EVENT HORIZON", "#c88fff");
+        } else if (plan.stats.active === "chronoshift") {
+          // rewind to where they stood 2s ago, leaving a ghost trail of the
+          // path being undone, and give the health back
+          const past = who.past && who.past[0];
+          who.rewind = { from: { x: who.x, y: who.y }, to: past ? { x: past.x, y: past.y } : { x: who.x, y: who.y }, life: 0.9 };
+          if (past) { who.x = past.x; who.y = past.y; who.vx = 0; who.vy = 0; }
+          heal(who, 35);
+          who.blockT = Math.max(who.blockT, 0.4);   // brief grace, as in game
+          puff(who.x, who.y, "#8fd8ff", 24, 340);
+          float(who.x, who.y - 62, "REWIND +35", "#8fd8ff");
+        }
         else for (let i = 0; i < 5; i += 1) bullets.push({
           owner: who, x: victim.x + (i - 2) * 34, y: -20 - i * 30, ox: 0, oy: 0,
           vx: 0, vy: 420, r: 9, damage: 34, gravity: 300 * SCALE, life: 4,
@@ -676,10 +738,28 @@
           const d = Math.hypot(who.x - f.x, who.y - f.y);
           if (d < f.r) { who.vx += ((who.x - f.x) / (d || 1)) * 900 * SCALE * dt; who.vy -= 120 * SCALE * dt; }
         }
-        if (f.type === "void" || f.type === "vortex") for (const who of [a, bb]) {
-          if (who === f.owner) continue;
-          const dx = f.x - who.x, dy = f.y - who.y, d = Math.hypot(dx, dy) || 1;
-          if (d < f.r) { who.vx += (dx / d) * 700 * SCALE * dt; who.vy += (dy / d) * 500 * SCALE * dt; who.hp = Math.max(1, who.hp - 12 * dt); }
+        if (f.type === "void" || f.type === "vortex") {
+          for (const who of [a, bb]) {
+            if (who === f.owner) continue;
+            const dx = f.x - who.x, dy = f.y - who.y, d = Math.hypot(dx, dy) || 1;
+            if (d < f.r) {
+              // hard enough to actually drag them off their feet
+              who.vx += (dx / d) * 2600 * SCALE * dt;
+              who.vy += (dy / d) * 1500 * SCALE * dt - 260 * SCALE * dt;
+              who.hp = Math.max(1, who.hp - 16 * dt);
+              if (Math.random() < dt * 8) float(who.x, who.y - 40, "-" + Math.round(16 * 0.5), "#c88fff");
+            }
+          }
+          // debris spiralling in, so the pull is legible even with nobody near
+          if (Math.random() < dt * 40) {
+            const ang = rand(0, Math.PI * 2), rr = f.r * rand(0.55, 1);
+            parts.push({
+              x: f.x + Math.cos(ang) * rr, y: f.y + Math.sin(ang) * rr,
+              vx: -Math.cos(ang) * 180 - Math.sin(ang) * 120,
+              vy: -Math.sin(ang) * 180 + Math.cos(ang) * 120,
+              life: 0.5, max: 0.5, r: rand(1.5, 3.5), color: "#d8a8ff", spark: true
+            });
+          }
         }
         if (f.type === "stink") for (const e of enemies(f.owner)) {
           if (Math.hypot(e.x - f.x, e.y - f.y) < f.r) { e.chillT = 0.5; e.poisonT = 0.6; e.dotDps = 8 * f.stink; }
@@ -692,6 +772,7 @@
         p.x += p.vx * dt; p.y += p.vy * dt;
         if (p.smoke) { p.vy -= 55 * dt; p.vx *= Math.pow(0.9, dt * 60); }
         else if (p.flame) p.vy -= 120 * dt;
+        else if (p.spark) { /* vortex debris flies its own way */ }
         else p.vy += 400 * dt;
       }
       parts = parts.filter(p => p.life > 0);
@@ -849,12 +930,43 @@
           }
           ctx.closePath(); ctx.fill(); ctx.restore();
         } else if (f.type === "void" || f.type === "vortex") {
+          const a01 = Math.min(1, f.life);
           const rg = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
-          rg.addColorStop(0, "rgba(10,5,20,0.9)"); rg.addColorStop(0.6, "rgba(140,60,220,0.35)"); rg.addColorStop(1, "rgba(120,40,200,0)");
-          ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
+          rg.addColorStop(0, "rgba(6,3,14,0.96)");
+          rg.addColorStop(0.35, "rgba(90,30,170,0.55)");
+          rg.addColorStop(0.7, `rgba(150,70,230,${0.3 * a01})`);
+          rg.addColorStop(1, "rgba(120,40,200,0)");
+          ctx.fillStyle = rg;
+          ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
+          // spinning accretion arcs
+          ctx.save();
+          ctx.translate(f.x, f.y);
+          ctx.rotate(t * 3.4);
+          ctx.strokeStyle = `rgba(216,168,255,${0.75 * a01})`;
+          for (let i = 0; i < 3; i += 1) {
+            ctx.lineWidth = 3 - i * 0.6;
+            ctx.beginPath();
+            ctx.arc(0, 0, f.r * (0.3 + i * 0.2), i * 1.9, i * 1.9 + Math.PI * 1.25);
+            ctx.stroke();
+          }
+          ctx.restore();
+          // hard event-horizon rim
+          ctx.strokeStyle = `rgba(255,255,255,${0.5 * a01})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 0.3, 0, Math.PI * 2); ctx.stroke();
         } else if (f.type === "stink") {
           ctx.fillStyle = `rgba(110,190,60,${0.22 * Math.min(1, f.life)})`;
           ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
+        } else if (f.type === "nova") {
+          const k = 1 - Math.max(0, f.life) / 0.5;
+          ctx.save();
+          ctx.strokeStyle = `rgba(255,233,94,${(1 - k) * 0.95})`;
+          ctx.lineWidth = 6 * (1 - k) + 1.5;
+          ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (0.25 + k * 0.85), 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.7})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (0.25 + k * 0.7), 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
         } else if (f.type === "push") {
           ctx.strokeStyle = `rgba(255,255,255,${0.35 * Math.min(1, f.life / 0.25)})`; ctx.lineWidth = 4;
           ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1.2 - f.life), 0, Math.PI * 2); ctx.stroke();
@@ -870,8 +982,26 @@
       for (const p of parts) {
         const al = p.life / p.max;
         if (p.bolt) {
-          ctx.strokeStyle = p.color; ctx.globalAlpha = al; ctx.lineWidth = 2.5;
-          ctx.beginPath(); ctx.moveTo(p.x1, p.y1); ctx.lineTo(p.x2, p.y2); ctx.stroke(); ctx.globalAlpha = 1;
+          // forked, with a glow, so a zap reads at a glance
+          ctx.save();
+          ctx.globalAlpha = al;
+          ctx.shadowColor = p.color; ctx.shadowBlur = 10;
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 3.5;
+          ctx.beginPath();
+          ctx.moveTo(p.x1, p.y1);
+          const segs = 4;
+          for (let i = 1; i < segs; i += 1) {
+            const k = i / segs;
+            const mx = p.x1 + (p.x2 - p.x1) * k, my = p.y1 + (p.y2 - p.y1) * k;
+            const nx = -(p.y2 - p.y1), ny = p.x2 - p.x1;
+            const nl = Math.hypot(nx, ny) || 1;
+            const j = (i % 2 ? 1 : -1) * 9 * (1 - k);
+            ctx.lineTo(mx + (nx / nl) * j, my + (ny / nl) * j);
+          }
+          ctx.lineTo(p.x2, p.y2);
+          ctx.stroke();
+          ctx.restore();
         } else if (p.smoke) {
           ctx.globalAlpha = al * 0.55; ctx.fillStyle = p.color;
           ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.6 - al * 0.6), 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
@@ -910,6 +1040,33 @@
         } else {
           ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         }
+        ctx.restore();
+      }
+      // Chronoshift: the undone path, drawn as a fading ghost of the fighter
+      for (const who of [a, bb]) {
+        if (!who.rewind) continue;
+        const k = Math.max(0, who.rewind.life) / 0.9;
+        const { from, to } = who.rewind;
+        ctx.save();
+        ctx.strokeStyle = `rgba(143,216,255,${0.8 * k})`;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([7, 6]);
+        ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); ctx.stroke();
+        ctx.setLineDash([]);
+        // the ghost they left behind, where the damage happened
+        ctx.globalAlpha = 0.45 * k;
+        ctx.translate(from.x, from.y);
+        if (who.character && window.ROUNDERS.drawCharacter) {
+          window.ROUNDERS.drawCharacter(ctx, who.character, who.stats.radius, { t, aimX: who.aimX, aimY: 0 });
+        }
+        ctx.restore();
+        // an arrow head at the destination so the direction of the rewind reads
+        ctx.save();
+        ctx.globalAlpha = k;
+        ctx.fillStyle = "#8fd8ff";
+        ctx.font = "800 12px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("◀ 2s", (from.x + to.x) / 2, (from.y + to.y) / 2 - 34);
         ctx.restore();
       }
       drawFighter(a); drawFighter(bb);

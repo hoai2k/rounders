@@ -777,14 +777,24 @@
         : Math.max(0, Math.round(settings.rarityWeights[c.rarity] ?? 1));
       for (let i = 0; i < n; i += 1) weighted.push(c);
     }
+    // A pool smaller than the hand simply deals a smaller hand. Both draws
+    // below reject duplicates, so asking either for more distinct cards than
+    // exist would spin forever — Choose mode makes that easy to arrange.
+    const want = Math.min(count, bag.length);
     const picked = [];
-    while (picked.length < count && weighted.length) {
+    // Weighted draw without replacement: take a ticket, then strike every other
+    // ticket for that card so the pool genuinely shrinks each time round.
+    while (picked.length < want && weighted.length) {
       const candidate = weighted[Math.floor(Math.random() * weighted.length)];
-      if (!picked.includes(candidate)) picked.push(candidate);
+      picked.push(candidate);
+      for (let i = weighted.length - 1; i >= 0; i -= 1) if (weighted[i] === candidate) weighted.splice(i, 1);
     }
-    while (picked.length < count && bag.length) {
-      const candidate = bag[Math.floor(Math.random() * bag.length)];
-      if (!picked.includes(candidate)) picked.push(candidate);
+    // Every rarity rate can be dialled to zero, and in Choose mode they can be
+    // zero for everything left in the pool — deal the rest flat rather than
+    // hand back a short hand.
+    const rest = bag.filter(c => !picked.includes(c));
+    while (picked.length < want && rest.length) {
+      picked.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]);
     }
     return picked;
   }
@@ -3548,13 +3558,19 @@
 
   // menuNav() is edge-triggered — one move per press. This is the held state,
   // which is what an auto-repeating cursor needs.
+  //
+  // `pressed` is folded in alongside `keys` so a quick tap still counts: a key
+  // pressed and released between two frames never shows up as held, and would
+  // otherwise be swallowed. `pressed` only survives one frame, so a tap moves
+  // the cursor exactly once and never starts a repeat.
   function heldMenuDirection(pads) {
     let x = 0, y = 0;
+    const down = code => keys.has(code) || pressed.has(code);
     for (const sc of keyboardSchemes) {
-      if (keys.has(sc.right)) x = 1;
-      if (keys.has(sc.left)) x = -1;
-      if (keys.has(sc.down)) y = 1;
-      if (keys.has(sc.up)) y = -1;
+      if (down(sc.right)) x = 1;
+      if (down(sc.left)) x = -1;
+      if (down(sc.down)) y = 1;
+      if (down(sc.up)) y = -1;
     }
     for (const pad of pads) {
       const ax = axis(pad.axes[0]), ay = axis(pad.axes[1]);

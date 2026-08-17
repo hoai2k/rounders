@@ -36,7 +36,7 @@
     gun: {
       damage: 36,
       maxAmmo: 3,
-      fireDelay: 0.26,        // seconds between shots (lower = faster follow-ups)
+      fireDelay: 0.27,        // seconds between shots (lower = faster follow-ups)
       reload: 2.0,            // seconds to refill the whole clip once it's empty
       bulletSpeed: 1180,      // px/s
       bulletGravity: 1050,    // how much shots arc

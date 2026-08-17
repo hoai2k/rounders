@@ -65,19 +65,24 @@
         gap: 14px 12px;
         --cardw: 100%;
       }
+      /* Every card renders exactly as it does in game — full colour art, no
+         dimming. This is the tool you judge the artwork in, so the draft
+         hand's "unpicked cards sit back" treatment would be actively wrong
+         here; selection is carried by the ring and lift instead. */
       .cw-grid .card {
         margin: 0; width: 100%; animation: none;
         transform: none;
-        /* unpicked cards sit back, like the draft hand, so the current one pops */
-        filter: saturate(0.45) brightness(0.62);
-        opacity: 0.8;
       }
-      .cw-grid .card:hover { transform: translateY(-4px); filter: saturate(0.8) brightness(0.85); opacity: 0.95; }
+      .cw-grid .card:hover { transform: translateY(-4px); }
       .cw-grid .card.current {
-        filter: none; opacity: 1;
         border-color: #fff;
-        box-shadow: 0 0 0 2px #fff, 0 0 34px var(--rglow), 0 12px 26px rgba(0, 0, 0, 0.55);
-        transform: translateY(-2px);
+        box-shadow:
+          0 0 0 3px #fff,
+          0 0 0 7px color-mix(in srgb, var(--rcol) 55%, transparent),
+          0 0 40px var(--rglow),
+          0 14px 30px rgba(0, 0, 0, 0.6);
+        transform: translateY(-4px) scale(1.02);
+        z-index: 2;
       }
       .cw-grid .card.hidden-rarity { display: none; }
       .cw-rarity-head {

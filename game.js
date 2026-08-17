@@ -159,9 +159,10 @@
       radius: 27, pellets: 1, spread: 0.04,
       bounces: 0, explosive: 0, homing: 0, grow: 0, pierce: 0,
       poison: 0, burn: 0, chill: 0, chain: 0, shards: 0,
+      groundHug: 0, voidPull: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
-      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0,
+      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0,
       goldenShot: false, killHeal: false,
       active: null, activeCooldown: 10
     };
@@ -601,6 +602,9 @@
       p.pitBounces = 0;
       p.guardianCharges = p.stats.guardian;
       p.roundRevives = p.stats.revives;
+      p.shield = p.stats.shield;
+      p.shieldDelay = 0;
+      p.shieldFlash = 0;
       p.trail = [];
       p.spawnGrace = 1.6;
     });
@@ -1522,10 +1526,18 @@
       if (!hit) continue;
       const rx = hit.qx - s.x, ry = hit.qy - s.y;
       const svx = s.vx - s.va * ry, svy = s.vy + s.va * rx;
-      // a slab slamming down on a head hurts
-      if (hit.ny > 0.55 && svy - p.vy > 330 && p.slabGrace <= 0) {
-        hurt(p, clamp(14 + (svy - p.vy - 330) * 0.06, 14, 44), null, hit.nx * 220, 260);
-        p.slabGrace = 0.6;
+      // A slab slamming down hurts in proportion to how big it is and how
+      // fast it lands: a thin shelf dropping a short way is a bonk, a chunky
+      // block from height is a crush. Reference mass is a standard 220×24
+      // hung platform; damage only starts past a real falling speed.
+      const relDown = svy - p.vy;
+      if (hit.ny > 0.55 && relDown > 500 && p.slabGrace <= 0) {
+        const massF = clamp((s.w * s.h) / (220 * 24), 0.35, 2.4);
+        const dmg = clamp((relDown - 500) * 0.05 * massF, 0, 55);
+        if (dmg >= 5) {
+          hurt(p, dmg, null, hit.nx * 220, 260);
+          p.slabGrace = 0.6;
+        }
         wakeSlab(s);
       }
       p.x += hit.nx * hit.depth;
@@ -1653,6 +1665,15 @@
       }
       if (p.chillTimer > 0) p.chillTimer -= dt;
       if (p.stats.regen > 0) p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.regen * dt);
+      if (p.stats.shield > 0) {
+        p.shieldFlash = Math.max(0, p.shieldFlash - dt);
+        p.shieldDelay = Math.max(0, p.shieldDelay - dt);
+        if (p.shieldDelay <= 0 && p.shield < p.stats.shield) {
+          const was = p.shield;
+          p.shield = Math.min(p.stats.shield, p.shield + 26 * dt);
+          if (was <= 0 && p.shield > 0) puff(p.x, p.y - p.stats.radius, "#7fd8ff", 6);
+        }
+      }
 
       if (p.reloadTimer > 0) {
         p.reloadTimer -= dt;
@@ -1985,7 +2006,8 @@
         r: (5.5 + Math.min(9, p.stats.damage / 22)) * p.stats.bulletSize,
         damage: p.stats.damage * rageMul * (golden ? (pellets > 1 ? 2 : 3) : 1),
         life: 3.2,
-        gravity: p.stats.bulletGravity,
+        // seekers fly true: homing shots shrug off most of their drop
+        gravity: p.stats.bulletGravity * (p.stats.homing > 0 ? 0.4 : 1),
         drag: p.stats.bulletDrag,
         restitution: p.stats.bulletRestitution,
         bounces: p.stats.bounces + (currentLevel().bulletBounceBonus || 0),
@@ -1998,6 +2020,8 @@
         chain: p.stats.chain,
         shards: p.stats.shards,
         grow: p.stats.grow,
+        groundHug: p.stats.groundHug,
+        voidPull: p.stats.voidPull,
         golden,
         isShard: false,
         hitIds: new Set(),
@@ -2016,16 +2040,43 @@
     const wind = windForce();
     for (const b of bullets) {
       if (b.homing) {
+        // Steering, not a nudge: rotate the whole velocity toward the target
+        // at a turn rate set by the homing stat, keeping speed — so one card
+        // visibly curves shots and two make heat-seekers. (The old version
+        // added ~500 px/s² of side pull to an ~1100 px/s bullet: invisible.)
         const target = nearestEnemy(b);
         if (target) {
-          const dx = target.x - b.x, dy = target.y - b.y;
-          const mag = Math.hypot(dx, dy) || 1;
-          b.vx += (dx / mag) * b.homing * 520 * dt;
-          b.vy += (dy / mag) * b.homing * 520 * dt;
+          const cur = Math.atan2(b.vy, b.vx);
+          const want = Math.atan2(target.y - b.y, target.x - b.x);
+          let diff = want - cur;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          const maxTurn = Math.min(b.homing * 2.7, 6.5) * dt;
+          const a = cur + clamp(diff, -maxTurn, maxTurn);
+          const sp = Math.hypot(b.vx, b.vy);
+          b.vx = Math.cos(a) * sp;
+          b.vy = Math.sin(a) * sp;
         }
       }
       b.prevX = b.x; b.prevY = b.y;
-      b.vy += b.gravity * dt;
+      // ground-hugging bullets catch a surface below them and skim along it,
+      // kicking up dust — they drop off ledges and catch the next floor
+      if (b.groundHug && b.vy > -60) {
+        let caught = null;
+        for (const platform of plats) {
+          if (b.x < platform.x || b.x > platform.x + platform.w) continue;
+          const gap = platform.y - b.y;
+          if (gap > -6 && gap < 44 && (!caught || platform.y < caught.y)) caught = platform;
+        }
+        if (caught) {
+          const targetY = caught.y - b.r - 2;
+          b.y += (targetY - b.y) * Math.min(1, 14 * dt);
+          b.vy = 0;
+          b.hugging = true;
+          if (Math.random() < dt * 30) puffOne(b.x, caught.y, "rgba(255,255,255,0.5)");
+        } else b.hugging = false;
+      }
+      if (!b.hugging) b.vy += b.gravity * dt;
       if (wind) b.vx += wind * 0.9 * dt;
       let drag = Math.pow(b.drag, dt * 60);
       // Water drags a shot down hard: shooting across a pool is a real choice,
@@ -2161,6 +2212,15 @@
   }
 
   function explodeBullet(b) {
+    if (b.voidPull) {
+      // a pocket vortex: brief, hungry, and very visible
+      fields.push({
+        type: "blackhole", owner: b.owner, x: b.x, y: b.y,
+        r: 120 + b.voidPull * 40, life: 0.55 + b.voidPull * 0.25,
+        force: -(520 + b.voidPull * 260), dps: 4 + b.voidPull * 3
+      });
+      sfx("teleport");
+    }
     if (b.explosive) {
       fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: 95 + b.explosive * 20, life: 0.14, force: 760 });
       for (const p of players) {
@@ -2383,6 +2443,21 @@
 
   function applyDamage(p, amount, attacker) {
     p.hitFlash = Math.max(p.hitFlash || 0, amount >= 8 ? 0.2 : 0.16);
+    // a regenerating shield soaks damage before health (world-kill bypasses)
+    if (p.stats.shield > 0 && amount < 500) {
+      p.shieldDelay = 3.5;
+      if (p.shield > 0) {
+        const soaked = Math.min(p.shield, amount);
+        p.shield -= soaked;
+        amount -= soaked;
+        p.shieldFlash = 0.25;
+        if (p.shield <= 0) {
+          burst(p.x, p.y, "#7fd8ff", 20, 340);
+          sfx("block");
+        }
+        if (amount <= 0) return;
+      }
+    }
     const lethal = p.hp - amount <= 0;
     if (lethal && p.guardianCharges > 0 && amount < 500) {
       p.guardianCharges -= 1;
@@ -2434,7 +2509,7 @@
     for (const p of players) {
       if (!p.alive || p === b.owner || b.hitIds.has(p.id)) continue;
       const d = Math.hypot(p.x - b.x, p.y - b.y);
-      if (d < bestD && d < 650) { bestD = d; best = p; }
+      if (d < bestD && d < 900) { bestD = d; best = p; }
     }
     return best;
   }
@@ -3544,6 +3619,21 @@
         ctx.arc(0, 0, r + 15 + Math.sin(performance.now() / 45) * 3, 0, Math.PI * 2);
         ctx.stroke();
       }
+      // regenerating shield: a cyan bubble whose glow tracks its charge, with
+      // a hard flash when a hit lands on it
+      if (p.stats.shield > 0 && p.shield > 0) {
+        const frac = p.shield / p.stats.shield;
+        const flash = p.shieldFlash > 0 ? p.shieldFlash / 0.25 : 0;
+        ctx.strokeStyle = `rgba(127,216,255,${0.25 + frac * 0.35 + flash * 0.4})`;
+        ctx.lineWidth = 2.5 + flash * 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, r + 9 + Math.sin(world.time * 5) * 1.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(127,216,255,${0.05 + flash * 0.18})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, r + 9, 0, Math.PI * 2);
+        ctx.fill();
+      }
       // active ability ready
       if (p.stats.active && p.activeCooldown <= 0) {
         ctx.strokeStyle = "rgba(255,77,143,0.8)";
@@ -3601,6 +3691,20 @@
       ctx.roundRect(x + 2.5, y + 2, Math.max(1, (w - 5) * frac), 1.6, 1);
       ctx.fill();
     }
+    // shield charge rides as a thin cyan sliver above the health bar
+    if (p.stats.shield > 0) {
+      const sf = clamp(p.shield / p.stats.shield, 0, 1);
+      ctx.fillStyle = "rgba(30,50,70,0.7)";
+      ctx.beginPath();
+      ctx.roundRect(x, y - 5, w, 3.5, 2);
+      ctx.fill();
+      if (sf > 0) {
+        ctx.fillStyle = "#7fd8ff";
+        ctx.beginPath();
+        ctx.roundRect(x + 1, y - 4.4, Math.max(2, (w - 2) * sf), 2.4, 1.4);
+        ctx.fill();
+      }
+    }
     ctx.restore();
   }
 
@@ -3639,29 +3743,93 @@
     }
   }
 
+  // Every card effect a bullet carries should be readable on the bullet
+  // itself, so a loaded build LOOKS loaded mid-fight.
   function drawBullets() {
+    const t = world.time;
     for (const b of bullets) {
       ctx.save();
-      if (b.golden) {
-        ctx.shadowColor = "#ffd700";
-        ctx.shadowBlur = 16;
-      }
-      if (b.meteor) {
-        ctx.shadowColor = "#ff9e3d";
-        ctx.shadowBlur = 20;
-      }
+      if (b.golden) { ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 16; }
+      if (b.meteor) { ctx.shadowColor = "#ff9e3d"; ctx.shadowBlur = 20; }
+      if (b.explosive) { ctx.shadowColor = "#ff7a3d"; ctx.shadowBlur = 10 + Math.sin(t * 18) * 5; }
+      // grown bullets read bigger the farther they've flown
+      const growF = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 1300) : 1;
+      const r = b.r * growF;
+      const ang = Math.atan2(b.vy, b.vx);
       ctx.fillStyle = b.color;
       ctx.strokeStyle = "#15121c";
       ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      if (b.homing) {
-        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+      if (b.pierce > 0) {
+        // drill slugs are elongated along their flight
+        ctx.translate(b.x, b.y);
+        ctx.rotate(ang);
         ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r + 5, 0, Math.PI * 2);
+        ctx.roundRect(-r * 1.9, -r * 0.72, r * 3.8, r * 1.44, r * 0.7);
+        ctx.fill();
         ctx.stroke();
+        ctx.rotate(-ang);
+        ctx.translate(-b.x, -b.y);
+      } else {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      if (b.poison) {
+        ctx.strokeStyle = "rgba(122,220,60,0.85)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, r + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (b.chill) {
+        ctx.strokeStyle = "rgba(160,225,255,0.9)";
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i += 1) {
+          const a = t * 4 + (i / 3) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(b.x + Math.cos(a) * (r + 2), b.y + Math.sin(a) * (r + 2));
+          ctx.lineTo(b.x + Math.cos(a) * (r + 7), b.y + Math.sin(a) * (r + 7));
+          ctx.stroke();
+        }
+      }
+      if (b.chain) {
+        ctx.strokeStyle = "rgba(255,233,94,0.8)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        let px = b.x - Math.cos(ang) * (r + 12), py = b.y - Math.sin(ang) * (r + 12);
+        ctx.moveTo(px, py);
+        for (let i = 0; i < 3; i += 1) {
+          px += Math.cos(ang) * 5 + rand(-4, 4);
+          py += Math.sin(ang) * 5 + rand(-4, 4);
+          ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+      if (b.voidPull) {
+        ctx.strokeStyle = "rgba(180,92,255,0.7)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, r + 5 + Math.sin(t * 10) * 2, t * 3, t * 3 + Math.PI * 1.4);
+        ctx.stroke();
+      }
+      if (b.homing) {
+        // seeker ring + swept fins so the curve reads as guidance
+        ctx.strokeStyle = "rgba(255,255,255,0.45)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, r + 4, t * 6, t * 6 + Math.PI * 1.3);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        for (const side of [-1, 1]) {
+          const fa = ang + Math.PI + side * 0.55;
+          ctx.beginPath();
+          ctx.moveTo(b.x + Math.cos(ang + side * Math.PI / 2) * r * 0.7, b.y + Math.sin(ang + side * Math.PI / 2) * r * 0.7);
+          ctx.lineTo(b.x + Math.cos(fa) * (r + 8), b.y + Math.sin(fa) * (r + 8));
+          ctx.lineTo(b.x + Math.cos(ang + Math.PI) * r, b.y + Math.sin(ang + Math.PI) * r);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
       ctx.restore();
     }

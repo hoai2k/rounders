@@ -40,10 +40,18 @@ Pillars:
 - [x] `CLAUDE.md` — repo policy (merge to main when a task is done)
 - [x] This state document
 
-### 2. Card system — 52 cards, designed from scratch
+### 2. Card system — 55 cards, designed from scratch
 - [x] New card schema: id, name, rarity, tagline (flavor), description (plain-English
       explanation), effect list, tags, apply()
-- [x] 14 Common / 12 Uncommon / 10 Rare / 8 Epic / 5 Legendary / 3 Mythic = **52 cards**
+- [x] 14 Common / 13 Uncommon / 11 Rare / 9 Epic / 5 Legendary / 3 Mythic = **55 cards**
+- [x] **Power-card audit** (AUDIT.md §6): homing reworked from a feeble nudge to
+      real steering (visible curves, heat-seekers when stacked); three ROUNDS
+      gaps filled — Aegis Bubble (regenerating shield with bubble/absorb/break
+      visuals), Lowrider (ground-hugging bullets), Pocket Void (impacts open a
+      brief black hole); per-effect bullet tells (drill slugs, poison ring,
+      frost picks, crackling chain tail, swelling grow shots); every numeric
+      effect verified to stack on duplicate drafts; slab crush damage now
+      scales with slab mass and impact speed
 - [x] New combat mechanics to support them: burn DoT, chill (slow), pierce, chain
       lightning, shrapnel split, thorns, regen, rage (low-HP damage), adrenaline
       (low-HP speed), guardian save, golden first shot, kill-heal, storm block,

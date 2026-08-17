@@ -127,8 +127,18 @@ Pillars:
       Void (emblem + scene each). Verified on arrival — emblems are RGBA with
       transparent corners, so no `npm run intake` keying was needed; prompts
       moved to `image-requests-history.md` §9
-- [ ] **Art outstanding** (`image-requests.md`): 33 cards have no emblem or
-      scene at all, plus the bullet (29) and effect (18) batches
+- [x] **Art complete 2026-08-17** (`image-requests.md`): nothing outstanding.
+      All 77 shipping cards have an emblem and a scene, 29 painted bullets and
+      20 effect sheets are on disk. The last six files — `fx/angel.png`,
+      `fx/lemonade.png` and re-arts for Second Defence and Sawblade — landed
+      already transparent, so `npm run intake-art` filed them with nothing to
+      key; prompts moved to `image-requests-history.md` §11
+- [ ] **15 effect sheets are on disk with no call site**: `armor-plates`,
+      `bore-hole`, `chill-aura`, `dust-puff`, `explosion`, `explosion-big`,
+      `frost-burst`, `heal-field`, `lightning-arc`, `muzzle-flash`,
+      `shield-break`, `shield-bubble`, `shockwave-ring`, `storm-nova`,
+      `stun-stars`. Only `angel`, `black-hole`, `lemonade`, `poison-cloud` and
+      `sawblade` are drawn today — the rest are waiting on engine work, not art
 - [x] **Play-feel pass 2026-08-17**: Big Bore cut (a strictly worse
       Cannonball); Boxing Glove +300% knockback; Sugar Rush +100% speed;
       Longshot +100% bullet speed; Grasshopper is a hard launch (+38% jump
@@ -209,8 +219,8 @@ Pillars:
       card scenes are exempt since they are meant to be opaque. Painted rounds
       are now drawn in game (picked from the newest card a fighter holds that
       changes the bullet) and the delivered explosion sheets, black hole,
-      sawblade and poison cloud replace their procedural drawings. Only
-      `fx/angel.png` is still outstanding
+      sawblade and poison cloud replace their procedural drawings. `fx/angel.png`
+      and `fx/lemonade.png` followed in the final six-file drop
 - [x] **Controller badges on cards**: any card that only pays off when you
       press something wears the Xbox button in its corner — **LB** for the
       block family, **Y** for a Mythic ability, **A** for jump/float cards,
@@ -272,10 +282,12 @@ Pillars:
       is gone and the gap is simply empty space; what sells the break is a
       shower of ~30 wall-coloured tumbling chunks plus dust, thrown from
       `punchHole` itself so every bore throws debris whatever punched it
-- [x] **Second Defence needs new art**: the rename kept its files, which are a
-      tennis serve from when it was Second Serve. Re-requested in
-      `image-requests.md` §2. Breakthrough's painting already showed a fighter
-      smashing through a stone wall and needs nothing
+- [x] **Second Defence re-arted**: the rename kept its files, which were a
+      tennis serve from when it was Second Serve. Both were re-requested and
+      have now been replaced — the emblem and scene show a hexagonal shield
+      snapping back as the punch lands. Breakthrough's painting already showed a
+      fighter smashing through a stone wall and needed nothing. Sawblade got the
+      same treatment: its art no longer shows a blade on an orbital track
 - [x] **Card feel pass 2026-08-17 (5)**: **Mosh Pit renamed Sawblade**, and the
       blade no longer orbits — one huge disc centred on the fighter, spinning on
       its own axis, drawn behind them at the full radius it damages in and

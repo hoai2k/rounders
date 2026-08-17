@@ -117,7 +117,7 @@
   //   breaks — Map(level platform → {hp,max,dead}) for platforms with `breakable`
   //   hungs  — platforms suspended on shootable chains; cut every chain and they drop
   //   crates — pushable, shootable boxes players can climb and knock around
-  const props = { breaks: new Map(), hungs: [], crates: [] };
+  const props = { breaks: new Map(), hungs: [], crates: [], slabs: [] };
   let last = performance.now();
   let toastTimer = 0;
   let audioCtx = null;
@@ -245,9 +245,11 @@
         list.push({ ...p, vxDelta: 0, vyDelta: 0, breakRef: brk });
       }
     }
+    // Hung platforms are static while they hang; once every chain is cut they
+    // leave this list and live on as free-tumbling slabs (see updateSlabs).
     for (const hg of props.hungs) {
       if (hg.dead) continue;
-      list.push({ x: hg.x, y: hg.y, w: hg.w, h: hg.h, ice: hg.ice, vxDelta: 0, vyDelta: hg.falling ? hg.vy * world.lastStep : 0, isMover: hg.falling, hungRef: hg });
+      list.push({ x: hg.x, y: hg.y, w: hg.w, h: hg.h, ice: hg.ice, vxDelta: 0, vyDelta: 0, hungRef: hg });
     }
     for (const c of props.crates) {
       if (c.dead) continue;
@@ -1259,8 +1261,9 @@
     props.hungs = (level.hung || []).map(h => ({
       x: h.x, y: h.y, w: h.w, h: h.h, ice: h.ice, anchorY: h.anchorY || 0,
       chains: h.chains.map(cx => ({ x: cx, cut: false, cutAt: 0 })),
-      vy: 0, falling: false, settled: false, dead: false
+      dead: false
     }));
+    props.slabs = [];
     props.crates = (level.crates || []).map(c => ({
       x: c.x, y: c.y, w: c.s, h: c.s, vx: 0, vy: 0,
       hp: c.hp || 70, max: c.hp || 70, dead: false, grounded: false,
@@ -1281,7 +1284,7 @@
       }
       list.push(p);
     }
-    for (const hg of props.hungs) if (!hg.dead && !hg.falling) list.push(hg);
+    for (const hg of props.hungs) if (!hg.dead) list.push(hg);
     return list;
   }
 
@@ -1290,26 +1293,7 @@
     const g = levelGravity();
     const solids = propSolids(level);
     for (const brk of props.breaks.values()) brk.flash = Math.max(0, brk.flash - dt);
-    for (const hg of props.hungs) {
-      if (hg.dead || !hg.falling) continue;
-      hg.vy += g * dt;
-      hg.y += hg.vy * dt;
-      for (const s of solids) {
-        if (s === hg) continue;
-        if (hg.x + hg.w > s.x && hg.x < s.x + s.w &&
-            hg.y + hg.h > s.y && hg.y + hg.h < s.y + s.h + hg.vy * dt + 30) {
-          hg.y = s.y - hg.h;
-          hg.falling = false;
-          hg.settled = true;
-          hg.vy = 0;
-          world.shake = Math.max(world.shake, 8);
-          puff(hg.x + hg.w / 2, hg.y + hg.h, level.palette.accent, 14);
-          sfx("thud");
-          break;
-        }
-      }
-      if (hg.y > world.height + 100) hg.dead = true;
-    }
+    updateSlabs(dt, level, g, solids);
     for (const c of props.crates) {
       if (c.dead) continue;
       c.vy += g * dt;
@@ -1360,6 +1344,223 @@
     }
   }
 
+  // ------------------------------------------------------------ loose slabs
+  // A platform cut off its chains becomes a SLAB: a free rigid body that
+  // tumbles, teeters on its corners, gets kicked around by bullets and
+  // explosions, can be shoved by walking into it, crushes whoever it lands
+  // on, carries whoever rides it, and floats in water. A physics toy.
+  const SLAB_E = 0.26;          // restitution on corner impacts
+  const SLAB_MU = 0.8;          // contact friction
+  const SLAB_REST = 0.45;       // seconds of stillness before it sleeps
+
+  function spawnSlab(hg, tipX) {
+    const cx = hg.x + hg.w / 2;
+    props.slabs.push({
+      x: cx, y: hg.y + hg.h / 2, w: hg.w, h: hg.h, ice: hg.ice,
+      angle: 0, vx: 0, vy: 0,
+      // tip away from the last chain that was holding it
+      va: clamp((cx - tipX) / hg.w, -0.5, 0.5) * 1.4,
+      I: (hg.w * hg.w + hg.h * hg.h) / 12,
+      rest: 0, thudCd: 0, dead: false
+    });
+  }
+
+  function slabCorners(s) {
+    const c = Math.cos(s.angle), n = Math.sin(s.angle);
+    const hw = s.w / 2, hh = s.h / 2;
+    return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]]
+      .map(([lx, ly]) => ({ x: s.x + lx * c - ly * n, y: s.y + lx * n + ly * c }));
+  }
+
+  // y of the water surface under x, or Infinity if the air is dry there
+  function waterSurfaceY(level, x) {
+    let y = Infinity;
+    if (level.tide) y = world.tideLevel;
+    for (const h of level.hazards) {
+      if (h.kind === "water" && x > h.x && x < h.x + h.w) y = Math.min(y, h.y);
+    }
+    return y;
+  }
+
+  function updateSlabs(dt, level, g, solids) {
+    for (const s of props.slabs) {
+      if (s.dead) continue;
+      s.thudCd = Math.max(0, s.thudCd - dt);
+      if (s.rest >= SLAB_REST) continue;      // asleep until something wakes it
+      s.vy += g * dt;
+      const waterY = waterSurfaceY(level, s.x);
+      if (s.y > waterY) {                      // buoyancy: slabs make rafts
+        s.vy -= g * dt * (1.55 + Math.min(0.6, (s.y - waterY) / 80));
+        s.vx *= Math.pow(0.985, dt * 60);
+        s.vy *= Math.pow(0.97, dt * 60);
+        s.va *= Math.pow(0.96, dt * 60);
+      }
+      s.vy = Math.min(s.vy, 1050);
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.angle += s.va * dt;
+      const edge = s.w * 0.35;
+      if (s.x < edge) { s.x = edge; s.vx = Math.abs(s.vx) * 0.4; }
+      if (s.x > world.width - edge) { s.x = world.width - edge; s.vx = -Math.abs(s.vx) * 0.4; }
+
+      // corner contacts against level geometry and crates
+      let grounded = false;
+      const rests = solids.concat(props.crates.filter(c => !c.dead));
+      for (const box of rests) {
+        for (const pt of slabCorners(s)) {
+          if (pt.x <= box.x || pt.x >= box.x + box.w || pt.y <= box.y || pt.y >= box.y + box.h) continue;
+          // shallowest exit for this corner
+          const outs = [
+            { nx: 0, ny: -1, d: pt.y - box.y },
+            { nx: 0, ny: 1, d: box.y + box.h - pt.y },
+            { nx: -1, ny: 0, d: pt.x - box.x },
+            { nx: 1, ny: 0, d: box.x + box.w - pt.x }
+          ].sort((a, b) => a.d - b.d)[0];
+          s.x += outs.nx * outs.d;
+          s.y += outs.ny * outs.d;
+          const rx = pt.x - s.x, ry = pt.y - s.y;
+          const vpx = s.vx - s.va * ry, vpy = s.vy + s.va * rx;
+          const vn = vpx * outs.nx + vpy * outs.ny;
+          if (vn < 0) {
+            const rn = rx * outs.ny - ry * outs.nx;
+            const j = -(1 + SLAB_E) * vn / (1 + rn * rn / s.I);
+            s.vx += j * outs.nx;
+            s.vy += j * outs.ny;
+            s.va += rn * j / s.I;
+            // friction along the tangent
+            const tx = -outs.ny, ty = outs.nx;
+            const vt = vpx * tx + vpy * ty;
+            const rt = rx * ty - ry * tx;
+            const jt = clamp(-vt / (1 + rt * rt / s.I), -SLAB_MU * j, SLAB_MU * j);
+            s.vx += jt * tx;
+            s.vy += jt * ty;
+            s.va += rt * jt / s.I;
+            if (box.hp !== undefined) {          // slab lands on a crate: shove it
+              box.vx -= outs.nx * j * 0.45;
+              box.vy -= outs.ny * j * 0.35;
+            }
+            if (j > 180 && s.thudCd <= 0) {
+              s.thudCd = 0.25;
+              world.shake = Math.max(world.shake, Math.min(9, j / 60));
+              puff(pt.x, pt.y, level.palette.accent, 8);
+              sfx("thud");
+            }
+          }
+          if (outs.ny === -1) grounded = true;
+        }
+      }
+      // settle: damp the rocking, then sleep when genuinely still
+      if (grounded) {
+        s.va *= Math.pow(0.92, dt * 60);
+        s.vx *= Math.pow(0.96, dt * 60);
+        if (Math.abs(s.vx) < 22 && Math.abs(s.vy) < 30 && Math.abs(s.va) < 0.35) {
+          s.rest += dt;
+          if (s.rest >= SLAB_REST) { s.vx = 0; s.vy = 0; s.va = 0; }
+        } else s.rest = 0;
+      } else s.rest = 0;
+      if (s.y - Math.max(s.w, s.h) > world.height + 140) s.dead = true;
+    }
+  }
+
+  function wakeSlab(s) { s.rest = 0; }
+
+  // Bullets kick slabs: impulse along the shot at the hit point, so an edge
+  // hit spins it and a hit under a grounded slab pops it into the air.
+  function checkSlabHits(b) {
+    for (const s of props.slabs) {
+      if (s.dead) continue;
+      const hit = slabCirclePoint(s, b.x, b.y, b.r);
+      if (!hit) continue;
+      const mag = Math.hypot(b.vx, b.vy) || 1;
+      const dx = b.vx / mag, dy = b.vy / mag;
+      const j = 120 + b.damage * 2.4;
+      const rx = hit.qx - s.x, ry = hit.qy - s.y;
+      s.vx += dx * j * 0.55;
+      s.vy += dy * j * 0.55 - 42;
+      s.va += (rx * dy - ry * dx) * j / s.I * 0.4;
+      wakeSlab(s);
+      puff(hit.qx, hit.qy, currentLevel().palette.accent, 6);
+      sfx("block");
+      return true;
+    }
+    return false;
+  }
+
+  // Closest point on a slab to a circle; null if the circle is clear of it.
+  function slabCirclePoint(s, px, py, r) {
+    const c = Math.cos(s.angle), sn = Math.sin(s.angle);
+    const dx = px - s.x, dy = py - s.y;
+    const lx = dx * c + dy * sn, ly = -dx * sn + dy * c;
+    const qlx = clamp(lx, -s.w / 2, s.w / 2), qly = clamp(ly, -s.h / 2, s.h / 2);
+    const ddx = lx - qlx, ddy = ly - qly;
+    const d2 = ddx * ddx + ddy * ddy;
+    if (d2 > r * r) return null;
+    let nlx, nly, depth;
+    if (d2 > 1e-6) {
+      const d = Math.sqrt(d2);
+      nlx = ddx / d; nly = ddy / d; depth = r - d;
+    } else {
+      // centre inside: exit along the shallower local axis
+      const ex = s.w / 2 - Math.abs(lx), ey = s.h / 2 - Math.abs(ly);
+      if (ex < ey) { nlx = lx < 0 ? -1 : 1; nly = 0; depth = ex + r; }
+      else { nlx = 0; nly = ly < 0 ? -1 : 1; depth = ey + r; }
+    }
+    return {
+      nx: nlx * c - nly * sn, ny: nlx * sn + nly * c, depth,
+      qx: s.x + qlx * c - qly * sn, qy: s.y + qlx * sn + qly * c
+    };
+  }
+
+  // Players vs slabs: stand on them, ride them, shove them, get crushed by
+  // them, wall-kick off a leaning one.
+  function collidePlayerSlabs(p, dt) {
+    p.slabGrace = Math.max(0, (p.slabGrace || 0) - dt);
+    const r = p.stats.radius;
+    for (const s of props.slabs) {
+      if (s.dead) continue;
+      const hit = slabCirclePoint(s, p.x, p.y, r);
+      if (!hit) continue;
+      const rx = hit.qx - s.x, ry = hit.qy - s.y;
+      const svx = s.vx - s.va * ry, svy = s.vy + s.va * rx;
+      // a slab slamming down on a head hurts
+      if (hit.ny > 0.55 && svy - p.vy > 330 && p.slabGrace <= 0) {
+        hurt(p, clamp(14 + (svy - p.vy - 330) * 0.06, 14, 44), null, hit.nx * 220, 260);
+        p.slabGrace = 0.6;
+        wakeSlab(s);
+      }
+      p.x += hit.nx * hit.depth;
+      p.y += hit.ny * hit.depth;
+      const rvx = p.vx - svx, rvy = p.vy - svy;
+      const vn = rvx * hit.nx + rvy * hit.ny;
+      if (vn < 0) {
+        p.vx -= vn * hit.nx;
+        p.vy -= vn * hit.ny;
+        if (vn < -60) {                       // real knock, not resting contact
+          const rn = rx * hit.ny - ry * hit.nx;
+          const j = Math.min(-vn * 0.4, 420);
+          s.vx -= j * hit.nx * 0.5;
+          s.vy -= j * hit.ny * 0.22;
+          s.va -= rn * j / s.I * 0.45;
+          wakeSlab(s);
+        }
+      }
+      if (hit.ny < -0.55) {                   // on top: it's ground, and it carries
+        p.grounded = true;
+        p.jumpsLeft = Math.max(p.jumpsLeft, 1 + p.stats.extraJumps);
+        p.x += svx * dt;
+        p.y += svy * dt;
+      } else if (Math.abs(hit.nx) > 0.72 && !p.grounded) {
+        touchWall(p, hit.nx < 0 ? -1 : 1);
+      }
+      // leaning into it walks it along the floor
+      const move = clamp(p.input.move, -1, 1);
+      if (Math.abs(hit.nx) > 0.6 && move && Math.sign(move) === -Math.sign(hit.nx)) {
+        s.vx += move * 620 * dt;
+        wakeSlab(s);
+      }
+    }
+  }
+
   function damageCrate(c, dmg, ix, iy) {
     c.hp -= dmg;
     c.vx += clamp(ix, -260, 260) * 0.4;
@@ -1384,10 +1585,11 @@
     }
   }
 
-  // A bullet crossing an intact chain cuts it; the last chain drops the platform.
+  // A bullet crossing an intact chain cuts it; cutting the last chain frees
+  // the platform into a tumbling slab.
   function checkChainHits(b) {
     for (const hg of props.hungs) {
-      if (hg.dead || hg.falling || hg.settled) continue;
+      if (hg.dead) continue;
       for (const ch of hg.chains) {
         if (ch.cut) continue;
         if (Math.abs(b.x - ch.x) < 9 + b.r && b.y > hg.anchorY && b.y < hg.y) {
@@ -1396,7 +1598,8 @@
           burst(b.x, b.y, "#ffd27a", 12, 260);
           sfx("chain");
           if (hg.chains.every(k => k.cut)) {
-            hg.falling = true;
+            hg.dead = true;
+            spawnSlab(hg, ch.x);
             world.shake = Math.max(world.shake, 5);
           }
           return true;
@@ -1544,6 +1747,7 @@
       p.groundPlatform = null;
 
       collidePlayer(p, plats);
+      collidePlayerSlabs(p, dt);
 
       // bounce pads
       for (const pad of level.bouncePads || []) {
@@ -1851,6 +2055,10 @@
       if (b.life > 0 && checkChainHits(b)) {
         b.life = -1;
       }
+      if (b.life > 0 && checkSlabHits(b)) {
+        b.life = -1;
+        explodeBullet(b);
+      }
 
       for (const platform of plats) {
         if (b.life <= 0) break;
@@ -1976,6 +2184,18 @@
         const cx = clamp(b.x, pl.x, pl.x + pl.w), cy = clamp(b.y, pl.y, pl.y + pl.h);
         const d = Math.hypot(cx - b.x, cy - b.y);
         if (d < radius) damageBreakable(brk, cx, cy, (1 - d / radius) * (30 + b.explosive * 10));
+      }
+      for (const s of props.slabs) {
+        if (s.dead) continue;
+        const d = Math.hypot(s.x - b.x, s.y - b.y);
+        if (d < radius + s.w / 2) {
+          const f = (1 - Math.min(1, d / (radius + s.w / 2))) * (260 + b.explosive * 60);
+          const mag = Math.hypot(s.x - b.x, s.y - b.y) || 1;
+          s.vx += ((s.x - b.x) / mag) * f;
+          s.vy += ((s.y - b.y) / mag) * f - 60;
+          s.va += rand(-1, 1) * f / 200;
+          wakeSlab(s);
+        }
       }
     }
     if (b.shards && !b.isShard) {
@@ -3019,9 +3239,16 @@
       if (brk) drawBreakableOverlay(p, brk, pal);
     }
     for (const hg of props.hungs) {
-      if (hg.dead) continue;
-      drawChains(hg, pal);
-      drawPlatform(hg, pal, 1, hg.ice, 0);
+      drawChains(hg, pal);                    // dead hungs keep their cut stubs
+      if (!hg.dead) drawPlatform(hg, pal, 1, hg.ice, 0);
+    }
+    for (const s of props.slabs) {
+      if (s.dead) continue;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.angle);
+      drawPlatform({ x: -s.w / 2, y: -s.h / 2, w: s.w, h: s.h }, pal, 1, s.ice, 0);
+      ctx.restore();
     }
     for (const c of props.crates) {
       if (c.dead) continue;

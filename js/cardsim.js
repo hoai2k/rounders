@@ -59,7 +59,7 @@
       guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0,
       goldenShot: false, killHeal: false,
       active: null, activeCooldown: 10,
-      kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0, wallPierce: 0,
+      kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0, wallPierce: 0, holePunch: 0,
       steer: 0, helium: 0, boomerang: 0, encore: 0, burstFire: 0,
       bloodMoney: 0, underdog: 0,
       blockReload: 0, healField: 0, frostBlock: 0, sawBlock: 0,
@@ -130,7 +130,8 @@
       watch
     };
 
-    if (on("wallPierce")) { plan.wall = "thin"; watch.push("the shot bores clean through the pillar"); }
+    if (on("holePunch")) { plan.wall = "thin"; watch.push("each impact blows a permanent hole in the pillar — later shots fly through it"); }
+    else if (on("wallPierce")) { plan.wall = "thin"; watch.push("the shot bores clean through the pillar"); }
     else if (on("pierce")) { plan.secondTarget = true; watch.push("one bullet passes through the first fighter into the second"); }
     // a skip shot off the floor: reliable to stage, and it reads as a bounce
     // far better than a bank off a floating slab, which lands anywhere
@@ -205,6 +206,8 @@
     const chB = CH[opts.targetChar ?? 3] || null;
 
     let a, bb, bullets, fields, parts, floaters, decoys, slabs, t, cycle, raf = 0, running = false;
+    // holes Skylight blows in the preview's pillar, in the pillar's own space
+    let pillarHoles = [];
 
     function makeFighter(x, holder, color, character, facing) {
       const st = holder ? plan.stats : baseStats();
@@ -228,13 +231,15 @@
       a.temp = a.holder ? a.stats.maxHp * a.stats.freshCoat : 0;
       bb.temp = bb.holder ? bb.stats.maxHp * bb.stats.freshCoat : 0;
       bullets = []; fields = []; parts = []; floaters = []; decoys = []; slabs = [];
+      pillarHoles = [];
       t = 0; cycle = 0;
     }
 
     // --------------------------------------------------------------- helpers
     const walls = () => {
       const list = [{ x: -40, y: GROUND, w: W + 80, h: 90, ground: true }];
-      if (plan.wall === "thin") list.push({ x: 350, y: 118, w: 26, h: GROUND - 118 });
+      // Skylight's pillar is chunky, so a bored hole is unmistakable
+      if (plan.wall === "thin") list.push({ x: 350, y: 118, w: plan.stats.holePunch ? 46 : 26, h: GROUND - 118, holes: pillarHoles });
       if (plan.wall === "bounce") list.push({ x: 360, y: 60, w: 30, h: 120 });
       for (const s of slabs) list.push({ x: s.x - s.w / 2, y: s.y - s.h / 2, w: s.w, h: s.h, slab: true });
       return list;
@@ -364,6 +369,7 @@
           gravity: (st.helium ? -st.bulletGravity * 0.35 : st.bulletGravity * (st.homing ? 0.4 : 1)) * SCALE,
           life: 3.4, bounces: st.bounces, pierce: st.pierce,
           wallPierce: st.wallPierce ? 70 + 50 * (st.wallPierce - 1) : 0,
+          holePunch: st.holePunch,
           homing: st.homing, steer: st.steer, grow: st.grow, groundHug: st.groundHug,
           explosive: st.explosive, shards: st.shards, chain: st.chain,
           poison: st.poison, burn: st.burn, chill: st.chill, stink: st.stink,
@@ -544,6 +550,27 @@
         // walls
         for (const w of wl) {
           if (b.life <= 0 || !hitRect(b.x, b.y, b.r, w)) continue;
+          // a hole already bored here is a way through (same doorway rule the
+          // game uses: measured across the slab's long axis)
+          if (w.holes && w.holes.length) {
+            const acrossX = w.w >= w.h;
+            const through = w.holes.some(h => {
+              const off = acrossX ? Math.abs(b.x - (w.x + h.lx)) : Math.abs(b.y - (w.y + h.ly));
+              return off <= Math.max(2, h.r - b.r * 0.62);
+            });
+            if (through) continue;
+          }
+          if (b.holePunch && !w.ground && w.holes) {
+            const lx = b.x - w.x, ly = b.y - w.y;
+            const r = 30 + 8 * (b.holePunch - 1);
+            const near = w.holes.find(h => Math.hypot(h.lx - lx, h.ly - ly) < Math.max(h.r, r) * 0.75);
+            if (near) near.r = Math.min(w.h * 0.4, Math.hypot(near.r, r));
+            else if (w.holes.length < 6) w.holes.push({ lx, ly, r });
+            b.life = -1;
+            puff(b.x, b.y, "#e8e2d4", 18, 300);
+            boom(b);
+            continue;
+          }
           if (b.wallPierce > 0 && !w.ground) {
             // bore through: walk to the far side, spending thickness
             const mag = Math.hypot(b.vx, b.vy) || 1;
@@ -750,10 +777,29 @@
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
       // ground + walls
       for (const w of walls()) {
+        const holes = w.holes && w.holes.length ? w.holes : null;
+        ctx.save();
+        if (holes) {
+          // even-odd clip so the bored holes are genuinely missing
+          ctx.beginPath();
+          ctx.rect(w.x - 6, w.y - 6, w.w + 12, w.h + 12);
+          for (const h of holes) {
+            ctx.moveTo(w.x + h.lx + h.r, w.y + h.ly);
+            ctx.arc(w.x + h.lx, w.y + h.ly, h.r, 0, Math.PI * 2);
+          }
+          ctx.clip("evenodd");
+        }
         ctx.fillStyle = w.ground ? "#3a4152" : w.slab ? "#6d6152" : "#4a5266";
         ctx.beginPath(); ctx.roundRect(w.x, w.y, w.w, w.h, w.ground ? 0 : 5); ctx.fill();
         ctx.fillStyle = "rgba(255,255,255,0.10)";
         ctx.fillRect(w.x, w.y, w.w, 3);
+        ctx.restore();
+        if (holes) for (const h of holes) {
+          ctx.strokeStyle = "rgba(20,16,12,0.75)"; ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.arc(w.x + h.lx, w.y + h.ly, h.r, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = "rgba(255,210,150,0.3)"; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(w.x + h.lx, w.y + h.ly, h.r - 2, 0, Math.PI * 2); ctx.stroke();
+        }
       }
       // fields
       for (const f of fields) {

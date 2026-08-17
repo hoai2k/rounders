@@ -5551,6 +5551,10 @@
     const t = world.time;
     for (const b of bullets) {
       ctx.save();
+      // Resolved EVERY frame, not cached on the bullet: a sprite that finishes
+      // loading after the shot was fired still gets drawn on it. Read by the
+      // trail below as well as the round itself, so it is resolved up here.
+      const look = bulletLookFor(b.owner);
       if (b.golden || b.empowered) {
         // the golden shot announces itself: hard glow plus a sparkle trail
         ctx.shadowColor = "#ffd700";
@@ -5564,6 +5568,21 @@
             color: Math.random() < 0.5 ? "#fff3b0" : "#ffd700", spark: true
           });
         }
+      }
+      // A painted round leaves a streak in its OWN colour (js/bullet-art.js) —
+      // a venom round trails green, a frost round blue — so the streak and the
+      // sprite agree, and a build carrying several bullet cards trails their
+      // blend. Skipped for rounds that already have a louder trail of their
+      // own (golden, banked, raging, supernova).
+      if (look.color && !b.golden && !b.empowered && !b.banked && !b.rage && b.explosive < 2
+          && Math.random() < 0.6) {
+        const sp = b.r * (look.scale || 1);      // `r` is not resolved yet up here
+        particles.push({
+          x: b.x + rand(-sp * 0.5, sp * 0.5), y: b.y + rand(-sp * 0.5, sp * 0.5),
+          vx: rand(-14, 14) - b.vx * 0.05, vy: rand(-14, 14) - b.vy * 0.05,
+          life: rand(0.16, 0.3), maxLife: 0.3, r: rand(1.2, 2.4) * (look.scale || 1),
+          color: look.color
+        });
       }
       if (b.rage > 0) {
         // Berserker's Blood: the round bleeds as it flies. A scratch leaves the
@@ -5635,7 +5654,7 @@
       if (b.explosive) { ctx.shadowColor = "#ff7a3d"; ctx.shadowBlur = 10 + Math.sin(t * 18) * 5; }
       // grown bullets read bigger the farther they've flown
       const growF = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 1300) : 1;
-      const r = b.r * growF;
+      const r = b.r * growF * (look.scale || 1);
       // Comet Trail: the tail is sized off the CURRENT radius, so the trail
       // thickens and lengthens along with the head instead of staying a thin
       // thread behind a swelling comet
@@ -5654,13 +5673,13 @@
           });
         }
       }
-      const art = b.art !== undefined ? b.art : (b.art = bulletArtFor(b.owner));
-      if (art) {
-        // painted rounds are drawn pointing along their flight
+      if (look.art && b.explosive < 2) {
+        // painted rounds are drawn pointing along their flight, plus whatever
+        // turn the card's art needs to line its barrel up with that
         const d = r * 3.4;
         ctx.translate(b.x, b.y);
-        ctx.rotate(Math.atan2(b.vy, b.vx));
-        ctx.drawImage(art, -d / 2, -d / 2, d, d);
+        ctx.rotate(Math.atan2(b.vy, b.vx) + (look.rotation || 0));
+        ctx.drawImage(look.art, -d / 2, -d / 2, d, d);
         ctx.restore();
         continue;
       }
@@ -7042,16 +7061,82 @@
     }
   }
 
-  // The round a player fires is the painted one from the newest card they hold
-  // that changes how the bullet looks; everything else keeps the procedural
-  // tells layered on top.
-  function bulletArtFor(p) {
-    if (!p || !p.cards) return null;
-    for (let i = p.cards.length - 1; i >= 0; i -= 1) {
-      const img = loadArt("bullets", p.cards[i].id);
-      if (img) return img;
+  // ---------------------------------------------------------- bullet looks
+  // How a player's round is DRAWN, from js/bullet-art.js. A build with several
+  // bullet cards gets the two newest painted rounds BLENDED — the newest at
+  // full strength and the one before it washed over it, which at the size a
+  // bullet is actually drawn keeps one clear silhouette while still telling
+  // you the second card is there. Three or more turn to mud, so anything past
+  // the second only shows in the trail colour.
+  const MIX_TOP = 2;          // sprites blended into the round
+  const MIX_LEAD = 0.68;      // how much of it is the newest card
+  const mixCache = new Map();
+
+  function mixBulletArt(ids) {
+    if (ids.length === 1) return loadArt("bullets", ids[0]);
+    const key = ids.join("|");
+    if (mixCache.has(key)) return mixCache.get(key);
+    const imgs = ids.map(id => loadArt("bullets", id));
+    if (imgs.some(im => !im)) return imgs[imgs.length - 1] || null;   // retry once loaded
+    const size = Math.max(...imgs.map(im => im.naturalWidth || im.width || 128));
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = size;
+    const c = cv.getContext("2d");
+    imgs.forEach((im, i) => {
+      c.globalAlpha = i === imgs.length - 1 ? MIX_LEAD : (1 - MIX_LEAD) / (imgs.length - 1);
+      c.drawImage(im, 0, 0, size, size);
+    });
+    mixCache.set(key, cv);
+    return cv;
+  }
+
+  // Everything about how this fighter's round looks, resolved together so the
+  // sprite, its transform and its trail colour always agree.
+  function bulletLookFor(p) {
+    if (!p || !p.cards) return { art: null, scale: 1, rotation: 0, color: null };
+    const cfg = window.ROUNDERS.BULLET_ART || {};
+    const painted = [];
+    const colours = [];
+    for (const card of p.cards) {
+      const k = cfg[card.id];
+      if (k && k.color) colours.push(k.color);
+      // a card marked procedural never lends its sprite — its hand-drawn round
+      // is the one worth seeing
+      if (!(k && k.procedural) && loadArt("bullets", card.id)) painted.push(card.id);
     }
-    return null;
+    // The transform comes from the newest card that HAS an entry, whether or
+    // not it ships a sprite — Cannonball is drawn 1.4× and has no art of its
+    // own — and it is read independently of loading, so a slow sprite never
+    // costs the round its size.
+    // the LEAD SPRITE's entry decides the transform, since that is the art the
+    // rotation lines up; with no sprite at all, fall back to the newest entry
+    // that asks for one (Cannonball is drawn 1.4× and ships no art)
+    let tuned = {};
+    if (painted.length) tuned = cfg[painted[painted.length - 1]] || {};
+    else for (const card of p.cards) {
+      const k = cfg[card.id];
+      if (k && (k.scale != null || k.rotation != null)) tuned = k;
+    }
+    return {
+      art: painted.length ? mixBulletArt(painted.slice(-MIX_TOP)) : null,
+      scale: tuned.scale || 1,
+      rotation: (tuned.rotation || 0) * Math.PI / 180,
+      // the trail carries every bullet card, not just the two that are drawn
+      color: colours.length ? blendHex(colours) : null
+    };
+  }
+
+  // average of a list of #rrggbb, so a build's trail is the blend of its rounds
+  function blendHex(list) {
+    let r = 0, g = 0, b = 0;
+    for (const h of list) {
+      r += parseInt(h.slice(1, 3), 16);
+      g += parseInt(h.slice(3, 5), 16);
+      b += parseInt(h.slice(5, 7), 16);
+    }
+    const n = list.length;
+    const hx = v => Math.round(v / n).toString(16).padStart(2, "0");
+    return `#${hx(r)}${hx(g)}${hx(b)}`;
   }
 
   // Tiny dev/test hooks: grant a card by id mid-match, peek at the fighters.
@@ -7081,6 +7166,33 @@
       damage: Math.round(b.damage), empowered: b.empowered || 0, explosive: b.explosive,
       singularity: b.singularity || 0
     })),
+    // how a fighter's round is drawn, for checking the bullet-art config
+    bulletLook: p => bulletLookFor(p),
+    // strip a fighter back to a clean slate: no cards, baseline stats, full
+    // health. Lets a test run build after build without reloading the page.
+    stripCards(index) {
+      const p = players[index];
+      if (!p) return false;
+      p.cards = [];
+      p.stats = defaultStats();
+      p.hp = p.stats.maxHp;
+      p.ammo = p.stats.maxAmmo;
+      p.guardianCharges = 0; p.roundRevives = 0; p.hoverLeft = 0; p.freshPool = 0;
+      p.hovering = false; p.rebirth = null; p.activeCooldown = 0;
+      p.burstQueue = []; p.encoreQueue = [];
+      p.decayPool = 0; p.hotShield = 0; p.overShield = 0; p.shield = 0;
+      p.alive = true;
+      return true;
+    },
+    defaultStats,
+    // fire a fighter's Mythic on demand: bots never press the ability button,
+    // so a combination test has no other way to exercise the actives
+    fireActive(index) {
+      const p = players[index];
+      if (!p || !p.stats.active) return false;
+      p.activeCooldown = 0;
+      return Boolean(tryActive(p));
+    },
     // chronoshift tape: is the world running backwards, and how much is left
     rewind: () => ({ active: rewind.active, cursor: rewind.cursor, frames: history.length }),
     slabs: () => props.slabs.filter(s => !s.dead).map(s => ({

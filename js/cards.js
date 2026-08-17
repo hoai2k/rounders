@@ -276,8 +276,8 @@
 
     card("skylight", "Skylight", "epic",
       "Every wall wants a window.",
-      "Shots that strike terrain blow a permanent hole clean through it — anyone can shoot or climb through the gaps you make. People still just get hit.",
-      ["impacts punch real holes in terrain", "−10% damage"], ["projectile", "control"],
+      "Shots chew a square bite out of whatever terrain they strike — two into a thick wall opens a permanent gap anyone can shoot or climb through. People still just get hit.",
+      ["impacts bite squares out of terrain", "thick walls take 2 hits", "−10% damage"], ["projectile", "control"],
       p => { p.stats.holePunch += 1; p.stats.damage *= 0.9; }),
 
     card("chain-lightning", "Chain Letter", "rare",

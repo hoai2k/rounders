@@ -664,29 +664,52 @@
           // a hole already bored here is a way through (same doorway rule the
           // game uses: measured across the slab's long axis)
           if (w.holes && w.holes.length) {
-            const acrossX = w.w >= w.h;
-            const through = w.holes.some(h => {
-              const off = acrossX ? Math.abs(b.x - (w.x + h.lx)) : Math.abs(b.y - (w.y + h.ly));
-              return off <= Math.max(2, h.r - b.r * 0.62);
-            });
-            if (through) continue;
+            const inside = w.holes.some(h =>
+              b.x > w.x + h.lx && b.x < w.x + h.lx + h.w &&
+              b.y > w.y + h.ly && b.y < w.y + h.ly + h.h);
+            if (inside && !b.holePunch) continue;      // a plain round sails through
           }
           if (b.holePunch && !w.ground && w.holes) {
-            const r = 30 + 8 * (b.holePunch - 1);
-            // centre the bore inside the slab, not on the face it struck
-            const fit = (v, size) => size < r * 2 ? size / 2 : Math.max(r, Math.min(size - r, v));
-            const lx = fit(b.x - w.x, w.w);
-            const ly = fit(b.y - w.y, w.h);
-            const near = w.holes.find(h => Math.hypot(h.lx - lx, h.ly - ly) < Math.max(h.r, r) * 0.75);
-            if (near) near.r = Math.min(w.h * 0.4, Math.hypot(near.r, r));
-            else if (w.holes.length < 6) w.holes.push({ lx, ly, r });
+            // Collision fires at the slab's FACE, so a borer must first walk
+            // through whatever has already been chewed out and start biting
+            // where solid material actually begins — otherwise every shot
+            // re-cuts the same first bite and nothing ever holes through.
+            const mag = Math.hypot(b.vx, b.vy) || 1;
+            const dx = b.vx / mag, dy = b.vy / mag;
+            const solidAt = (x, y) => x > w.x && x < w.x + w.w && y > w.y && y < w.y + w.h &&
+              !w.holes.some(h => x > w.x + h.lx && x < w.x + h.lx + h.w &&
+                                 y > w.y + h.ly && y < w.y + h.ly + h.h);
+            let x = b.x, y = b.y, guard = 0;
+            while (guard < 400 && !solidAt(x, y)) {
+              if (x > w.x + w.w + 4 || x < w.x - 4 || y > w.y + w.h + 4 || y < w.y - 4) break;
+              x += dx * 3; y += dy * 3; guard += 3;
+            }
+            if (!solidAt(x, y)) continue;              // the way is already clear
+            const size = 64 + 14 * (b.holePunch - 1);
+            const bw = Math.min(size, w.w), bh = Math.min(size, w.h);
+            const bite = {
+              lx: Math.max(0, Math.min(w.w - bw, x - w.x - bw / 2)),
+              ly: Math.max(0, Math.min(w.h - bh, y - w.y - bh / 2)),
+              w: bw, h: bh
+            };
+            for (let i = w.holes.length - 1; i >= 0; i -= 1) {
+              const o = w.holes[i];
+              if (bite.lx > o.lx + o.w + 2 || bite.lx + bite.w < o.lx - 2 ||
+                  bite.ly > o.ly + o.h + 2 || bite.ly + bite.h < o.ly - 2) continue;
+              const x0 = Math.min(bite.lx, o.lx), y0 = Math.min(bite.ly, o.ly);
+              bite.w = Math.max(bite.lx + bite.w, o.lx + o.w) - x0;
+              bite.h = Math.max(bite.ly + bite.h, o.ly + o.h) - y0;
+              bite.lx = x0; bite.ly = y0;
+              w.holes.splice(i, 1);
+            }
+            if (w.holes.length < 6) w.holes.push(bite);
             b.life = -1;
-            puff(b.x, b.y, "#e8e2d4", 18, 300);
+            puff(x, y, "#e8e2d4", 18, 300);
             boom(b);
             continue;
           }
           if (b.wallPierce > 0 && !w.ground) {
-            // bore through: walk to the far side, spending thickness
+            // Drill Rounds: bore straight through, spending thickness
             const mag = Math.hypot(b.vx, b.vy) || 1;
             const dx = b.vx / mag, dy = b.vy / mag;
             let x = b.x, y = b.y, dist = 0, out = false;
@@ -694,7 +717,12 @@
               x += dx * 3; y += dy * 3; dist += 3;
               if (!hitRect(x, y, b.r, w)) { out = true; break; }
             }
-            if (out) { b.x = x + dx * 2; b.y = y + dy * 2; b.wallPierce -= dist; puff(b.x, b.y, "#e8e2d4", 6, 130); continue; }
+            if (out) {
+              b.x = x + dx * 2; b.y = y + dy * 2;
+              b.wallPierce -= dist;
+              puff(b.x, b.y, "#e8e2d4", 6, 130);
+              continue;
+            }
           }
           if (b.bounces > 0) {
             const fromSide = b.px + b.r <= w.x || b.px - b.r >= w.x + w.w;
@@ -830,7 +858,11 @@
 
       // loop the scene once it has made its point
       const quiet = !bullets.length && !fields.length;
-      if ((t > 4.6 && quiet) || t > 7.5) { const keep = cycle + 1; reset(); cycle = keep; }
+      // Skylight needs longer: one bite, a second to hole right through, then
+      // shots flying through the gap. Cutting at 5s reset the wall every time.
+      const soft = plan.stats.holePunch ? 9 : 4.6;
+      const hard = plan.stats.holePunch ? 12 : 7.5;
+      if ((t > soft && quiet) || t > hard) { const keep = cycle + 1; reset(); cycle = keep; }
     }
 
     function boom(b) {
@@ -958,10 +990,7 @@
           // even-odd clip so the bored holes are genuinely missing
           ctx.beginPath();
           ctx.rect(w.x - 6, w.y - 6, w.w + 12, w.h + 12);
-          for (const h of holes) {
-            ctx.moveTo(w.x + h.lx + h.r, w.y + h.ly);
-            ctx.arc(w.x + h.lx, w.y + h.ly, h.r, 0, Math.PI * 2);
-          }
+          for (const h of holes) ctx.rect(w.x + h.lx, w.y + h.ly, h.w, h.h);
           ctx.clip("evenodd");
         }
         ctx.fillStyle = w.ground ? "#3a4152" : w.slab ? "#6d6152" : "#4a5266";
@@ -972,10 +1001,10 @@
         if (holes) for (const h of holes) {
           ctx.save();
           ctx.beginPath(); ctx.rect(w.x, w.y, w.w, w.h); ctx.clip();
-          ctx.strokeStyle = "rgba(20,16,12,0.75)"; ctx.lineWidth = 2.5;
-          ctx.beginPath(); ctx.arc(w.x + h.lx, w.y + h.ly, h.r, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = "rgba(20,16,12,0.78)"; ctx.lineWidth = 2.5;
+          ctx.strokeRect(w.x + h.lx, w.y + h.ly, h.w, h.h);
           ctx.strokeStyle = "rgba(255,210,150,0.3)"; ctx.lineWidth = 1.2;
-          ctx.beginPath(); ctx.arc(w.x + h.lx, w.y + h.ly, h.r - 2, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeRect(w.x + h.lx + 2, w.y + h.ly + 2, h.w - 4, h.h - 4);
           ctx.restore();
         }
       }
@@ -1223,7 +1252,7 @@
         shooter: { hp: a.hp, maxHp: a.maxHp, ammo: a.ammo },
         target: { hp: bb.hp, maxHp: bb.maxHp, shield: bb.shield, temp: bb.temp },
         bullets: bullets.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), vx: Math.round(b.vx), vy: Math.round(b.vy), hug: Boolean(b.hug) })),
-        fields: fields.length, cycle, pillarHoles: pillarHoles.length,
+        fields: fields.length, cycle, pillarHoles: pillarHoles.length, holeRects: pillarHoles.map(h => ({ lx: Math.round(h.lx), ly: Math.round(h.ly), w: Math.round(h.w), h: Math.round(h.h) })),
         pos: { ax: Math.round(a.x), ay: Math.round(a.y), bx: Math.round(bb.x), by: Math.round(bb.y) }
       })
     };

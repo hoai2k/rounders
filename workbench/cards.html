@@ -85,6 +85,21 @@
         z-index: 2;
       }
       .cw-grid .card.hidden-rarity { display: none; }
+      /* the art is a real element, so a missing file is visible rather than
+         silently falling through to the tinted panel */
+      .card-art { position: relative; overflow: hidden; }
+      .cw-art-img {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        object-fit: cover; display: block; border-radius: 10px;
+      }
+      .cw-art-img.emblem { object-fit: contain; }
+      .cw-art-img.missing { display: none; }
+      .card-art.no-art::after {
+        content: "no art yet";
+        position: absolute; inset: 0; display: grid; place-items: center;
+        font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.35);
+      }
       .cw-rarity-head {
         grid-column: 1 / -1;
         margin: 14px 0 0;
@@ -100,12 +115,6 @@
         overflow-y: auto;
         padding: 14px 18px 40px;
       }
-      /* the selected card, shown large with its own art, beside its details */
-      .cw-detail { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 12px; }
-      .cw-facewrap { flex: none; width: clamp(150px, 15vw, 210px); --cardw: 100%; }
-      .cw-facewrap .card { margin: 0; width: 100%; animation: none; transform: none; cursor: default; }
-      .cw-facewrap .card-desc { -webkit-line-clamp: unset; overflow: visible; }
-      .cw-detail-text { flex: 1; min-width: 0; }
       .cw-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
       .cw-head h2 { margin: 0; font-size: 20px; color: var(--rcol, #fff); }
       .cw-head .cw-rar {
@@ -161,14 +170,9 @@
       </aside>
 
       <section class="cw-view">
-        <div class="cw-detail">
-          <div class="cw-facewrap" id="face"></div>
-          <div class="cw-detail-text">
-            <div class="cw-head" id="head"></div>
-            <p class="cw-desc" id="desc"></p>
-            <div class="cw-pills" id="pills"></div>
-          </div>
-        </div>
+        <div class="cw-head" id="head"></div>
+        <p class="cw-desc" id="desc"></p>
+        <div class="cw-pills" id="pills"></div>
 
         <div class="cw-prev-head">
           <strong>Preview</strong>
@@ -203,6 +207,18 @@
     <script src="../js/gameplay.js"></script>
     <script src="../js/cardsim.js"></script>
     <script>
+      // scene missing -> try the emblem -> give up and say so
+      function cwArtFallback(img) {
+        const emblem = img.dataset.emblem;
+        if (emblem && img.src !== emblem) {
+          img.classList.add("emblem");
+          img.src = emblem;
+          return;
+        }
+        img.classList.add("missing");
+        img.parentElement.classList.add("no-art");
+      }
+
       (() => {
         "use strict";
         const { CARDS, RARITIES, RARITY_ORDER, CARD_SIM, cardArtUrl, cardSceneUrl } = window.ROUNDERS;
@@ -244,7 +260,12 @@
                      style="--rcol:${rar.color};--rglow:${rar.glow};--tilt:0deg">
               <span class="card-pip">${rar.name[0]}</span>
               <span class="rarity">${rar.name}</span>
-              <span class="card-art" style="--scene:url('${cardSceneUrl(c.id)}');--emblem:url('${cardArtUrl(c.id)}')"></span>
+              <span class="card-art">
+                <img class="cw-art-img" alt="" loading="lazy" decoding="async"
+                     src="${cardSceneUrl(c.id)}"
+                     data-emblem="${cardArtUrl(c.id)}"
+                     onerror="cwArtFallback(this)" />
+              </span>
               <strong class="card-name">${c.name}</strong>
               <em class="card-tagline">${c.tagline}</em>
               <p class="card-desc">${c.description}</p>
@@ -290,8 +311,6 @@
             `<h2>${c.name}</h2><span class="cw-rar">${rar.name}</span>` +
             `<em>${c.tagline}</em>` +
             `<span class="cw-count">${index + 1} / ${visible().length}${c.tags && c.tags.length ? " · " + c.tags.join(", ") : ""}</span>`;
-          // the card face itself, exactly as the game draws it
-          document.getElementById("face").innerHTML = cardHtml(c);
           descEl.textContent = c.description;
           pillsEl.innerHTML = c.effects.map(s => `<span>${s}</span>`).join("");
 

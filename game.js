@@ -321,47 +321,63 @@
   // object's local space and read back through the live platform each frame,
   // so a hole in a mover travels with it.
 
-  // Bore a hole through `platform` at world point (wx, wy).
-  function punchHole(platform, wx, wy, r) {
+  // Bore a square bite out of `platform` at world point (wx, wy).
+  //
+  // A hole is a RECTANGLE of removed material, not a doorway: a single shot
+  // takes a square bite out of the face it strikes, so anything thicker than
+  // one bite needs a second shot to finish the job. Overlapping bites merge
+  // into one opening, which is what deepens a hole into a passage.
+  function punchHole(platform, wx, wy, size) {
     const src = platform.holeSrc;
-    if (!src || platform.isCrate) return false;      // crates already break
+    if (!src || platform.isCrate) return false;
     const list = props.holes.get(src) || [];
-    // The impact point is on the slab's FACE, so a hole centred there sticks
-    // out into thin air and reads as a floating ring. Pull the centre inside
-    // the slab (and just centre it on an axis thinner than the hole).
-    const fit = (v, size) => size < r * 2 ? size / 2 : clamp(v, r, size - r);
-    const lx = fit(wx - platform.x, platform.w);
-    const ly = fit(wy - platform.y, platform.h);
-    // widen an overlapping hole instead of stacking dozens of little ones
-    for (const h of list) {
-      if (Math.hypot(h.lx - lx, h.ly - ly) < Math.max(h.r, r) * 0.75) {
-        h.r = Math.min(Math.max(platform.w, platform.h) * 0.6, Math.hypot(h.r, r));
-        h.lx = (h.lx + lx) / 2; h.ly = (h.ly + ly) / 2;
-        props.holes.set(src, list);
-        return true;
-      }
+    const w = Math.min(size, platform.w);
+    const h = Math.min(size, platform.h);
+    const lx = clamp(wx - platform.x - w / 2, 0, Math.max(0, platform.w - w));
+    const ly = clamp(wy - platform.y - h / 2, 0, Math.max(0, platform.h - h));
+    const bite = { lx, ly, w, h };
+    // merge with anything it touches, so successive shots chew deeper
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const o = list[i];
+      const touches = bite.lx <= o.lx + o.w + 2 && bite.lx + bite.w >= o.lx - 2 &&
+                      bite.ly <= o.ly + o.h + 2 && bite.ly + bite.h >= o.ly - 2;
+      if (!touches) continue;
+      const x0 = Math.min(bite.lx, o.lx), y0 = Math.min(bite.ly, o.ly);
+      bite.w = Math.max(bite.lx + bite.w, o.lx + o.w) - x0;
+      bite.h = Math.max(bite.ly + bite.h, o.ly + o.h) - y0;
+      bite.lx = x0; bite.ly = y0;
+      list.splice(i, 1);
     }
-    if (list.length > 14) return false;              // a wall can only be so much lace
-    list.push({ lx, ly, r });
+    if (list.length > 10) return false;          // a wall can only be so much lace
+    list.push(bite);
     props.holes.set(src, list);
     return true;
   }
 
-  // Is (wx, wy), with radius rad, inside one of this platform's holes?
+  // Does this opening go all the way through the slab's thickness?
+  function holeSpans(platform, h) {
+    return platform.w >= platform.h
+      ? h.ly <= 2 && h.ly + h.h >= platform.h - 2      // a floor: a shaft top to bottom
+      : h.lx <= 2 && h.lx + h.w >= platform.w - 2;     // a wall: a tunnel side to side
+  }
+
+  // Is (wx, wy) inside removed material?
   //
-  // A hole is a doorway bored clean THROUGH the slab, not a sphere carved in
-  // it: measured across the slab's long axis only, so a shaft in a floor is
-  // open for the whole fall and a tunnel in a wall is open all the way across.
-  // (Testing the round hole instead spat a falling player back out halfway
-  // through a thick floor.)
-  function inHole(platform, wx, wy, rad = 0) {
+  // Bullets travel through ANY excavation, including a half-finished niche —
+  // that is how a second shot reaches the back of the bite and holes right
+  // through. Players only pass an opening that spans the slab, so nobody can
+  // sink into a pocket and fall out of the world.
+  function inHole(platform, wx, wy, rad = 0, requireSpan = false) {
     const list = platform.holes;
     if (!list || !list.length) return false;
-    const acrossX = platform.w >= platform.h;
     for (const h of list) {
-      const hx = platform.x + h.lx, hy = platform.y + h.ly;
-      const off = acrossX ? Math.abs(wx - hx) : Math.abs(wy - hy);
-      if (off <= Math.max(2, h.r - rad * 0.62)) return true;
+      if (requireSpan && !holeSpans(platform, h)) continue;
+      const x0 = platform.x + h.lx, y0 = platform.y + h.ly;
+      const pad = rad * 0.62;
+      if (wx > x0 + pad && wx < x0 + h.w - pad && wy > y0 + pad && wy < y0 + h.h - pad) return true;
+      // an opening narrower than the body still lets it through along the
+      // thickness, so only the long axis is measured against the body
+      if (!requireSpan && wx > x0 && wx < x0 + h.w && wy > y0 && wy < y0 + h.h) return true;
     }
     return false;
   }
@@ -2124,7 +2140,7 @@
       const overlap = playerPlatformOverlap(p, platform);
       if (!overlap) continue;
       // a bored-out gap is a way through, for people as well as bullets
-      if (platform.holes && inHole(platform, p.x, p.y, r)) continue;
+      if (platform.holes && inHole(platform, p.x, p.y, r, true)) continue;
       if (overlap.side === "top") {
         p.y -= overlap.amount;
         p.vy = Math.min(0, p.vy);
@@ -2630,13 +2646,30 @@
       for (const platform of plats) {
         if (b.life <= 0) break;
         if (circleRect(b, platform)) {
-          // shots fly clean through a gap someone already bored
-          if (platform.holes && inHole(platform, b.x, b.y, b.r)) continue;
-          // wide enough for a fighter (radius 27) to climb through — a hole
-          // you cannot fit through would miss the whole point of the card
-          if (b.holePunch && !platform.isCrate && punchHole(platform, b.x, b.y, 44 + 12 * (b.holePunch - 1))) {
+          // a plain shot flies clean through a gap someone already bored
+          if (platform.holes && inHole(platform, b.x, b.y, b.r) && !b.holePunch) continue;
+          // A borer starts biting where solid material actually begins.
+          // Collision fires at the slab's FACE, so without first walking
+          // through what has already been excavated, every shot would re-cut
+          // the same opening bite and a thick wall could never be holed.
+          let bx = b.x, by = b.y;
+          if (b.holePunch && !platform.isCrate) {
+            const mag = Math.hypot(b.vx, b.vy) || 1;
+            const dx = b.vx / mag, dy = b.vy / mag;
+            const solidAt = (x, y) => x > platform.x && x < platform.x + platform.w &&
+              y > platform.y && y < platform.y + platform.h && !inHole(platform, x, y, 0);
+            let guard = 0;
+            while (guard < 400 && !solidAt(bx, by)) {
+              if (bx > platform.x + platform.w + 4 || bx < platform.x - 4 ||
+                  by > platform.y + platform.h + 4 || by < platform.y - 4) break;
+              bx += dx * 3; by += dy * 3; guard += 3;
+            }
+            if (!solidAt(bx, by)) continue;    // the way through is already clear
+          }
+          // a bite wide enough for a fighter (radius 27) to climb through
+          if (b.holePunch && !platform.isCrate && punchHole(platform, bx, by, 64 + 14 * (b.holePunch - 1))) {
             b.life = -1;
-            burst(b.x, b.y, "#e8e2d4", 26, 380);
+            burst(bx, by, "#e8e2d4", 26, 380);
             world.shake = Math.max(world.shake, 7);
             sfx("boom");
             explodeBullet(b);
@@ -4551,10 +4584,7 @@
     ctx.save();
     ctx.beginPath();
     ctx.rect(box.x - 12, box.y - 12, box.w + 24, box.h + 24);
-    for (const h of holes) {
-      ctx.moveTo(box.x + h.lx + h.r, box.y + h.ly);
-      ctx.arc(box.x + h.lx, box.y + h.ly, h.r, 0, Math.PI * 2);
-    }
+    for (const h of holes) ctx.rect(box.x + h.lx, box.y + h.ly, h.w, h.h);
     ctx.clip("evenodd");
     fn();
     ctx.restore();
@@ -4565,16 +4595,12 @@
       ctx.beginPath();
       ctx.rect(box.x, box.y, box.w, box.h);
       ctx.clip();
-      ctx.strokeStyle = "rgba(20,16,12,0.75)";
+      ctx.strokeStyle = "rgba(20,16,12,0.78)";
       ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(box.x + h.lx, box.y + h.ly, h.r, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.strokeStyle = "rgba(255,210,150,0.28)";
+      ctx.strokeRect(box.x + h.lx, box.y + h.ly, h.w, h.h);
+      ctx.strokeStyle = "rgba(255,210,150,0.3)";
       ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(box.x + h.lx, box.y + h.ly, h.r - 2.5, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.strokeRect(box.x + h.lx + 2.5, box.y + h.ly + 2.5, h.w - 5, h.h - 5);
       ctx.restore();
     }
   }
@@ -6263,7 +6289,7 @@
     // it currently is, and the hole rides with it)
     holes: () => activePlatforms(currentLevel(), world.time)
       .filter(pl => pl.holes && pl.holes.length)
-      .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, holes: pl.holes.map(h => ({ ...h })) })),
+      .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, holes: pl.holes.map(h => ({ ...h })), spans: pl.holes.map(h => holeSpans(pl, h)) })),
     bullets: () => bullets.map(b => ({
       x: Math.round(b.x), y: Math.round(b.y), ghost: Boolean(b.ghost),
       damage: Math.round(b.damage), empowered: b.empowered || 0, explosive: b.explosive
@@ -6280,9 +6306,9 @@
     probe: (px, py, rad = 27) => activePlatforms(currentLevel(), world.time)
       .filter(pl => pl.holes && pl.holes.length)
       .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, hasHoles: pl.holes.length, inHole: inHole(pl, px, py, rad) })),
-    punch: (px, py, r = 30) => {
+    punch: (px, py, size = 64) => {
       const plats = activePlatforms(currentLevel(), world.time);
-      for (const pl of plats) if (circleRect({ x: px, y: py, r: 4 }, pl)) return punchHole(pl, px, py, r);
+      for (const pl of plats) if (circleRect({ x: px, y: py, r: 4 }, pl)) return punchHole(pl, px, py, size);
       return false;
     },
     grant(index, cardId) {

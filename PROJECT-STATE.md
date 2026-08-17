@@ -188,6 +188,20 @@ Pillars:
       Magnet Suit deflects hard enough to actually turn shots away (0% of
       shots landing in the preview, was 100%) and crackles with a visible
       magnetic field
+- [x] **Skylight excavates square bites 2026-08-17**: holes are rectangles of
+      removed material, not circular doorways — one shot takes a square bite
+      out of the face it strikes, and anything thicker than a bite needs a
+      second shot to hole right through (the 92px preview wall opens on hit 2,
+      a 120px slab on hit 3). Overlapping bites merge, which is what deepens a
+      niche into a passage. Bullets travel through any excavation; players
+      only pass an opening that spans the slab, so nobody sinks into a pocket.
+      A borer walks through what is already cut before biting, since collision
+      fires at the slab's face and every shot would otherwise re-cut the same
+      first bite
+- [x] **Workbench**: the duplicate card face above the preview is gone, and
+      card art is drawn with real `<img>` elements (scene → emblem → a plain
+      "no art yet" badge), so a missing file is visible instead of silently
+      falling through to the tinted panel
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

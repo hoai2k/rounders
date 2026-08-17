@@ -67,6 +67,15 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
   Characters** to play with the built-in vector art.
 - **Simultaneous drafting** — when several players lose a round, they all draft at
   once, each with their own hand and controls.
+- **Choose Cards** (**Settings → Choose Cards**) — draft from the whole set at the
+  usual rarity rates (*Default*), from the whole set with every card equally
+  likely (*Equalize*), or from a set you build yourself (*Choose*): a scrollable
+  grid of every card where any of them can be greyed out and taken off the table.
+  A rarity heading toggles that whole block. Your selection is saved, so you can
+  flip back to Default to play with everything and return to Choose later to find
+  it exactly as you left it. On a controller the grid has its own cursor — hold a
+  direction to move fast, **A** toggles a card, **X** its whole rarity, **LB**/**RB**
+  jump between rarities.
 - Bots (three difficulties), controller rumble, screen shake, synth SFX, and a
   **28-track soundtrack cast per arena** — 14 themes × 2, with every arena
   matched to its opening song in `js/arena-music.js`. A board opens on its song,

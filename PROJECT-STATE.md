@@ -105,6 +105,24 @@ Pillars:
       scale, with size and rotation sliders. Tweaks persist in localStorage
       and come out of **⬇ Export changes** as `card-workbench-changes.json`.
       Painted rounds are picked up from `assets/images/bullets/<id>.png`
+- [x] **Choose Cards** (Settings → Choose Cards): a three-way pool mode —
+      **Default** (every card, rarity-weighted), **Equalize** (every card, one
+      ticket each, so a Mythic is as likely as a Common) and **Choose**, which
+      opens a scrollable grid of the whole set where any card can be greyed out
+      and taken off the draft table. Rarity headings carry a live `on/total`
+      count and toggle their whole block; All / None / Invert sit above the
+      grid. Only the mode and the disabled set persist (`localStorage`,
+      `rounders.cards.v1`), and they persist independently — flip to Default to
+      see everything, come back to Choose and the same selection is waiting.
+      Switching everything off is not a playable state, so an empty pool falls
+      back to the full set and the counter says so.
+      The grid is its own focus region for the pad: eighty-odd cells would
+      flood the panel's spatial cursor, so it stands in that list as a single
+      cell and takes over from there — row map measured from live geometry
+      (ragged last rows and full-width headings need no special case),
+      held-direction auto-repeat (0.3s, then ~18 cells a second), A to toggle,
+      X for the whole rarity, LB/RB to jump between rarities, and focus handed
+      back to the panel at the top and bottom edges
 - [ ] **Art outstanding** (`image-requests.md`): 36 cards have no emblem or
       scene at all, plus the new bullet (29) and effect (18) batches
 - [ ] Balance pass on the 32 new cards once they've been played for real

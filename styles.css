@@ -281,6 +281,193 @@ button.primary:hover, button.primary.controller-focus {
 .settings-panel .r-legendary { color: var(--legendary); }
 .settings-panel .r-mythic { color: var(--mythic); }
 
+/* ------------------------------------------------------------ choose cards */
+/* Default / Equalize / Choose, as a segmented control above the card grid. */
+.card-mode {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+
+.card-mode button {
+  padding: 11px 10px;
+  font-size: 15px;
+  border-radius: 12px;
+}
+
+.card-mode button.on {
+  background: linear-gradient(120deg, var(--coral), #b45cff);
+  border-color: transparent;
+  box-shadow: 0 6px 20px rgba(255, 61, 132, 0.38);
+}
+
+.card-mode button.on.controller-focus { box-shadow: 0 10px 26px rgba(255, 61, 132, 0.55), 0 0 0 2px #fff; }
+
+.card-note {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: rgba(245, 242, 255, 0.66);
+}
+
+/* The rarity sliders stop mattering in Equalize, so they read as switched off. */
+#rarityGroup.muted { opacity: 0.42; }
+
+.card-picker-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.card-picker-bar button { padding: 8px 14px; font-size: 13px; border-radius: 10px; }
+
+.card-count {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sky);
+  font-variant-numeric: tabular-nums;
+}
+
+.card-count.warn { color: var(--coral); }
+
+.card-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: rgba(245, 242, 255, 0.55);
+}
+
+.card-hint b {
+  color: rgba(245, 242, 255, 0.85);
+  font-weight: 800;
+}
+
+/* Its own scroller, so the grid never shoves the rest of Settings off screen. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+
+/* What the card under the cursor actually does. Fixed height, so reading down
+   the grid never shuffles the panel around underneath you. */
+.card-detail {
+  margin: 8px 2px 0;
+  min-height: 2.6em;
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: rgba(245, 242, 255, 0.72);
+}
+
+.card-detail b { color: var(--rcol, var(--paper)); font-weight: 800; }
+.card-detail i { color: rgba(245, 242, 255, 0.5); font-style: normal; }
+
+.rarity-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--rcol) 32%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--rcol) 12%, transparent);
+  color: var(--rcol);
+  font: 800 12px/1 inherit;
+  font-family: inherit;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.rarity-head:hover, .rarity-head.controller-focus {
+  background: color-mix(in srgb, var(--rcol) 24%, transparent);
+  border-color: var(--rcol);
+  transform: none;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.card-cell {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 4px;
+  padding: 8px 6px 7px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--rcol) 45%, #3a3f4d);
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--rcol) 18%, transparent), transparent 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.3));
+  text-shadow: none;
+  /* no transform on hover: 87 cells lifting under a fast-moving cursor is noise */
+  transition: filter 0.12s, opacity 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+
+.cc-art {
+  height: 46px;
+  background: var(--emblem) center/contain no-repeat;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
+}
+
+.cc-name {
+  font: 700 10.5px/1.2 inherit;
+  font-family: inherit;
+  color: var(--rcol);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  min-height: 2.4em;
+}
+
+.card-cell:hover, .card-cell.controller-focus {
+  transform: none;
+  border-color: var(--rcol);
+  box-shadow: 0 0 0 2px #fff, 0 0 20px var(--rglow);
+}
+
+/* Disabled cards stay in place, greyed out, so the grid never reflows. */
+.card-cell.off {
+  filter: grayscale(1) brightness(0.55);
+  opacity: 0.5;
+}
+
+.card-cell.off .cc-name { color: rgba(245, 242, 255, 0.75); }
+.card-cell.off.controller-focus { filter: grayscale(1) brightness(0.8); opacity: 0.85; }
+
+.card-cell::after {
+  content: "✓";
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 900;
+  color: #10121a;
+  background: var(--rcol);
+}
+
+.card-cell.off::after {
+  content: "";
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
 input[type="range"] {
   appearance: none;
   height: 8px;
@@ -861,6 +1048,9 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   .settings-panel label { grid-template-columns: 120px 1fr 54px; gap: 8px; font-size: 13px; }
   .hud-card { min-width: 150px; }
   .hud-cards { display: none; }
+  .card-grid { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); max-height: 50vh; }
+  .cc-art { height: 38px; }
+  .card-picker-bar { flex-wrap: wrap; }
 }
 
 /* ------------------------------------------------------------ title screen */

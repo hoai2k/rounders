@@ -174,6 +174,23 @@ terrain vocabulary.
   platform drops and settles; crates shoved across the floor by gunfire;
   breakable telegraph rendering.
 
+## 6. Power-card audit (effectiveness · ROUNDS variety · stacking · salience)
+
+A pass over all cards against three questions: does the effect *noticeably*
+change gameplay, does the set cover ROUNDS' card vocabulary, and does drafting
+a card twice compound it?
+
+| # | Finding | Resolution |
+|---|---|---|
+| K1 | **CRITICAL** — Homing was imperceptible (the report that started this audit). It added ~500 px/s² of side pull to an ~1100 px/s bullet: over a typical 0.4s flight that bends the path ~25px, and the 650px acquisition range often meant no target at all. | ✅ Homing is now *steering*: the whole velocity vector rotates toward the target at a rate set by the stat (Magnet Fingers ≈ 90°/s — a visible curve; stacked with Black Mamba ≈ 3.5 rad/s — a heat-seeker), speed preserved, acquisition range 900px, and homing shots shrug off 60% of bullet drop so the curve isn't fighting gravity. Seeker ring + fins on the bullet. |
+| K2 | No shield card — ROUNDS' Shield/Defender archetype was missing entirely. | ✅ **Aegis Bubble** (rare): +30 regenerating shield that absorbs before health and recharges 3.5s after the last hit. Fully additive per copy. Cyan bubble around the fighter, hard flash on absorb, break-burst when it pops, charge sliver above the health bar. |
+| K3 | No ground-follow card. | ✅ **Lowrider** (uncommon): bullets drop to the nearest floor and skim it, following terrain over ledges and catching the next floor down — with a dust trail so the skim reads. |
+| K4 | Black holes existed only as the Mythic active (Event Horizon), so the archetype was a lottery ticket. | ✅ **Pocket Void** (epic): every bullet break tears a brief vortex that drags players toward it; stacks grow the radius, pull, and duration. Reuses the black-hole field rendering. |
+| K5 | ROUNDS-vocabulary coverage check for the user's list: more ammo (Bubblegum/Hair Trigger/Hummingbird/Dragon's Hoard ✓), more HP (Stone Soup/Brick Wall/Juggernaut ✓), faster shots (Longshot/Railgun ✓), multi-shot (Double Dutch/Buckshot/Bullet Ballet ✓), big bullets (Big Bore ✓, stacks multiplicatively), shields ✗, ground-follow ✗, black holes (mythic-only). | ✅ The three gaps became K2–K4. Set is now **55 cards** (14C/13U/11R/9E/5L/3M). |
+| K6 | Stacking audit: every numeric effect verified to compound on a second copy (scripted apply-twice test over all 55 — no NaN, no non-stacking numerics). Golden Gun, kill-heal, and the three actives are deliberate booleans/replacements. | ✅ Rule written into the `js/cards.js` header; apply-twice check is part of the verification suite. 📝 |
+| K7 | Salience: every bullet rendered as an identical circle regardless of build (golden glow and a faint homing ring aside), so a loaded build didn't look loaded. Note: the bar is *noticeable in gameplay*, not necessarily on the bullet — faster bullets should simply be visibly faster. | ✅ Effects that benefit from readability got bullet-level tells: pierce = elongated drill slug, poison = green ring, chill = rotating frost picks, chain = crackling tail, explosive = pulsing warm glow, void = swirling arc, grow = the bullet visibly swells with distance, homing = ring + fins. Status tells on fighters: chill/burn tints (existing), shield bubble + charge sliver (new). Speed/damage/ammo/reload cards need no dressing — their numbers are felt directly. |
+| K8 | Slab crush damage was flat (14–44 from any slab past a fixed speed) — a thin shelf dropping a short way hit like a falling building. | ✅ Crush now scales with slab mass (area vs a standard 220×24 platform, 0.35×–2.4×) and starts at a real falling speed (500 px/s ≈ a 60px drop), with a 5-damage floor below which it's just a bonk. Thin-and-slow is harmless; big-and-fast still flattens. |
+
 ## Verification
 
 - `node --check` passes on all JS files.

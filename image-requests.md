@@ -1,9 +1,9 @@
 # Image Generation Requests — Rounders
 
-**Nothing is outstanding.** Every image the game asks for has been generated and
-is in the repo; the prompts they were made from are in
-`image-requests-history.md`, which is where a re-generation or a style question
-goes looking.
+**One batch outstanding: art for the 3 new cards** (below). Everything else
+the game asks for has been generated and is in the repo; the prompts they were
+made from are in `image-requests-history.md`, which is where a re-generation or
+a style question goes looking.
 
 The game ships with procedural fallbacks, so art can be dropped in incrementally:
 any missing file is fine and simply falls back.
@@ -25,6 +25,23 @@ any missing file is fine and simply falls back.
   green `#00ff00` for warm art) and keep it perfectly flat — no gradient, no
   shadow, and nothing enclosed by the art in that colour (`npm run audit-keys`
   catches backdrop trapped inside a shape, but it is cheaper not to make it).
+
+---
+
+## 1. New card art (3 cards × 2 images = 6 files)
+
+The power-card audit (AUDIT.md §6) added three cards. Each wants both shapes —
+an **emblem** (`assets/images/cards/<id>.png`, 256×256, transparent, single
+centered subject) and an **art panel** (`assets/images/cards/art/<id>.png`,
+512×384, full-bleed painted scene, key subject inside the middle 80%).
+
+| Card | Files | Subject |
+|---|---|---|
+| **Lowrider** (uncommon) | `lowrider.png` + `art/lowrider.png` | A bullet skimming along the ground hugging the terrain — a glowing round tracer hovering just above a rolling floor line, kicking up a little dust trail behind it, dipping over the lip of a ledge. Cool teal/green energy. |
+| **Aegis Bubble** (rare) | `aegis-bubble.png` + `art/aegis-bubble.png` | A translucent cyan energy bubble wrapped around a small round fighter silhouette, a bullet splashing harmlessly against its rim in a hard ring of light. Cyan/ice-blue glow on dark. |
+| **Pocket Void** (epic) | `pocket-void.png` + `art/pocket-void.png` | A tiny black hole torn open in mid-air at a bullet's point of impact — swirling violet accretion arc, debris and sparks bending into it, space warping at the edges. Deep purple/magenta. |
+
+---
 
 ## Where the art is used
 

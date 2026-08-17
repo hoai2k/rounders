@@ -1,7 +1,13 @@
-// Rounders — card set (52 cards, designed from scratch).
+// Rounders — card set (55 cards, designed from scratch).
 // Cards mutate player.stats via apply(). The engine implements every mechanic
 // referenced here (burn, chill, pierce, chain, shards, thorns, regen, rage,
-// adrenaline, guardian, goldenShot, killHeal, stormBlock, warpBlock, actives).
+// adrenaline, guardian, goldenShot, killHeal, stormBlock, warpBlock, shield,
+// groundHug, voidPull, actives).
+//
+// STACKING RULE: every numeric effect uses += or *= so drafting a card twice
+// compounds it (two Big Bores = fatter still; two Magnet Fingers = a true
+// heat-seeker). The only exceptions are the boolean legendaries (Golden Gun,
+// kill-heal) and the Mythic actives, where a duplicate replaces/no-ops.
 (() => {
   "use strict";
   window.ROUNDERS = window.ROUNDERS || {};
@@ -105,7 +111,7 @@
       ["+18% damage", "+25% bullet size", "−12% bullet speed"], ["damage"],
       p => { p.stats.damage *= 1.18; p.stats.bulletSize *= 1.25; p.stats.bulletSpeed *= 0.88; }),
 
-    // ---------------------------------------------------------- UNCOMMON (12)
+    // ---------------------------------------------------------- UNCOMMON (13)
     card("ricochet-romance", "Ricochet Romance", "uncommon",
       "Every wall is a matchmaker.",
       "Your bullets bounce off walls and floors up to 2 times before breaking.",
@@ -172,13 +178,19 @@
       ["block shockwave", "+15% health"], ["block"],
       p => { p.stats.blockPush += 1; p.stats.maxHp *= 1.15; }),
 
+    card("lowrider", "Lowrider", "uncommon",
+      "Keeps a low profile.",
+      "Your bullets drop to the nearest floor and skim along it, hugging the terrain over ledges and up to your target's ankles.",
+      ["bullets follow the ground", "−8% damage"], ["projectile"],
+      p => { p.stats.groundHug += 1; p.stats.damage *= 0.92; }),
+
     card("panic-pedals", "Panic Pedals", "uncommon",
       "Fear is a performance enhancer.",
       "While below 35% health you move 40% faster. Panic responsibly.",
       ["+40% speed when under 35% HP"], ["movement", "clutch"],
       p => { p.stats.adrenaline += 0.4; }),
 
-    // -------------------------------------------------------------- RARE (10)
+    // -------------------------------------------------------------- RARE (11)
     card("drill-rounds", "Drill Rounds", "rare",
       "Through, not around.",
       "Bullets punch straight through the first player they hit and keep flying.",
@@ -233,13 +245,19 @@
       ["up to +60% damage at low HP"], ["damage", "clutch"],
       p => { p.stats.rage += 0.6; }),
 
+    card("aegis-bubble", "Aegis Bubble", "rare",
+      "Bring your own weather.",
+      "A regenerating energy shield absorbs 30 damage before your health is touched. It recharges after 3.5 seconds without being hit.",
+      ["+30 regenerating shield"], ["defense"],
+      p => { p.stats.shield += 30; }),
+
     card("hummingbird", "Hummingbird", "rare",
       "Blink and you'll miss all of it.",
       "A blur of light, fast shots: a bigger magazine, much higher fire rate and speed, lower damage.",
       ["−40% fire delay", "+2 ammo", "+10% speed", "−20% damage"], ["firerate"],
       p => { p.stats.fireDelay *= 0.6; p.stats.maxAmmo += 2; p.stats.speed *= 1.1; p.stats.damage *= 0.8; }),
 
-    // -------------------------------------------------------------- EPIC (8)
+    // -------------------------------------------------------------- EPIC (9)
     card("cluster-bomb", "Party Favor", "epic",
       "One explosion is never enough.",
       "Bullets explode on impact AND split into bomblets. Reloads take longer.",
@@ -281,6 +299,12 @@
       "Once per round, a hit that would kill you leaves you at 25% health instead.",
       ["survive 1 lethal hit per round (25% HP)", "+10% health"], ["clutch", "defense"],
       p => { p.stats.guardian += 1; p.stats.maxHp *= 1.1; }),
+
+    card("pocket-void", "Pocket Void", "epic",
+      "Litter, but cosmic.",
+      "Wherever a bullet breaks, it tears open a brief vortex that drags nearby players toward it. Stacks make it bigger and hungrier.",
+      ["impacts open a small black hole", "−10% damage"], ["control", "aoe"],
+      p => { p.stats.voidPull += 1; p.stats.damage *= 0.9; }),
 
     card("bullet-ballet", "Bullet Ballet", "epic",
       "Choreographed devastation.",

@@ -68,7 +68,11 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 - **Simultaneous drafting** — when several players lose a round, they all draft at
   once, each with their own hand and controls.
 - Bots (three difficulties), controller rumble, screen shake, synth SFX, and a
-  2-track soundtrack.
+  **28-track soundtrack cast per arena** — 14 themes × 2, with every arena
+  matched to its opening song in `js/arena-music.js`. A board opens on its song,
+  follows it with that song's partner ("Tango 2" → "Tango 1"), then keeps going
+  with random non-repeating tracks. Picking a card leaves the song playing,
+  quieter; the next board brings its own.
 
 ## Project docs
 
@@ -88,6 +92,8 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 | `js/cards.js` | The 52-card set + rarity metadata |
 | `js/levels.js` | The 25 arenas |
 | `js/characters.js` | The 24 characters + procedural renderer |
+| `js/music.js` | Soundtrack manifest: the 28 tracks, their themes and pairs |
+| `js/arena-music.js` | **Which song opens which arena** — the table to edit |
 | `js/rig.js` | Composed sprites: loads body/weapon/arm parts, detects anchors, draws the aimable rig |
 | `js/chroma.js` | Backdrop keying (magenta/green screen → transparent), shared by intake and runtime |
 | `tools/intake.mjs` | `npm run intake` — keys and files delivered art, archives the originals |

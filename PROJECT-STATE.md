@@ -302,6 +302,35 @@ Pillars:
 - [x] **Mid-round grants sync their per-round counters**: `grantCard` refreshes
       `guardianCharges`, `roundRevives`, `hoverLeft` and `freshPool`, so a card
       taken mid-round no longer grants a save you cannot spend
+- [x] **Seven more cards cut 2026-08-17**: Chain Letter (redundant with Storm
+      Caller), Underdog, Coffee Break, Cold Snap, Panic Pedals, Rocket Skates,
+      Echo Chamber. **77 cards** now: 15 C / 18 U / 22 R / 14 E / 5 L / 3 M.
+      Their art stays in the repo in case they return, as with the earlier cuts
+- [x] **Card feel pass 2026-08-17 (6)**: **Popcorn Payload** actually pops —
+      the round throws 10 hot kernels up in a spray that rain back down for
+      more damage, and any that miss bounce twice more before giving up (the
+      old splash-explosion is gone). **Wasp Venom** stacks: doses add up on
+      repeated stings instead of the strongest one winning, capped at 4×.
+      **Bodyguard**'s shockwave now swats any bullet caught inside the
+      knockaway zone off in a random direction — rounds the block itself
+      parried are already gone, so it only catches the ones that were going to
+      sail past, and a swatted round answers to whoever swatted it. **Leech
+      Lunch** heals 25% (was 18%)
+- [x] **Panic Button's auto-block is genuinely free**: `tryBlock` gained a
+      `free` flag. The empty-magazine block no longer waits on the block
+      cooldown *or* spends it, so your manual parry is still there — it is an
+      extra shield, which is what the card promises
+- [x] **Two dead previews fixed**: **Hot Streak** was staged on the receiving
+      end, but its shield is earned by DEALING damage, so it never fired —
+      its holder now shoots. **Springload** had no stomp in the sim at all;
+      the sim implements it now and stages a hop onto the target's head
+- [x] **Helium Rounds preview**: the launch was never wrong — helium touches
+      only `gravity`, so the muzzle velocity is identical to a normal round.
+      What looked wrong was the preview's ballistic solver correctly aiming low
+      to let an upward-falling shot arc back down into a target at its own
+      height. It now fires dead FLAT, exactly like any round, at a target
+      standing on a ledge sized so the rise after launch carries it there —
+      which is the card's actual use
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

@@ -11,7 +11,9 @@ question goes looking.
 > cards, each with an emblem and a scene). Art for four cut cards is unused but
 > kept in case they return — `big-bore` (a strictly worse Cannonball) and
 > `gag-order` / `cold-shoulder` / `overflow` (effects that were not pulling
-> their weight).
+> their weight), and now `chain-lightning` / `underdog` / `coffee-break` /
+> `cold-snap` / `panic-pedals` / `rocket-skates` / `echo-chamber` on the same
+> terms. 77 cards ship.
 >
 > **Renamed cards keep their files, but not always their subject.** Skylight →
 > **Breakthrough** kept its painting, which already showed a fighter smashing

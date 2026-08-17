@@ -131,8 +131,8 @@
 
     card("wasp-venom", "Wasp Venom", "uncommon",
       "The sting is just the beginning.",
-      "Hits inject venom that deals damage over 3 seconds (strongest venom wins — it does not stack). Direct damage drops.",
-      ["poison on hit (3s)", "−15% damage"], ["dot"],
+      "Hits inject venom that deals damage over 3 seconds. Sting them again and the doses ADD UP. Direct damage drops.",
+      ["poison on hit (3s)", "doses stack", "−15% damage"], ["dot"],
       p => { p.stats.poison += 1; p.stats.damage *= 0.85; }),
 
     card("cinder-shot", "Cinder Shot", "uncommon",
@@ -155,15 +155,15 @@
 
     card("popcorn-payload", "Popcorn Payload", "uncommon",
       "Pop pop pop.",
-      "Bullets burst on impact, dealing splash damage and knockback nearby.",
-      ["small explosion on hit", "−10% damage"], ["aoe"],
-      p => { p.stats.explosive += 0.6; p.stats.damage *= 0.9; }),
+      "Bullets pop on impact, flinging 10 hot kernels up into the air. They rain back down for more damage, and anything that misses bounces twice more before it gives up.",
+      ["impacts pop into 10 kernels", "kernels rain down & bounce twice", "−10% damage"], ["aoe"],
+      p => { p.stats.popcorn += 10; p.stats.damage *= 0.9; }),
 
     card("leech-lunch", "Leech Lunch", "uncommon",
       "Eat what you hit.",
-      "Heal for 18% of every point of bullet damage you deal.",
-      ["18% lifesteal"], ["sustain"],
-      p => { p.stats.lifesteal += 0.18; }),
+      "Heal for 25% of every point of bullet damage you deal.",
+      ["25% lifesteal"], ["sustain"],
+      p => { p.stats.lifesteal += 0.25; }),
 
     card("double-dutch", "Double Dutch", "uncommon",
       "Two ropes, two bullets.",
@@ -171,22 +171,10 @@
       ["+1 pellet", "−25% damage per pellet", "slight spread"], ["multishot"],
       p => { p.stats.pellets += 1; p.stats.damage *= 0.75; p.stats.spread += 0.05; }),
 
-    card("rocket-skates", "Rocket Skates", "uncommon",
-      "Safety third.",
-      "Blocking also dashes you hard in your aim direction. Block recharges faster.",
-      ["block = dash", "−15% block cooldown"], ["block"],
-      p => { p.stats.blockDash += 1; p.stats.blockCooldown *= 0.85; }),
-
-    card("echo-chamber", "Echo Chamber", "uncommon",
-      "Say it again, louder.",
-      "A moment after you block, your parry window automatically re-opens for a second pulse.",
-      ["block repeats once", "+0.2s block cooldown"], ["block"],
-      p => { p.stats.echoBlock += 1; p.stats.blockCooldown += 0.2; }),
-
     card("bodyguard", "Bodyguard", "uncommon",
       "Personal space, enforced.",
-      "Blocking releases a shockwave that shoves nearby opponents away. Extra health too.",
-      ["block shockwave", "+15% health"], ["block"],
+      "Blocking releases a shockwave that shoves nearby opponents away and swats any bullet caught in it off in a random direction. Extra health too.",
+      ["block shockwave", "scatters bullets in range", "+15% health"], ["block"],
       p => { p.stats.blockPush += 1; p.stats.maxHp *= 1.15; }),
 
     card("lowrider", "Lowrider", "uncommon",
@@ -194,12 +182,6 @@
       "Your bullets drop to the nearest floor and skim along it, hugging the terrain over ledges and up to your target's ankles.",
       ["bullets follow the ground", "−8% damage"], ["projectile"],
       p => { p.stats.groundHug += 1; p.stats.damage *= 0.92; }),
-
-    card("panic-pedals", "Panic Pedals", "uncommon",
-      "Fear is a performance enhancer.",
-      "While below 35% health you move 40% faster. Panic responsibly.",
-      ["+40% speed when under 35% HP"], ["movement", "clutch"],
-      p => { p.stats.adrenaline += 0.4; }),
 
     card("waste-not", "Waste Not", "uncommon",
       "Every bullet comes home.",
@@ -213,23 +195,11 @@
       ["block = full reload", "+0.25s block cooldown"], ["block", "ammo"],
       p => { p.stats.blockReload += 1; p.stats.blockCooldown += 0.25; }),
 
-    card("cold-snap", "Cold Snap", "uncommon",
-      "Everyone out of the pool.",
-      "Blocking flash-freezes the air, chilling everyone nearby for 2.5 seconds.",
-      ["block chills nearby (2.5s)", "+10% health"], ["block", "control"],
-      p => { p.stats.frostBlock += 1; p.stats.maxHp *= 1.1; }),
-
     card("panic-button", "Panic Button", "uncommon",
       "Insurance you fire.",
       "Firing the last bullet in your magazine automatically triggers your block — and everything attached to it.",
       ["last bullet auto-blocks", "+0.3s reload"], ["block", "clutch"],
       p => { p.stats.autoBlock += 1; p.stats.reload += 0.3; }),
-
-    card("coffee-break", "Coffee Break", "uncommon",
-      "Do not talk to me yet.",
-      "While reloading you emit scalding pulses that damage and push nearby enemies.",
-      ["damaging pulses while reloading"], ["aoe"],
-      p => { p.stats.reloadPulse += 1; }),
 
     card("triple-tap", "Triple Tap", "uncommon",
       "Once more, with feeling. Twice.",
@@ -255,12 +225,6 @@
       ["head stomp: 25 damage + bounce"], ["movement"],
       p => { p.stats.stomp += 1; }),
 
-    card("underdog", "Underdog", "uncommon",
-      "Nothing left to lose.",
-      "For every round you trail the leader, hit 8% harder and move 8% faster.",
-      ["+8% damage & speed per round behind"], ["clutch"],
-      p => { p.stats.underdog += 0.08; }),
-
     card("firecracker-heels", "Firecracker Heels", "uncommon",
       "Ignition on the second hop.",
       "Your mid-air jumps detonate a small blast beneath you that damages and shoves enemies.",
@@ -279,12 +243,6 @@
       "Shots chew a square bite out of whatever terrain they strike — two into a thick wall opens a permanent gap anyone can shoot or climb through. People still just get hit.",
       ["impacts bite squares out of terrain", "thick walls take 2 hits", "−10% damage"], ["projectile", "control"],
       p => { p.stats.holePunch += 1; p.stats.damage *= 0.9; }),
-
-    card("chain-lightning", "Chain Letter", "rare",
-      "Sharing is shocking.",
-      "When you hit someone, lightning arcs to the nearest other opponent for 55% damage. In a duel it re-strikes your victim for 25% instead.",
-      ["hits arc to a 2nd enemy (55%)", "duels: re-strike 25%"], ["aoe"],
-      p => { p.stats.chain += 1; }),
 
     card("thorn-jacket", "Thorn Jacket", "rare",
       "Hug at your own risk.",

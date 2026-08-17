@@ -55,7 +55,7 @@
       blockCooldown: 1.55, blockDuration: 0.25,
       radius: 27, pellets: 1, spread: 0.04,
       bounces: 0, explosive: 0, homing: 0, grow: 0, pierce: 0,
-      poison: 0, burn: 0, chill: 0, chain: 0, shards: 0,
+      poison: 0, burn: 0, chill: 0, chain: 0, shards: 0, popcorn: 0,
       groundHug: 0, voidPull: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
@@ -121,7 +121,7 @@
       on("warpBlock") || on("blockDash") || on("stormBlock") || on("echoBlock") ||
       on("empowerBlock") || on("blockRefresh") || s.blockCooldown !== b.blockCooldown;
     const defensive = on("shield") || on("thorns") || on("regen") || on("kbResist") ||
-      on("overflow") || on("freshCoat") || on("hotStreak") || on("decay") ||
+      on("overflow") || on("freshCoat") || on("decay") ||
       on("guardian") || on("revives") || on("chillAura") || on("repel") ||
       s.maxHp > b.maxHp * 1.05;
     const movement = on("speed") || on("jump") || on("extraJumps") || on("airAccel") ||
@@ -155,7 +155,15 @@
     else if (on("bounces") || on("bankShot")) { plan.skip = true; watch.push("the shot skips off the floor instead of dying on it"); }
     if (on("chain")) { plan.wall = "perch"; watch.push("with nobody else to jump to, the bolt earths on the wall behind and comes back — hitting them twice"); }
     if (on("homing") || on("steer")) { plan.aimUp = -0.6; watch.push("fired well off-target, the bullet curves back onto them"); }
-    if (on("helium")) { plan.aimUp = 0.12; watch.push("the bullet falls upward instead of dropping"); }
+    if (on("helium")) {
+      // Fired FLAT, exactly as a normal round leaves the muzzle — the only
+      // difference is what happens after launch. The target waits on a ledge
+      // the shot could never reach if it dropped.
+      plan.flat = true;
+      plan.ledge = true;
+      watch.push("it leaves the muzzle flat, like any round — then falls UPWARD");
+      watch.push("so it climbs to a target a normal shot would sail under");
+    }
     if (on("grow")) watch.push("the bullet swells and hits harder the farther it flies");
     // a ground-hugger wants a flat shot: it only catches the floor if it is
     // fired near it, so lobbing it would just sail over the whole point
@@ -163,6 +171,11 @@
     if (on("boomerang")) { plan.aimUp = -0.75; watch.push("a miss turns around and flies back to the shooter"); }
     if (on("explosive")) watch.push("impacts detonate — the victim eats a share of the blast");
     if (on("shards")) watch.push("the bullet breaks into shrapnel");
+    if (on("popcorn")) {
+      plan.skip = false;
+      watch.push("the round POPS into ten kernels that arc up and rain back down");
+      watch.push("kernels that miss bounce twice more before giving up");
+    }
     if (on("stink")) watch.push("impacts leave a lingering cloud");
     if (on("voidPull")) watch.push("impacts tear open a vortex that drags them in");
     if (on("poison") || on("burn")) watch.push("damage keeps ticking after the hit");
@@ -200,13 +213,20 @@
     }
     if (on("sawBlock")) watch.push("a sawblade orbits them after the block");
     if (on("stormBlock")) watch.push("blocking throws lightning at whoever is near");
-    if (on("blockPush")) watch.push("blocking shoves the attacker away");
+    if (on("blockPush")) {
+      watch.push("blocking shoves the attacker away");
+      watch.push("and swats any bullet still in the blast off in a random direction");
+    }
     if (on("warpBlock")) watch.push("blocking teleports them out of the way");
     if (on("blockDash")) watch.push("blocking hurls them forward");
     if (on("echoBlock")) watch.push("the block fires a second time on its own");
     if (on("empowerBlock")) watch.push("after a block the next shot is gold and lands like a bomb");
     if (on("goldenShot")) watch.push("the first shot of the magazine is gold and triple damage");
-    if (on("stomp")) watch.push("landing on a head deals damage and bounces them off it");
+    if (on("stomp")) {
+      plan.stompDemo = true;
+      plan.close = true;
+      watch.push("landing on a head deals damage and bounces them off it");
+    }
     if (on("jumpBlast")) watch.push("their mid-air jump detonates underneath them");
     if (s.damage > b.damage * 1.02) watch.push("bigger bite out of the health bar");
     if (s.damage < b.damage * 0.98) watch.push("softer hits — the trade for the rest of the card");
@@ -259,6 +279,9 @@
       const holderIsTarget = plan.holder === "target";
       a = makeFighter(120, !holderIsTarget, "#ff5277", chA, 1);
       bb = makeFighter(plan.wall ? 600 : plan.close ? 300 : 545, holderIsTarget, "#52d7ff", chB, -1);
+      // stand them on the ledge: the sim's floor is a single line, so the
+      // fighter carries its own
+      if (plan.ledge) { bb.x = 640; bb.floorY = 175 - bb.stats.radius; bb.y = bb.floorY; bb.grounded = true; }
       a.temp = a.holder ? a.stats.maxHp * a.stats.freshCoat : 0;
       bb.temp = bb.holder ? bb.stats.maxHp * bb.stats.freshCoat : 0;
       bullets = []; fields = []; parts = []; floaters = []; decoys = []; slabs = [];
@@ -275,6 +298,9 @@
       // a slab BEHIND the target, clear of the flight path, so a chain bolt has
       // something real to earth itself on where you can watch it happen
       if (plan.wall === "perch") list.push({ x: 660, y: 96, w: 34, h: GROUND - 96 });
+      // sized so a FLAT helium shot climbs exactly onto it over the run-up:
+      // rise = g*d^2/(2v^2) puts the round at head height at x=640
+      if (plan.ledge) list.push({ x: 610, y: 175, w: 105, h: 14 });
       for (const s of slabs) list.push({ x: s.x - s.w / 2, y: s.y - s.h / 2, w: s.w, h: s.h, slab: true });
       return list;
     };
@@ -500,7 +526,7 @@
           wallPierce: st.wallPierce ? 70 + 50 * (st.wallPierce - 1) : 0,
           holePunch: st.holePunch,
           homing: st.homing, steer: st.steer, grow: st.grow, groundHug: st.groundHug,
-          explosive: st.explosive, shards: st.shards, chain: st.chain,
+          explosive: st.explosive, shards: st.shards, chain: st.chain, popcorn: st.popcorn,
           poison: st.poison, burn: st.burn, chill: st.chill, stink: st.stink,
           voidPull: st.voidPull, dazzle: st.dazzle, silence: st.silence,
           bankShot: st.bankShot, boomerang: st.boomerang, empowered: empower,
@@ -515,12 +541,13 @@
           who.queue.push({ t: 1 * i, mul: 0.5, angle: ang, pellets: 2, from: { x: who.x, y: who.y } });
         }
       }
-      if (who.ammo <= 0) { who.reloadT = st.reload; if (st.autoBlock) doBlock(who); }
+      if (who.ammo < st.autoBlock) doBlock(who, true);
+      if (who.ammo <= 0) who.reloadT = st.reload;
     }
 
     function blockEffects(who, x, y) {
       const st = who.stats;
-      if (st.blockPush) fields.push({ type: "push", owner: who, x, y, r: 110, life: 0.3 });
+      if (st.blockPush) fields.push({ type: "push", owner: who, x, y, r: 110, life: 0.3, scatter: true });
       if (st.frostBlock) { for (const e of enemies(who)) if (Math.hypot(e.x - x, e.y - y) < 150) e.chillT = 2.5; puff(x, y, "#8fd8ff", 16, 240); }
       if (st.healField) fields.push({ type: "heal", owner: who, x, y, r: 86, life: 3, hps: 10 * st.healField });
       if (st.stormBlock) {
@@ -543,11 +570,14 @@
       }
     }
 
-    function doBlock(who) {
-      if (who.blockCd > 0 || who.silenceT > 0) return;
+    // `free` is Panic Button's automatic block: an extra shield, so it neither
+    // waits on the cooldown nor spends it
+    function doBlock(who, free = false) {
+      if (who.silenceT > 0) return;
+      if (!free && who.blockCd > 0) return;
       const st = who.stats;
       who.blockT = st.blockDuration + 0.25;   // held a beat longer so it reads
-      who.blockCd = st.blockCooldown;
+      if (!free) who.blockCd = st.blockCooldown;
       puff(who.x, who.y, "#ffffff", 12, 200);
       if (st.decoy) {
         // stood clearly apart from its owner, or the two just overlap and the
@@ -632,6 +662,22 @@
           fire(who, q.mul, q.angle ?? null, true, q);
         }
         // physics
+        // Springload: landing on a head is an attack and a launchpad
+        if (who.stats.stomp && who.vy > 160 * SCALE && (who.stompCd || 0) <= 0) {
+          for (const e of enemies(who)) {
+            const dx = e.x - who.x, dy = e.y - who.y;
+            if (Math.abs(dx) < e.stats.radius + who.stats.radius * 0.7 &&
+                dy > 0 && dy < e.stats.radius + who.stats.radius + 10) {
+              damage(e, 25 * who.stats.stomp, who, dx * 0.4, 120, false);
+              who.vy = -who.stats.jump * 1.05 * SCALE;
+              who.stompCd = 0.5;
+              puff(e.x, e.y - e.stats.radius, "#ffe169", 14, 280);
+              float(e.x, e.y - e.stats.radius - 20, "STOMP", "#ffe169");
+              break;
+            }
+          }
+        }
+        who.stompCd = Math.max(0, (who.stompCd || 0) - dt);
         // Phoenix Feather: the pyre burns where they fell, then they rise
         if (who.rebirth) {
           who.rebirth.t -= dt;
@@ -671,7 +717,7 @@
         }
         if (!who.hovering) who.vy += 1500 * SCALE * dt;
         who.x += who.vx * dt; who.y += who.vy * dt;
-        const floor = GROUND - who.stats.radius;
+        const floor = who.floorY ?? (GROUND - who.stats.radius);
         if (who.y >= floor) {
           who.y = floor; who.vy = 0; who.grounded = true; who.jumps = 1 + who.stats.extraJumps;
           who.hovering = false;
@@ -702,6 +748,19 @@
         const h = plan.holder === "target" ? bb : a;
         if (h.grounded && !h.hovering && t > 0.5) { h.vy = -h.stats.jump * SCALE; h.grounded = false; }
         else if (!h.grounded && !h.hovering && h.vy > -60 * SCALE && h.hoverLeft > 0) h.hovering = true;
+      }
+      if (plan.stompDemo) {
+        // walk onto them, then hop and land on their head
+        const h = plan.holder === "target" ? bb : a;
+        const foe = enemies(h)[0];
+        const gap = foe.x - h.x;
+        if (h.grounded) {
+          if (Math.abs(gap) > 78) h.vx += Math.sign(gap) * h.stats.speed * SCALE * dt * 7;
+          else { h.vy = -h.stats.jump * 1.02 * SCALE; h.grounded = false; }
+        } else if (h.vy > 0) {
+          // steer the descent onto the head
+          h.vx += Math.sign(foe.x - h.x) * 420 * SCALE * dt;
+        }
       }
       if (plan.movementDemo) {
         // the holder runs and hops so speed / jump / stomp read on screen
@@ -952,7 +1011,12 @@
           if (b.owner.stats.hotStreak) b.owner.hotWant = true;
           if (b.owner.stats.scavenge) { b.owner.ammo = Math.min(b.owner.stats.maxAmmo, b.owner.ammo + 1); float(b.owner.x, b.owner.y - 56, "+1 AMMO", "#ffe169"); }
           if (b.owner.stats.sugarRush) b.owner.sugarT = 2.5;
-          if (b.poison || b.burn) { who.poisonT = b.poison ? 3 : 0; who.burnT = b.burn ? 2.5 : 0; who.dotDps = (9 + b.damage * 0.1) * (b.poison || b.burn); }
+          if (b.poison || b.burn) {
+            // venom doses ADD UP, up to a ceiling
+            const dose = (9 + b.damage * 0.1) * (b.poison || b.burn);
+            who.poisonT = b.poison ? 3 : who.poisonT; who.burnT = b.burn ? 2.5 : who.burnT;
+            who.dotDps = b.poison ? Math.min(dose * 4, (who.dotDps || 0) + dose) : dose;
+          }
           if (b.chill) { who.chillT = 2; puff(who.x, who.y, "#8fd8ff", 8, 180); }
           // a banked round arrives with everything it picked up off the cushions
           if (b.banked) { puff(who.x, who.y, "#ffe169", 16 + b.banked * 6, 300); puff(who.x, who.y, "#ffb03a", 10, 220); }
@@ -1007,6 +1071,19 @@
           f.x = o.x; f.y = o.y;
           for (const e of enemies(o)) if (Math.hypot(e.x - f.x, e.y - f.y) < e.stats.radius + f.r && (f.cd || 0) <= 0) { damage(e, f.dmg, o, e.x - o.x, -40, false); f.cd = 0.35; }
           f.cd = Math.max(0, (f.cd || 0) - dt);
+        }
+        // the shockwave swats loose rounds off at random, once
+        if (f.type === "push" && f.scatter && !f.scattered) {
+          f.scattered = true;
+          for (const b of bullets) {
+            if (b.owner === f.owner) continue;
+            if (Math.hypot(b.x - f.x, b.y - f.y) > f.r) continue;
+            const sp = Math.hypot(b.vx, b.vy) || 1;
+            const ang = Math.random() * Math.PI * 2;
+            b.vx = Math.cos(ang) * sp; b.vy = Math.sin(ang) * sp;
+            b.owner = f.owner; b.hit = new Set(); b.steer = 0; b.homing = 0;
+            puff(b.x, b.y, "#ffffff", 8, 220);
+          }
         }
         if (f.type === "push") for (const who of [a, bb]) {
           if (who === f.owner) continue;
@@ -1094,6 +1171,22 @@
         fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: radius, life: 0.22 });
         fields.push({ type: "boom", owner: b.owner, x: b.x, y: b.y, r: radius * 1.5, life: 0.5, power: b.explosive });
         puff(b.x, b.y, "#ff9e3d", 26, 420);
+      }
+      // Popcorn Payload: the round pops into kernels that arc up, rain back
+      // down for more damage, and bounce twice more if they miss
+      if (b.popcorn && !b.isShard && !b.kernel) {
+        for (let i = 0; i < b.popcorn; i += 1) {
+          const ang = -Math.PI / 2 + rand(-0.85, 0.85);
+          const sp = rand(180, 330);
+          bullets.push({ ...b, isShard: true, kernel: true, popcorn: 0,
+            x: b.x + rand(-6, 6), y: b.y - 6, ox: b.x, oy: b.y,
+            vx: Math.cos(ang) * sp + rand(-40, 40), vy: Math.sin(ang) * sp,
+            r: Math.max(2.5, b.r * 0.4), damage: b.damage * 0.16, life: 3.4,
+            gravity: 1700 * SCALE, bounces: 2, pierce: 0, explosive: 0,
+            shards: 0, boomerang: 0, chain: 0, poison: 0, burn: 0,
+            color: "#fff0c0", hit: new Set() });
+        }
+        puff(b.x, b.y, "#fff0c0", 14, 260);
       }
       if (b.shards && !b.isShard) {
         for (let i = 0; i < b.shards; i += 1) {

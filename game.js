@@ -208,7 +208,7 @@
       blockCooldown: B.cooldown, blockDuration: B.duration,
       radius: F.radius, pellets: G.pellets, spread: G.spread,
       bounces: 0, explosive: 0, homing: 0, grow: 0, pierce: 0,
-      poison: 0, burn: 0, chill: 0, chain: 0, shards: 0,
+      poison: 0, burn: 0, chill: 0, chain: 0, shards: 0, popcorn: 0,
       groundHug: 0, voidPull: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
@@ -1975,7 +1975,7 @@
         p.echoTimer -= dt;
         if (p.echoTimer <= 0) {
           p.blockTimer = Math.max(p.blockTimer, p.stats.blockDuration * 0.8);
-          if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 200, life: 0.18, force: 840 });
+          if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 200, life: 0.18, force: 840, scatter: true });
           burst(p.x, p.y, "#ffffff", 12, 200);
         }
       }
@@ -2376,7 +2376,7 @@
   // bullet lands. Movement effects (dash, warp) stay on the body and are not
   // part of this set.
   function blockEffectsAt(p, x, y) {
-    if (p.stats.blockPush) fields.push({ type: "push", owner: p, x, y, r: 190, life: 0.18, force: 1000 });
+    if (p.stats.blockPush) fields.push({ type: "push", owner: p, x, y, r: 190, life: 0.18, force: 1000, scatter: true });
     if (p.stats.stormBlock) {
       for (const q of players) {
         if (!q.alive || q === p || q.spawnGrace > 0) continue;
@@ -2409,10 +2409,14 @@
     }
   }
 
-  function tryBlock(p) {
-    if (p.blockCooldown > 0 || p.silenceTimer > 0) return;
+  // `free` is Panic Button's automatic block: an EXTRA shield, so it neither
+  // waits on the block cooldown nor spends it — your manual parry is still
+  // there the instant you want it.
+  function tryBlock(p, free = false) {
+    if (p.silenceTimer > 0) return;
+    if (!free && p.blockCooldown > 0) return;
     p.blockTimer = p.stats.blockDuration;
-    p.blockCooldown = p.stats.blockCooldown;
+    if (!free) p.blockCooldown = p.stats.blockCooldown;
     pulse(p, 0.32, 95);
     sfx("block");
     burst(p.x, p.y, "#ffffff", 14, 240);
@@ -2496,7 +2500,7 @@
         vx: Math.cos(a2) * 820, vy: Math.sin(a2) * 820,
         r: 16, damage: 12, life: 4, gravity: 260, drag: 1, restitution: 0,
         bounces: 0, explosive: 0, homing: 0, pierce: 0, poison: 0, burn: 0,
-        chill: 0, chain: 0, shards: 0, grow: 0, groundHug: 0, voidPull: 0,
+        chill: 0, chain: 0, shards: 0, popcorn: 0, grow: 0, groundHug: 0, voidPull: 0,
         wallPierce: 0, holePunch: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0,
         boomerang: 0, steer: 0, empowered: 0, golden: false, isShard: true,
         singularity: stacks, hitIds: new Set(), color: "#c88fff"
@@ -2513,7 +2517,7 @@
           vx: rand(-40, 40), vy: 900 + rand(0, 250),
           r: 15, damage: 34, life: 3, gravity: 500, drag: 1, restitution: 0.5,
           bounces: 0, explosive: 1.2, homing: 0, pierce: 0, poison: 0, burn: 1,
-          chain: 0, shards: 0, grow: 0, golden: false, isShard: true,
+          chain: 0, shards: 0, popcorn: 0, grow: 0, golden: false, isShard: true,
           color: "#ff9e3d", meteor: true, hitIds: new Set()
         });
       }
@@ -2588,6 +2592,7 @@
         chill: p.stats.chill,
         chain: p.stats.chain,
         shards: p.stats.shards,
+        popcorn: p.stats.popcorn,
         grow: p.stats.grow,
         groundHug: p.stats.groundHug,
         voidPull: p.stats.voidPull,
@@ -2662,7 +2667,7 @@
     }
     // Panic Button: the empty click doubles as the block button. Stacking arms
     // it earlier — two copies cover the last two rounds in the magazine.
-    if (p.ammo < p.stats.autoBlock) tryBlock(p);
+    if (p.ammo < p.stats.autoBlock) tryBlock(p, true);
     if (p.ammo <= 0) p.reloadTimer = p.stats.reload;
   }
 
@@ -2963,8 +2968,11 @@
               b.empowered = 0;
             }
             if (b.poison) {
+              // doses ADD UP: sting them again and the venom gets worse, up to
+              // a ceiling so a magazine cannot delete somebody outright
+              const dose = (9 + b.damage * 0.1) * b.poison;
               p.poisonTimer = Math.max(p.poisonTimer, 3);
-              p.poisonDps = Math.max(p.poisonDps, (9 + b.damage * 0.1) * b.poison);
+              p.poisonDps = Math.min(dose * 4, (p.poisonDps || 0) + dose);
               p.poisonAttacker = b.owner;
             }
             if (b.burn) {
@@ -3185,10 +3193,32 @@
           r: Math.max(4, b.r * 0.55), damage: b.damage * 0.4, life: 2.6,
           gravity: 1500, drag: 0.997, restitution: 0.6,
           bounces: 0, explosive: 0, homing: 0, pierce: 0,
-          poison: b.poison, burn: b.burn, chill: 0, chain: 0, shards: 0, grow: 0,
+          poison: b.poison, burn: b.burn, chill: 0, chain: 0, shards: 0, popcorn: 0, grow: 0,
           golden: false, isShard: true, hitIds: new Set(), color: b.color
         });
       }
+    }
+    // Popcorn Payload: the round POPS. Ten hot kernels go straight up in a
+    // spray, arc over and rain back down for a second helping of damage; any
+    // that miss keep bouncing twice more before they give up.
+    if (b.popcorn && !b.isShard && !b.kernel) {
+      for (let i = 0; i < b.popcorn; i += 1) {
+        const a = -Math.PI / 2 + rand(-0.85, 0.85);
+        const sp = rand(340, 620);
+        bullets.push({
+          owner: b.owner, x: b.x + rand(-6, 6), y: b.y - 6,
+          prevX: b.x, prevY: b.y, ox: b.x, oy: b.y,
+          vx: Math.cos(a) * sp + rand(-70, 70), vy: Math.sin(a) * sp,
+          r: Math.max(3.5, b.r * 0.4), damage: b.damage * 0.16, life: 3.4,
+          gravity: 1700, drag: 0.999, restitution: 0.52,
+          bounces: 2, explosive: 0, homing: 0, pierce: 0,
+          poison: 0, burn: 0, chill: 0, chain: 0, shards: 0, popcorn: 0, grow: 0,
+          golden: false, isShard: true, kernel: true,
+          hitIds: new Set(), color: "#fff0c0"
+        });
+      }
+      burst(b.x, b.y, "#fff0c0", 16, 300);
+      sfx("bounce");
     }
     burst(b.x, b.y, b.color, b.explosive ? 30 : 10, b.explosive ? 520 : 180);
   }
@@ -3366,6 +3396,25 @@
             sl.va += 0.6 * t2 * dt;
             wakeSlab(sl);
           }
+        }
+      }
+      // Bodyguard's shockwave doesn't only shove people: anything still in
+      // the air inside the knockaway zone is scattered off in a random
+      // direction. Rounds the block itself parried are already gone by now,
+      // so this only catches the ones that were going to sail past.
+      if (f.type === "push" && f.scatter && !f.scattered) {
+        f.scattered = true;
+        for (const b of bullets) {
+          if (b.owner === f.owner) continue;
+          if (Math.hypot(b.x - f.x, b.y - f.y) > f.r) continue;
+          const sp = Math.hypot(b.vx, b.vy) || 1;
+          const a = Math.random() * Math.PI * 2;
+          b.vx = Math.cos(a) * sp;
+          b.vy = Math.sin(a) * sp;
+          b.hitIds = new Set();          // it may now find anyone, its thrower included
+          b.owner = f.owner;             // and it answers to whoever swatted it
+          b.steer = 0; b.homing = 0;     // no more guidance after a knock like that
+          burst(b.x, b.y, "#ffffff", 8, 220);
         }
       }
       for (const p of players) {

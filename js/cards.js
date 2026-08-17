@@ -548,32 +548,77 @@
   // Most cards are passive — they just change your numbers. The ones that only
   // pay off when you PRESS something get a little Xbox badge on the face, so a
   // draft tells you at a glance that a card asks something of you.
+  // Every stat a card can touch, at its untouched value. A card's badges are
+  // worked out by applying it to this and seeing what moved.
   const BASE_PROBE = () => ({
+    // block family
     blockPush: 0, echoBlock: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
     blockReload: 0, healField: 0, frostBlock: 0, sawBlock: 0, empowerBlock: 0,
     brickBlock: 0, decoy: 0, blockRefresh: 0, blockCooldown: 1.55, blockDuration: 0.25,
-    floatTime: 0, extraJumps: 0, jump: 880, jumpBlast: 0, stomp: 0, steer: 0,
-    active: null, autoBlock: 0
+    autoBlock: 0,
+    // movement family
+    floatTime: 0, extraJumps: 0, jump: 880, jumpBlast: 0, stomp: 0, hover: 0,
+    // the shot: anything that changes what pulling the trigger does, or what
+    // landing a hit pays out
+    damage: 36, fireDelay: 0.22, reload: 2, maxAmmo: 3,
+    bulletSpeed: 1180, bulletGravity: 1050, bulletDrag: 0.997,
+    bulletRestitution: 0.72, bulletSize: 1, pellets: 1, spread: 0.04,
+    bounces: 0, explosive: 0, homing: 0, pierce: 0, poison: 0, burn: 0, chill: 0,
+    chain: 0, shards: 0, popcorn: 0, grow: 0, groundHug: 0, voidPull: 0,
+    wallPierce: 0, holePunch: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0,
+    boomerang: 0, helium: 0, encore: 0, burstFire: 0, goldenShot: 0,
+    lifesteal: 0, killHeal: false, rage: 0, scavenge: 0, bloodMoney: 0,
+    kbDeal: 0, sugarRush: 0, hotStreak: 0,
+    // aim
+    steer: 0,
+    // Mythics
+    active: null
   });
 
-  function buttonsFor(apply) {
+  const BLOCK_KEYS = ["blockPush", "echoBlock", "blockDash", "warpBlock", "stormBlock",
+    "blockReload", "healField", "frostBlock", "sawBlock", "empowerBlock",
+    "brickBlock", "decoy", "blockRefresh", "autoBlock", "blockCooldown", "blockDuration"];
+  const JUMP_KEYS = ["floatTime", "extraJumps", "jumpBlast", "stomp", "hover", "jump"];
+  const SHOOT_KEYS = ["damage", "fireDelay", "reload", "maxAmmo", "bulletSpeed",
+    "bulletGravity", "bulletDrag", "bulletRestitution", "bulletSize", "pellets",
+    "spread", "bounces", "explosive", "homing", "pierce", "poison", "burn",
+    "chill", "chain", "shards", "popcorn", "grow", "groundHug", "voidPull",
+    "wallPierce", "holePunch", "bankShot", "stink", "dazzle", "silence",
+    "boomerang", "helium", "encore", "burstFire", "goldenShot", "lifesteal",
+    "killHeal", "rage", "scavenge", "bloodMoney", "kbDeal", "sugarRush", "hotStreak"];
+
+  // Which ACTIONS a card pays off from. Purely passive cards — more health,
+  // more speed, thicker skin — name no action and wear no badge; everything
+  // else tells you what to press. The button itself is looked up from
+  // GAMEPLAY.controls at render time, so a re-binding moves the badges too.
+  function actionsFor(apply) {
     const base = BASE_PROBE();
     const st = BASE_PROBE();
     try { apply({ stats: st }); } catch { return []; }
-    const on = k => (st[k] || 0) > (base[k] || 0);
+    const moved = k => st[k] !== base[k];
+    const up = k => (st[k] || 0) > (base[k] || 0);
     const out = [];
-    if (st.active) out.push({ b: "Y", why: "ability" });
-    const blocky = ["blockPush", "echoBlock", "blockDash", "warpBlock", "stormBlock",
-      "blockReload", "healField", "frostBlock", "sawBlock", "empowerBlock",
-      "brickBlock", "decoy", "blockRefresh"].some(on) || st.blockCooldown !== base.blockCooldown;
-    if (blocky) out.push({ b: "LB", why: "block" });
-    if (on("floatTime")) out.push({ b: "A", why: "hold to float" });
-    else if (on("extraJumps") || on("jumpBlast") || on("stomp") || st.jump > base.jump) out.push({ b: "A", why: "jump" });
-    if (on("steer")) out.push({ b: "RS", why: "steer the shot" });
+    if (st.active) out.push({ action: "ability", why: "ability" });
+    if (BLOCK_KEYS.some(moved)) out.push({ action: "block", why: "block" });
+    if (SHOOT_KEYS.some(moved)) out.push({ action: "shoot", why: "shoot" });
+    if (JUMP_KEYS.some(moved)) {
+      out.push({ action: "jump", why: up("floatTime") ? "hold to float" : up("hover") ? "double-tap to hover" : "jump" });
+    }
+    if (moved("steer")) out.push({ action: "aim", why: "steer the shot" });
     return out;
   }
 
-  for (const c of CARDS) c.buttons = buttonsFor(c.apply);
+  // Actions are fixed at load; the BUTTON is resolved on read, so the badges
+  // follow GAMEPLAY.controls even though that file loads after this one.
+  for (const c of CARDS) {
+    c.actions = actionsFor(c.apply);
+    Object.defineProperty(c, "buttons", {
+      get() {
+        const badge = (window.ROUNDERS && window.ROUNDERS.padBadge) || (a => a);
+        return c.actions.map(a => ({ b: badge(a.action), why: a.why, action: a.action }));
+      }
+    });
+  }
 
   window.ROUNDERS.RARITIES = RARITIES;
   window.ROUNDERS.RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];

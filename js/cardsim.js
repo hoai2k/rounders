@@ -17,6 +17,24 @@
   const rand = (min, max) => min + Math.random() * (max - min);
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+  // Painted bullet art, cached. The game picks the newest card a fighter holds
+  // that ships a round (game.js bulletArtFor); a preview only ever has the one
+  // card, so this is that card's round if it has one.
+  const bulletArtCache = new Map();
+  function bulletArt(id) {
+    if (!bulletArtCache.has(id)) {
+      const img = new Image();
+      const entry = { img, ok: false };
+      img.onload = () => { entry.ok = true; };
+      img.onerror = () => { entry.ok = false; };
+      img.src = `../assets/images/bullets/${id}.png`;
+      bulletArtCache.set(id, entry);
+    }
+    const e = bulletArtCache.get(id);
+    return e.ok ? e.img : null;
+  }
+  window.ROUNDERS.bulletArt = bulletArt;
+
   // World is authored at this size and scaled to whatever canvas it gets.
   const W = 720, H = 320;
   const GROUND = 252;
@@ -233,8 +251,16 @@
     if (s.maxHp > b.maxHp * 1.02) watch.push("a longer health bar");
     if (s.fireDelay < b.fireDelay * 0.98 || s.maxAmmo > b.maxAmmo) watch.push("faster, fuller volleys");
     if (s.bulletSpeed > b.bulletSpeed * 1.05) watch.push("a flatter, faster shot");
-    if (s.active === "eventHorizon") watch.unshift("the black hole opens beside them and drags them in, crushing as it goes");
-    else if (s.active === "chronoshift") watch.unshift("they take fire, then rewind to where they stood 2s ago and get the health back");
+    if (s.active === "eventHorizon") {
+      watch.unshift("a swirling knot is THROWN like a round and plants where it lands");
+      watch.push("then it drags in everything for 7 seconds — the caster too, if they stood too close");
+      watch.push("the core mauls like an arena hazard, over and over");
+    }
+    else if (s.active === "chronoshift") {
+      watch.unshift("hold it and the WHOLE board runs backwards at half speed — both fighters, every bullet");
+      watch.push("ghosts trail behind everything, showing the path being undone");
+      watch.push("up to 3 seconds of game time, and the cooldown only starts when you let go");
+    }
     else if (s.active === "starfall") watch.unshift("a volley of meteors comes down on them");
     else if (s.active) watch.unshift("the ability fires on its own here");
     if (movement) watch.push("the fighter runs and jumps so the movement reads");
@@ -256,6 +282,13 @@
     const chB = CH[opts.targetChar ?? 3] || null;
 
     let a, bb, bullets, fields, parts, floaters, decoys, slabs, t, cycle, raf = 0, running = false;
+    // Chronoshift runs the whole preview backwards, so the preview keeps the
+    // same rolling film of itself the game does: one frame per tick, consumed
+    // at half real time, with ghosts of everything retreating along it.
+    let history = [];
+    const rewind = { active: false, cursor: 0, spent: 0, carry: 0 };
+    const REWIND_MAX = 3;      // seconds of preview time that can be undone
+    const REWIND_RATE = 0.5;   // history consumed per second of real time
     // holes Breakthrough blows in the preview's pillar, in the pillar's own space
     let pillarHoles = [];
 
@@ -285,6 +318,8 @@
       a.temp = a.holder ? a.stats.maxHp * a.stats.freshCoat : 0;
       bb.temp = bb.holder ? bb.stats.maxHp * bb.stats.freshCoat : 0;
       bullets = []; fields = []; parts = []; floaters = []; decoys = []; slabs = [];
+      history = [];
+      rewind.active = false; rewind.cursor = 0; rewind.spent = 0; rewind.carry = 0;
       pillarHoles = [];
       t = 0; cycle = 0;
     }
@@ -530,7 +565,13 @@
           poison: st.poison, burn: st.burn, chill: st.chill, stink: st.stink,
           voidPull: st.voidPull, dazzle: st.dazzle, silence: st.silence,
           bankShot: st.bankShot, boomerang: st.boomerang, empowered: empower,
-          golden, hit: new Set(), color: golden || empower ? "#ffd700" : who.color
+          golden, hit: new Set(), color: golden || empower ? "#ffd700" : who.color,
+          art: bulletArt(plan.card.id),
+          // Supernova flies white-hot and Golden Gun flies gold, so their
+          // trails must too — a pink streak behind a white star reads wrong
+          trailColor: st.explosive >= 2 ? "#ffb03a"
+            : golden || empower ? "#ffd700"
+            : st.burn ? "#ff9e3d" : who.color
         });
       }
       // only a real trigger pull spawns echoes — an echo that echoed itself
@@ -582,12 +623,15 @@
       if (st.decoy) {
         // stood clearly apart from its owner, or the two just overlap and the
         // copy reads as a smudge rather than a second body
+        // exactly where you were, facing the way you were; YOU are the one
+        // who gets shoved off the spot, so the copy is what stays behind
         decoys.push({
-          x: who.x - (who.facing || 1) * 74, y: who.y,
+          x: who.x, y: who.y,
           hp: 20 * st.decoy, maxHp: 20 * st.decoy,
-          character: who.character, color: who.color, owner: who
+          character: who.character, color: who.color, owner: who,
+          facing: who.facing || 1, aimX: who.aimX
         });
-        who.vx += (who.facing || 1) * 260;
+        who.vx -= (who.facing || 1) * 620;
       }
       if (st.warpBlock) { who.x = Math.max(60, Math.min(W - 60, who.x + who.facing * 110)); puff(who.x, who.y, who.color, 14, 240); }
       if (st.blockDash) who.vx += who.facing * 320;
@@ -601,7 +645,43 @@
     }
 
     // ------------------------------------------------------------------ step
+    // one frame of the film, and how to put it back
+    function snapshot(dt) {
+      const who = w => ({ x: w.x, y: w.y, vx: w.vx, vy: w.vy, hp: w.hp, shield: w.shield,
+        temp: w.temp, aimX: w.aimX, facing: w.facing, ammo: w.ammo, hovering: w.hovering });
+      return { dt, a: who(a), b: who(bb), bullets: bullets.map(b => ({ ...b, hit: new Set(b.hit) })) };
+    }
+    function restore(f) {
+      if (!f) return;
+      for (const [w, snap] of [[a, f.a], [bb, f.b]]) Object.assign(w, snap);
+      bullets = f.bullets.map(b => ({ ...b, hit: new Set(b.hit) }));
+    }
+
     function step(dt) {
+      // ---- Chronoshift: the board runs backwards at half real time
+      if (rewind.active) {
+        let left = dt * REWIND_RATE + rewind.carry;
+        while (rewind.cursor > 0 && rewind.spent < REWIND_MAX) {
+          const f = history[rewind.cursor];
+          if (left < f.dt) break;
+          left -= f.dt; rewind.spent += f.dt; rewind.cursor -= 1;
+        }
+        rewind.carry = left;
+        restore(history[Math.max(0, rewind.cursor)]);
+        t -= dt;
+        for (const p of parts) p.life -= dt;
+        parts = parts.filter(p => p.life > 0);
+        for (const f of floaters) f.life -= dt;
+        floaters = floaters.filter(f => f.life > 0);
+        if (rewind.cursor <= 0 || rewind.spent >= REWIND_MAX) {
+          rewind.active = false;
+          history.length = Math.max(1, rewind.cursor + 1);
+          float(a.x, a.y - 70, "REWOUND", "#8fd8ff");
+        }
+        return;                                   // the preview does not advance
+      }
+      history.push(snapshot(dt));
+      if (history.length > 400) history.shift();
       t += dt;
       for (const who of [a, bb]) {
         who.queue = who.queue || [];
@@ -780,7 +860,11 @@
       }
       // the receiver blocks incoming fire when blocking is what's on show
       if (plan.blockDemo) {
-        const inc = bullets.find(b => b.owner !== bb && Math.hypot(b.x - bb.x, b.y - bb.y) < 105);
+        // Body Double needs the block to land EARLY, while the round is still
+        // well out: the copy has to be seen standing on the spot before the
+        // shot arrives and eats it.
+        const reach = plan.stats.decoy ? 260 : 105;
+        const inc = bullets.find(b => b.owner !== bb && Math.hypot(b.x - bb.x, b.y - bb.y) < reach);
         if (inc && bb.blockCd <= 0) doBlock(bb);
       }
       // a mythic active fires itself once, mid-cycle
@@ -793,27 +877,31 @@
         const who = plan.holder === "target" ? bb : a;
         if (plan.stats.active === "eventHorizon") {
           // opened on the OTHER fighter, off to their far side, so they are
-          // visibly hauled across the floor into it and crushed
+          // Thrown, not placed: a swirling round flies out and plants itself
+          // where it lands, exactly as in game.
           const foe = enemies(who)[0];
-          // opened between the two of them (and kept fully in frame), so the
-          // victim is hauled bodily across the floor into it
-          fields.push({
-            type: "void", owner: who,
-            x: Math.max(180, Math.min(W - 180, (who.x + foe.x) / 2 + 70)),
-            y: foe.y - 30,
-            r: 165, life: 3
+          const ang2 = Math.atan2(foe.y - who.y, (foe.x - who.x) || 1);
+          bullets.push({
+            owner: who, x: who.x + Math.cos(ang2) * 30, y: who.y + Math.sin(ang2) * 30,
+            ox: who.x, oy: who.y,
+            vx: Math.cos(ang2) * 380, vy: Math.sin(ang2) * 380 - 40,
+            r: 12, damage: 12, life: 4, gravity: 260 * SCALE,
+            bounces: 0, pierce: 0, wallPierce: 0, homing: 0, steer: 0, grow: 0,
+            groundHug: 0, explosive: 0, shards: 0, popcorn: 0, chain: 0,
+            poison: 0, burn: 0, chill: 0, stink: 0, voidPull: 0, dazzle: 0,
+            silence: 0, bankShot: 0, boomerang: 0, empowered: 0, golden: false,
+            singularity: 1, isShard: true, hit: new Set(), color: "#c88fff"
           });
-          float(foe.x, foe.y - 70, "EVENT HORIZON", "#c88fff");
+          float(who.x, who.y - 66, "EVENT HORIZON", "#c88fff");
         } else if (plan.stats.active === "chronoshift") {
-          // rewind to where they stood 2s ago, leaving a ghost trail of the
-          // path being undone, and give the health back
-          const past = who.past && who.past[0];
-          who.rewind = { from: { x: who.x, y: who.y }, to: past ? { x: past.x, y: past.y } : { x: who.x, y: who.y }, life: 0.9 };
-          if (past) { who.x = past.x; who.y = past.y; who.vx = 0; who.vy = 0; }
-          heal(who, 35);
-          who.blockT = Math.max(who.blockT, 0.4);   // brief grace, as in game
+          // Not a teleport: the whole board starts running backwards at half
+          // real time, everything on it, until the tape runs out.
+          rewind.active = true;
+          rewind.cursor = history.length - 1;
+          rewind.spent = 0;
+          rewind.carry = 0;
           puff(who.x, who.y, "#8fd8ff", 24, 340);
-          float(who.x, who.y - 62, "REWIND +35", "#8fd8ff");
+          float(who.x, who.y - 62, "◀◀ REWIND", "#8fd8ff");
         }
         else for (let i = 0; i < 5; i += 1) bullets.push({
           owner: who, x: victim.x + (i - 2) * 34, y: -20 - i * 30, ox: 0, oy: 0,
@@ -890,7 +978,7 @@
         // the comet swells with distance the trail thickens and lengthens with
         // it instead of staying a thin thread behind a growing head
         const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 600) : 1;
-        parts.push({ x: b.x, y: b.y, vx: 0, vy: 0, life: 0.2 * gr, max: 0.2 * gr, r: b.r * gr * 0.5, color: b.burn ? "#ff9e3d" : b.color, trail: true });
+        parts.push({ x: b.x, y: b.y, vx: 0, vy: 0, life: 0.2 * gr, max: 0.2 * gr, r: b.r * gr * 0.5, color: b.trailColor || (b.burn ? "#ff9e3d" : b.color), trail: true });
         if (b.grow && gr > 1.08) {
           // and once it is genuinely burning it throws embers as well
           const heat = (gr - 1) / 0.7;
@@ -1092,7 +1180,7 @@
         }
         if (f.type === "void" || f.type === "vortex") {
           for (const who of [a, bb]) {
-            if (who === f.owner) continue;
+            if (who === f.owner && !f.singularity) continue;   // it takes the caster too
             const dx = f.x - who.x, dy = f.y - who.y, d = Math.hypot(dx, dy) || 1;
             if (d < f.r) {
               // hard enough to actually drag them off their feet
@@ -1142,7 +1230,8 @@
       parts = parts.filter(p => p.life > 0);
       for (const f of floaters) { f.life -= dt; f.y -= 26 * dt; }
       floaters = floaters.filter(f => f.life > 0);
-      decoys = decoys.filter(d => d.hp > 0);
+      for (const d of decoys) if (d.hp <= 0) d.fade = (d.fade ?? 0.6) - dt;
+      decoys = decoys.filter(d => d.hp > 0 || (d.fade ?? 0) > 0);
 
       // loop the scene once it has made its point
       const quiet = !bullets.length && !fields.length;
@@ -1171,6 +1260,18 @@
         fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: radius, life: 0.22 });
         fields.push({ type: "boom", owner: b.owner, x: b.x, y: b.y, r: radius * 1.5, life: 0.5, power: b.explosive });
         puff(b.x, b.y, "#ff9e3d", 26, 420);
+      }
+      // Event Horizon: the thrown round does not explode — it plants itself
+      // where it hit and becomes the singularity
+      if (b.singularity) {
+        fields.push({
+          type: "void", owner: b.owner, singularity: true,
+          x: Math.max(120, Math.min(W - 120, b.x)),
+          y: Math.min(GROUND - 30, b.y),
+          r: 165, life: 7
+        });
+        puff(b.x, b.y, "#c88fff", 26, 380);
+        return;
       }
       // Popcorn Payload: the round pops into kernels that arc up, rain back
       // down for more damage, and bounce twice more if they miss
@@ -1224,7 +1325,7 @@
       if (who.stunT > 0) ctx.rotate(Math.sin(t * 40) * 0.07);
       // Juggernaut's studded iron shell, behind the body, same as in game
       if (who.stats.ironHull > 0 && window.ROUNDERS.drawIronHull) {
-        window.ROUNDERS.drawIronHull(ctx, who.stats.radius, who.stats.ironHull, t);
+        window.ROUNDERS.drawIronHull(ctx, who.stats.radius, who.stats.ironHull);
       }
       // Hummingbird holding station: wings beating too fast to resolve
       if (who.hovering && window.ROUNDERS.drawHoverWings) {
@@ -1442,11 +1543,18 @@
         }
       }
       for (const d of decoys) {
-        ctx.save(); ctx.globalAlpha = 0.6; ctx.translate(d.x, d.y);
-        if (d.character && window.ROUNDERS.drawCharacter) window.ROUNDERS.drawCharacter(ctx, d.character, 24, { t, aimX: 1, aimY: 0 });
+        const gone = d.hp <= 0 ? Math.max(0, (d.fade ?? 0) / 0.6) : 1;
+        ctx.save(); ctx.globalAlpha = 0.6 * gone; ctx.translate(d.x, d.y);
+        if (d.hp <= 0) ctx.scale(1 + (1 - gone) * 0.5, 1 + (1 - gone) * 0.5);
+        if (d.character && window.ROUNDERS.drawCharacter) {
+          window.ROUNDERS.drawCharacter(ctx, d.character, 24, { t, aimX: d.aimX ?? d.facing ?? 1, aimY: 0, facing: d.facing ?? 1 });
+        }
         ctx.restore();
-        ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = "600 9px system-ui"; ctx.textAlign = "center";
-        ctx.fillText("DECOY", d.x, d.y - 34);
+        ctx.globalAlpha = gone;
+        ctx.fillStyle = d.hp <= 0 ? "rgba(255,180,180,0.9)" : "rgba(255,255,255,0.5)";
+        ctx.font = "600 9px system-ui"; ctx.textAlign = "center";
+        ctx.fillText(d.hp <= 0 ? "TOOK THE SHOT" : "DECOY", d.x, d.y - 34);
+        ctx.globalAlpha = 1;
       }
       for (const p of parts) {
         const al = p.life / p.max;
@@ -1536,6 +1644,37 @@
             });
           }
         }
+        if (b.singularity) {
+          // a knot of dark spinning matter, so what lands is what you saw fly
+          ctx.save();
+          ctx.translate(b.x, b.y);
+          const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, b.r * 2.2);
+          rg.addColorStop(0, "rgba(6,3,14,1)");
+          rg.addColorStop(0.45, "rgba(120,50,200,0.75)");
+          rg.addColorStop(1, "rgba(150,70,230,0)");
+          ctx.fillStyle = rg;
+          ctx.beginPath(); ctx.arc(0, 0, b.r * 2.2, 0, Math.PI * 2); ctx.fill();
+          ctx.rotate(t * 9);
+          ctx.strokeStyle = "rgba(216,168,255,0.9)";
+          for (let i = 0; i < 3; i += 1) {
+            ctx.lineWidth = 2.4 - i * 0.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, b.r * (0.5 + i * 0.42), i * 2, i * 2 + Math.PI * 1.3);
+            ctx.stroke();
+          }
+          ctx.restore();
+          if (Math.random() < 0.85) {
+            const ang = rand(0, Math.PI * 2);
+            parts.push({
+              x: b.x + Math.cos(ang) * b.r * 2.4, y: b.y + Math.sin(ang) * b.r * 2.4,
+              vx: -Math.cos(ang) * 90 - Math.sin(ang) * 70,
+              vy: -Math.sin(ang) * 90 + Math.cos(ang) * 70,
+              life: 0.35, max: 0.35, r: rand(1.2, 2.6), color: "#d8a8ff", spark: true
+            });
+          }
+          ctx.restore();
+          continue;
+        }
         // The round in flight is drawn by the SAME renderer as the bullet
         // viewer, from a spec read off the bullet itself — so a Railgun slug is
         // the elongated drill round in both places, and the pane can never
@@ -1553,31 +1692,50 @@
         }, { scale: gr * tScale, rotation: tRot * 180 / Math.PI, art: b.art || null });
         ctx.restore();
       }
-      // Chronoshift: the undone path, drawn as a fading ghost of the fighter
-      for (const who of [a, bb]) {
-        if (!who.rewind) continue;
-        const k = Math.max(0, who.rewind.life) / 0.9;
-        const { from, to } = who.rewind;
+      // Chronoshift: while the board runs backwards, everything on it leaves a
+      // trail of ghosts along the path it is retreating down — fighters and
+      // bullets alike, read straight off the frames still on the tape.
+      if (rewind.active && history.length) {
         ctx.save();
-        ctx.strokeStyle = `rgba(143,216,255,${0.8 * k})`;
-        ctx.lineWidth = 3;
-        ctx.setLineDash([7, 6]);
-        ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); ctx.stroke();
-        ctx.setLineDash([]);
-        // the ghost they left behind, where the damage happened
-        ctx.globalAlpha = 0.45 * k;
-        ctx.translate(from.x, from.y);
-        if (who.character && window.ROUNDERS.drawCharacter) {
-          window.ROUNDERS.drawCharacter(ctx, who.character, who.stats.radius, { t, aimX: who.aimX, aimY: 0 });
+        for (let g = 1; g <= 5; g += 1) {
+          const idx = Math.min(history.length - 1, rewind.cursor + g * 7);
+          const f = history[idx];
+          if (!f || idx <= rewind.cursor) continue;
+          const fade = 0.42 * (1 - g / 6);
+          for (const [snap, who] of [[f.a, a], [f.b, bb]]) {
+            ctx.globalAlpha = fade;
+            ctx.save();
+            ctx.translate(snap.x, snap.y);
+            if (who.character && window.ROUNDERS.drawCharacter) {
+              window.ROUNDERS.drawCharacter(ctx, who.character, who.stats.radius, { t, aimX: snap.aimX, aimY: 0 });
+            } else {
+              ctx.fillStyle = who.color;
+              ctx.beginPath(); ctx.arc(0, 0, who.stats.radius, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.restore();
+          }
+          ctx.globalAlpha = fade * 1.2;
+          ctx.fillStyle = "#8fd8ff";
+          for (const gb of f.bullets) {
+            ctx.beginPath(); ctx.arc(gb.x, gb.y, gb.r * 0.85, 0, Math.PI * 2); ctx.fill();
+          }
         }
         ctx.restore();
-        // an arrow head at the destination so the direction of the rewind reads
+        // the tape counter, so the half-speed drain is legible
         ctx.save();
-        ctx.globalAlpha = k;
+        ctx.globalAlpha = 0.55 + 0.25 * Math.sin(t * 22);
         ctx.fillStyle = "#8fd8ff";
-        ctx.font = "800 12px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("◀ 2s", (from.x + to.x) / 2, (from.y + to.y) / 2 - 34);
+        ctx.font = "800 15px system-ui, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText("\u25C0\u25C0 REWIND", 16, 26);
+        ctx.globalAlpha = 0.35;
+        ctx.font = "700 11px system-ui, sans-serif";
+        ctx.fillText(`${Math.max(0, REWIND_MAX - rewind.spent).toFixed(1)}s of tape left`, 16, 42);
+        ctx.restore();
+        // a cold wash, so you can tell at a glance the world is running back
+        ctx.save();
+        ctx.fillStyle = "rgba(80,170,255,0.10)";
+        ctx.fillRect(0, 0, W, H);
         ctx.restore();
       }
       drawFighter(a); drawFighter(bb);
@@ -1612,8 +1770,8 @@
       inspect: () => ({
         shooter: { hp: a.hp, maxHp: a.maxHp, ammo: a.ammo },
         target: { hp: bb.hp, maxHp: bb.maxHp, shield: bb.shield, temp: bb.temp },
-        bullets: bullets.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), vx: Math.round(b.vx), vy: Math.round(b.vy), hug: Boolean(b.hug) })),
-        fields: fields.length, cycle, pillarHoles: pillarHoles.length, holeRects: pillarHoles.map(h => ({ lx: Math.round(h.lx), ly: Math.round(h.ly), w: Math.round(h.w), h: Math.round(h.h) })),
+        bullets: bullets.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), vx: Math.round(b.vx), vy: Math.round(b.vy), hug: Boolean(b.hug), singularity: Boolean(b.singularity) })),
+        fields: fields.length, cycle, rewinding: rewind.active, decoys: decoys.length, pillarHoles: pillarHoles.length, holeRects: pillarHoles.map(h => ({ lx: Math.round(h.lx), ly: Math.round(h.ly), w: Math.round(h.w), h: Math.round(h.h) })),
         pos: { ax: Math.round(a.x), ay: Math.round(a.y), bx: Math.round(bb.x), by: Math.round(bb.y) }
       })
     };
@@ -1629,7 +1787,7 @@
     ctx.save();
     ctx.rotate(rot);
     if (opts.art) {
-      const d = r * 2;
+      const d = r * 3.4;               // same as game.js drawBullets
       ctx.drawImage(opts.art, -d / 2, -d / 2, d, d);
       ctx.restore();
       return;

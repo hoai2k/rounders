@@ -812,20 +812,86 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   z-index: 3;
 }
 
-.card-btns b {
+/* Controller badges are drawn as the buttons themselves: the four face
+   buttons are coloured discs in Xbox's own palette, the bumpers and sticks
+   are grey pills, because that is the shape your thumb is looking for. The
+   same rules serve the draft hand and the card workbench. */
+.card-btns b,
+.cw-btnbadge {
+  --btn-face: #2f3546;
+  --btn-ink: #ffffff;
   display: grid;
   place-items: center;
   min-width: 19px;
   height: 19px;
-  padding: 0 4px;
-  border-radius: 6px;
+  padding: 0 5px;
+  border-radius: 999px;              /* a pill; face buttons go fully round */
   font-size: 10.5px;
   font-weight: 900;
-  color: #fff;
-  background: rgba(24, 27, 38, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  font-family: system-ui, sans-serif;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--btn-ink);
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.42), transparent 58%),
+    var(--btn-face);
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  box-shadow:
+    inset 0 -1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.28),
+    0 2px 6px rgba(0, 0, 0, 0.5);
 }
+
+/* the four face buttons: round, in Xbox's colours, with dark lettering so the
+   colour is what you read first */
+.card-btns b[data-b="A"], .cw-btnbadge[data-b="A"] { --btn-face: #5bb64a; --btn-ink: #0c2408; width: 19px; padding: 0; }
+.card-btns b[data-b="B"], .cw-btnbadge[data-b="B"] { --btn-face: #e04a3f; --btn-ink: #2a0805; width: 19px; padding: 0; }
+.card-btns b[data-b="X"], .cw-btnbadge[data-b="X"] { --btn-face: #3b82e0; --btn-ink: #05132a; width: 19px; padding: 0; }
+.card-btns b[data-b="Y"], .cw-btnbadge[data-b="Y"] { --btn-face: #f2c31c; --btn-ink: #2a2004; width: 19px; padding: 0; }
+
+/* bumpers are wide flat pills; sticks are rounded caps */
+.card-btns b[data-b="LB"], .card-btns b[data-b="RB"],
+.card-btns b[data-b="LS"], .card-btns b[data-b="RS"],
+.cw-btnbadge[data-b="LB"], .cw-btnbadge[data-b="RB"],
+.cw-btnbadge[data-b="LS"], .cw-btnbadge[data-b="RS"] {
+  --btn-face: #cfd6e2;
+  --btn-ink: #171b26;
+  min-width: 25px;
+  font-size: 9.5px;
+}
+
+/* The triggers are not pills. A real Xbox trigger is a paddle: a generously
+   rounded top that your finger sits in, tapering to a squarer heel. Drawing
+   them that way is what tells LT/RT apart from LB/RB at badge size. */
+.card-btns b[data-b="LT"], .card-btns b[data-b="RT"],
+.cw-btnbadge[data-b="LT"], .cw-btnbadge[data-b="RT"] {
+  --btn-face: #e6ebf3;
+  --btn-ink: #141824;
+  min-width: 25px;
+  height: 21px;
+  font-size: 9.5px;
+  padding: 2px 5px 0;
+  border-radius: 11px 11px 4px 4px;
+  align-content: end;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 46%),
+    var(--btn-face);
+  box-shadow:
+    inset 0 -2px 3px rgba(0, 0, 0, 0.28),
+    inset 0 2px 2px rgba(255, 255, 255, 0.65),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.cw-btnbadge[data-b="LT"], .cw-btnbadge[data-b="RT"] { height: 22px; vertical-align: -5px; }
+
+/* the workbench's inline badges sit in a line of text, so they need a hair
+   more room and a baseline nudge */
+.cw-btnbadge {
+  display: inline-grid;
+  vertical-align: -4px;
+  height: 20px;
+}
+.cw-btnbadge[data-b="A"], .cw-btnbadge[data-b="B"],
+.cw-btnbadge[data-b="X"], .cw-btnbadge[data-b="Y"] { width: 20px; }
 
 /* the effect pills are the part you must not lose, so they keep their space
    and the description clamps around them */

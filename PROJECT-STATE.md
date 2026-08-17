@@ -331,6 +331,41 @@ Pillars:
       height. It now fires dead FLAT, exactly like any round, at a target
       standing on a ledge sized so the rise after launch carries it there —
       which is the card's actual use
+- [x] **Badges are action-derived, not button-derived 2026-08-17**: a card is
+      tagged with the ACTION it pays off from (`shoot` / `block` / `jump` /
+      `ability` / `aim`) and the button is resolved at render time from
+      `GAMEPLAY.controls` — which `game.js` now also reads its gamepad bindings
+      from, so re-binding a button moves every badge with it and the two cannot
+      drift apart. Anything that touches the shot wears **RT**, the block
+      family wears **LT**, jump/float/hover **A**, a Mythic **Y**, Puppet
+      Strings **RS**. 64 of 77 cards carry one; the 13 that do not are purely
+      passive (more health, more speed, thicker skin). The badges are drawn as
+      the buttons themselves: A/B/X/Y as coloured discs in Xbox's palette,
+      bumpers and sticks as grey pills, and the triggers as paddles — a
+      generously rounded top tapering to a squarer heel, which is what tells
+      LT/RT from LB/RB at badge size
+- [x] **Both Mythic previews rebuilt to match the reworked cards**:
+      **Chronoshift** was still the old teleport — it now runs the whole
+      preview backwards at half real time off a real frame buffer, with ghost
+      trails for both fighters and every bullet, a cold wash and a tape
+      counter. **Event Horizon** now visibly throws its swirling knot, which
+      spins across the arena and plants where it lands into the 7-second
+      vortex; the caster is no longer exempt from its own pull
+- [x] **Preview rounds use the painted art**: the game has always picked a
+      fighter's bullet sprite (`bulletArtFor`), but the preview drew every
+      round procedurally, so the bullet pane and the preview disagreed for
+      Supernova, Golden Gun and Railgun. The preview now loads the same
+      sprites, at the same `r * 3.4` the game draws them at, and a round's
+      trail takes its colour from how the round LOOKS — white-hot for
+      Supernova, gold for Golden Gun — instead of the shooter's player colour
+- [x] **Juggernaut's plate is armour, not machinery**: concentric with the
+      body, sized off the current radius so any other resize carries it, and
+      no longer spinning
+- [x] **Body Double**: the copy stands EXACTLY where you were, facing the way
+      you were — the block shoves YOU off the spot instead of offsetting the
+      copy, which is what the card was always meant to do. The preview stages
+      a long enough flight to see the copy standing before the round arrives,
+      and the copy fades out where it fell rather than vanishing mid-frame
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

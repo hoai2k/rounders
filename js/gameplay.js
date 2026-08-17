@@ -73,6 +73,29 @@
       touchGrace: 1.0,  // seconds of immunity to steer back to safety
       pitBounces: 2,    // times the bottom of the world throws you back in
       soakRate: 7       // HP per second while under water
+    },
+
+    // ------------------------------------------------------------- CONTROLS
+    // The ACTION is what a card cares about, not the button. Cards are tagged
+    // with the action they pay off from (shoot / block / jump / ability / aim)
+    // and the badge on the card face is looked up here, so re-binding a button
+    // moves every badge with it. `pad` are standard-mapping gamepad indices —
+    // game.js reads its gamepad bindings from these same lists, so there is one
+    // place to change and nothing can drift out of step.
+    //   0 A · 1 B · 2 X · 3 Y · 4 LB · 5 RB · 6 LT · 7 RT · 9 Start
+    controls: {
+      jump:    { pad: [0], badge: "A",  label: "jump" },
+      shoot:   { pad: [2, 5, 7], badge: "RT", label: "shoot" },
+      block:   { pad: [1, 4, 6], badge: "LT", label: "block" },
+      ability: { pad: [3], badge: "Y",  label: "ability" },
+      aim:     { pad: [], badge: "RS", label: "aim" },
+      pause:   { pad: [9], badge: "☰",  label: "pause" }
     }
+  };
+
+  // action -> the badge to print on a card face
+  window.ROUNDERS.padBadge = action => {
+    const c = window.ROUNDERS.GAMEPLAY.controls[action];
+    return c ? c.badge : action;
   };
 })();

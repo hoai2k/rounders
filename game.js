@@ -1055,7 +1055,7 @@
           <div class="stat-list">${c.effects.map(s => `<span>${s}</span>`).join("")}</div>
           <span class="card-pip flip">${rar.name[0]}</span>
           ${(c.buttons || []).length ? `<span class="card-btns">${c.buttons.map(b =>
-            `<b title="${escapeHtml(b.why)}">${b.b}</b>`).join("")}</span>` : ""}
+            `<b data-b="${b.b}" title="${escapeHtml(b.why)}">${b.b}</b>`).join("")}</span>` : ""}
         `;
         el.addEventListener("pointerdown", event => {
           event.preventDefault();
@@ -1166,6 +1166,8 @@
     input.menuPressed ||= pressed.has("Enter") || pressed.has("NumpadEnter");
   }
 
+  const PAD = (window.ROUNDERS.GAMEPLAY && window.ROUNDERS.GAMEPLAY.controls) || {};
+
   function readGamepad(pad, input) {
     const lx = axis(pad.axes[0]);
     const ly = axis(pad.axes[1]);
@@ -1183,14 +1185,17 @@
     } else {
       input.aimX = input.move || 0; input.aimY = 0;
     }
-    input.jump ||= button(pad, 0) || dUp;
-    input.shoot ||= button(pad, 2) || button(pad, 5) || button(pad, 7);
-    input.block ||= button(pad, 1) || button(pad, 4) || button(pad, 6);
-    // Y is the special: with a Mythic in hand the active no longer eats the
-    // block press, so you can still parry while your ability is charged
-    input.special ||= button(pad, 3);
-    input.pause ||= button(pad, 9);
-    input.menuPressed ||= buttonEdge(pad, 9);
+    // Bindings come from GAMEPLAY.controls, the same table the card badges are
+    // printed from — move a button there and the badges move with it.
+    const held = act => (PAD[act] ? PAD[act].pad : []).some(i => button(pad, i));
+    input.jump ||= held("jump") || dUp;
+    input.shoot ||= held("shoot");
+    input.block ||= held("block");
+    // the ability has its own button: with a Mythic in hand the active no
+    // longer eats the block press, so you can still parry while it is charged
+    input.special ||= held("ability");
+    input.pause ||= held("pause");
+    input.menuPressed ||= (PAD.pause ? PAD.pause.pad : [9]).some(i => buttonEdge(pad, i));
     input.leftPressed ||= buttonEdge(pad, 14) || axisEdge(pad, 0, -1);
     input.rightPressed ||= buttonEdge(pad, 15) || axisEdge(pad, 0, 1);
   }
@@ -2424,11 +2429,16 @@
     if (p.stats.decoy) {
       // set a step to the side, so the copy is a separate body rather than
       // a second drawing hidden underneath you
+      // The copy stands EXACTLY where you were, facing the way you were —
+      // that is the whole trick. You are the one who moves: the block shoves
+      // you back off the spot so the decoy is left holding it.
       decoys.push({
-        x: p.x - (p.facing || 1) * 26, y: p.y, hp: 20 * p.stats.decoy, maxHp: 20 * p.stats.decoy,
+        x: p.x, y: p.y, hp: 20 * p.stats.decoy, maxHp: 20 * p.stats.decoy,
         owner: p, character: p.character, color: p.color, life: 6, wobble: Math.random() * 6,
+        facing: p.facing || 1, aimX: p.aimX, aimY: p.aimY,
         isDecoy: true
       });
+      p.vx -= (p.facing || 1) * 320;
     }
     if (p.stats.warpBlock) {
       burst(p.x, p.y, p.color, 18, 300);
@@ -5296,7 +5306,7 @@
 
       // Juggernaut wears its bulk: a studded iron shell sitting just proud of
       // the body, so the fighter reads as armoured rather than merely large
-      if (p.stats.ironHull > 0) window.ROUNDERS.drawIronHull(ctx, r, p.stats.ironHull, world.time + p.botSeed);
+      if (p.stats.ironHull > 0) window.ROUNDERS.drawIronHull(ctx, r, p.stats.ironHull);
       // Hummingbird holding station: wings beating far too fast to resolve
       if (p.hovering) window.ROUNDERS.drawHoverWings(ctx, 0, 0, r, p.wingPhase || 0);
 
@@ -5904,7 +5914,10 @@
       ctx.save();
       ctx.translate(dcy.x, dcy.y + Math.sin(dcy.wobble * 2.2) * 2);
       ctx.globalAlpha = 0.88;
-      drawCharacter(ctx, dcy.character, 27, { t: world.time + dcy.wobble, aimX: 1, aimY: 0 });
+      drawCharacter(ctx, dcy.character, 27, {
+        t: world.time + dcy.wobble,
+        aimX: dcy.aimX ?? dcy.facing ?? 1, aimY: dcy.aimY ?? 0, facing: dcy.facing ?? 1
+      });
       // hp pips
       const frac = clamp(dcy.hp / dcy.maxHp, 0, 1);
       ctx.globalAlpha = 0.9;

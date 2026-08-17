@@ -1071,10 +1071,13 @@
   // Juggernaut's shell. Drawn BEHIND the fighter and a little wider than they
   // are, so it reads as their outline thickening into studded iron rather than
   // as a separate object hovering around them. Stacks add plate and rivets.
-  function drawIronHull(ctx, r, stacks = 1, t = 0) {
+  function drawIronHull(ctx, r, stacks = 1) {
+    // Armour, not machinery: concentric with the body, sized off the CURRENT
+    // radius so any other card that resizes the fighter resizes the plate too,
+    // and fixed in place — a rotating ring reads as a gadget, not as plate.
     const n = Math.max(1, stacks);
-    const outer = r * (1.2 + 0.05 * (n - 1));
-    const inner = r * 0.98;
+    const outer = r * (1.16 + 0.05 * (n - 1));
+    const inner = r;
     ctx.save();
     // the ring itself, lit from above like rolled steel
     const g = ctx.createLinearGradient(0, -outer, 0, outer);
@@ -1097,9 +1100,8 @@
     // rivets, marching slowly round the rim
     const studs = 10 + (n - 1) * 4;
     const rr = (outer + inner) / 2;
-    const spin = t * 0.35;
     for (let i = 0; i < studs; i += 1) {
-      const a = spin + (i / studs) * Math.PI * 2;
+      const a = (i / studs) * Math.PI * 2;
       const sx = Math.cos(a) * rr, sy = Math.sin(a) * rr;
       const sr = Math.max(1.5, (outer - inner) * 0.32);
       ctx.fillStyle = "#20242c";

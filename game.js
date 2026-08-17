@@ -118,7 +118,9 @@
   //   breaks — Map(level platform → {hp,max,dead}) for platforms with `breakable`
   //   hungs  — platforms suspended on shootable chains; cut every chain and they drop
   //   crates — pushable, shootable boxes players can climb and knock around
-  const props = { breaks: new Map(), hungs: [], crates: [], slabs: [] };
+  // holes: Map<source platform/mover/hung object, [{lx, ly, r}]> in platform-LOCAL
+  // coordinates, so a hole bored in a moving platform rides along with it.
+  const props = { breaks: new Map(), hungs: [], crates: [], slabs: [], holes: new Map() };
   let last = performance.now();
   let toastTimer = 0;
   let audioCtx = null;
@@ -174,7 +176,7 @@
       goldenShot: false, killHeal: false,
       active: null, activeCooldown: 10,
       // gap-audit wave (CARD-GAP-AUDIT.md): offense & bullets
-      kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0, wallPierce: 0,
+      kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0, wallPierce: 0, holePunch: 0,
       steer: 0, helium: 0, boomerang: 0, encore: 0, burstFire: 0,
       bloodMoney: 0, underdog: 0,
       // block toolkit
@@ -263,16 +265,16 @@
       if (p.phase) {
         const cyc = ((t + p.phase.offset) % p.phase.period) / p.phase.period;
         if (cyc > p.phase.duty) continue;
-        list.push({ ...p, vxDelta: 0, vyDelta: 0, phaseCyc: cyc, breakRef: brk });
+        list.push({ ...p, vxDelta: 0, vyDelta: 0, phaseCyc: cyc, breakRef: brk, holes: props.holes.get(p), holeSrc: p });
       } else {
-        list.push({ ...p, vxDelta: 0, vyDelta: 0, breakRef: brk });
+        list.push({ ...p, vxDelta: 0, vyDelta: 0, breakRef: brk, holes: props.holes.get(p), holeSrc: p });
       }
     }
     // Hung platforms are static while they hang; once every chain is cut they
     // leave this list and live on as free-tumbling slabs (see updateSlabs).
     for (const hg of props.hungs) {
       if (hg.dead) continue;
-      list.push({ x: hg.x, y: hg.y, w: hg.w, h: hg.h, ice: hg.ice, vxDelta: 0, vyDelta: 0, hungRef: hg });
+      list.push({ x: hg.x, y: hg.y, w: hg.w, h: hg.h, ice: hg.ice, vxDelta: 0, vyDelta: 0, hungRef: hg, holes: props.holes.get(hg), holeSrc: hg });
     }
     for (const c of props.crates) {
       if (c.dead) continue;
@@ -283,10 +285,55 @@
       const s = (Math.sin((t / m.period) * Math.PI * 2 + ph) + 1) / 2;
       const sPrev = (Math.sin(((t - world.lastStep) / m.period) * Math.PI * 2 + ph) + 1) / 2;
       const x = m.x + m.dx * s, y = m.y + m.dy * s;
-      list.push({ ...m, x, y, vxDelta: m.dx * (s - sPrev), vyDelta: m.dy * (s - sPrev), isMover: true });
+      list.push({ ...m, x, y, vxDelta: m.dx * (s - sPrev), vyDelta: m.dy * (s - sPrev), isMover: true, holes: props.holes.get(m), holeSrc: m });
     }
     platCache = { t, level, list };
     return list;
+  }
+
+  // ------------------------------------------------------------------ holes
+  // Skylight bores permanent gaps in terrain. Holes are stored in the source
+  // object's local space and read back through the live platform each frame,
+  // so a hole in a mover travels with it.
+
+  // Bore a hole through `platform` at world point (wx, wy).
+  function punchHole(platform, wx, wy, r) {
+    const src = platform.holeSrc;
+    if (!src || platform.isCrate) return false;      // crates already break
+    const list = props.holes.get(src) || [];
+    const lx = wx - platform.x, ly = wy - platform.y;
+    // widen an overlapping hole instead of stacking dozens of little ones
+    for (const h of list) {
+      if (Math.hypot(h.lx - lx, h.ly - ly) < Math.max(h.r, r) * 0.75) {
+        h.r = Math.min(Math.max(platform.w, platform.h) * 0.6, Math.hypot(h.r, r));
+        h.lx = (h.lx + lx) / 2; h.ly = (h.ly + ly) / 2;
+        props.holes.set(src, list);
+        return true;
+      }
+    }
+    if (list.length > 14) return false;              // a wall can only be so much lace
+    list.push({ lx, ly, r });
+    props.holes.set(src, list);
+    return true;
+  }
+
+  // Is (wx, wy), with radius rad, inside one of this platform's holes?
+  //
+  // A hole is a doorway bored clean THROUGH the slab, not a sphere carved in
+  // it: measured across the slab's long axis only, so a shaft in a floor is
+  // open for the whole fall and a tunnel in a wall is open all the way across.
+  // (Testing the round hole instead spat a falling player back out halfway
+  // through a thick floor.)
+  function inHole(platform, wx, wy, rad = 0) {
+    const list = platform.holes;
+    if (!list || !list.length) return false;
+    const acrossX = platform.w >= platform.h;
+    for (const h of list) {
+      const hx = platform.x + h.lx, hy = platform.y + h.ly;
+      const off = acrossX ? Math.abs(wx - hx) : Math.abs(wy - hy);
+      if (off <= Math.max(2, h.r - rad * 0.62)) return true;
+    }
+    return false;
   }
 
   function phaseAlpha(p, t) {
@@ -1296,6 +1343,7 @@
   // ----------------------------------------------------------------- players
   // ------------------------------------------------------- destructible props
   function resetProps(level) {
+    props.holes = new Map();   // terrain repairs itself between rounds
     props.breaks = new Map();
     for (const p of level.platforms) {
       if (p.breakable) props.breaks.set(p, { hp: p.breakable, max: p.breakable, dead: false, flash: 0 });
@@ -1973,6 +2021,8 @@
     for (const platform of plats) {
       const overlap = playerPlatformOverlap(p, platform);
       if (!overlap) continue;
+      // a bored-out gap is a way through, for people as well as bullets
+      if (platform.holes && inHole(platform, p.x, p.y, r)) continue;
       if (overlap.side === "top") {
         p.y -= overlap.amount;
         p.vy = Math.min(0, p.vy);
@@ -2240,8 +2290,9 @@
         grow: p.stats.grow,
         groundHug: p.stats.groundHug,
         voidPull: p.stats.voidPull,
-        // Open Plan: how much solid a shot can bore through, in px of thickness
+        // Drill Rounds: how much solid a shot can bore through, in px of thickness
         wallPierce: p.stats.wallPierce ? 70 + 50 * (p.stats.wallPierce - 1) : 0,
+        holePunch: p.stats.holePunch,
         bankShot: p.stats.bankShot,
         stink: p.stats.stink,
         dazzle: p.stats.dazzle,
@@ -2450,6 +2501,18 @@
       for (const platform of plats) {
         if (b.life <= 0) break;
         if (circleRect(b, platform)) {
+          // shots fly clean through a gap someone already bored
+          if (platform.holes && inHole(platform, b.x, b.y, b.r)) continue;
+          // wide enough for a fighter (radius 27) to climb through — a hole
+          // you cannot fit through would miss the whole point of the card
+          if (b.holePunch && !platform.isCrate && punchHole(platform, b.x, b.y, 44 + 12 * (b.holePunch - 1))) {
+            b.life = -1;
+            burst(b.x, b.y, "#e8e2d4", 26, 380);
+            world.shake = Math.max(world.shake, 7);
+            sfx("boom");
+            explodeBullet(b);
+            continue;
+          }
           if (platform.isCrate) {
             damageCrate(platform.crateRef, b.damage, b.vx, b.vy);
             b.life = -1;
@@ -3882,6 +3945,38 @@
     }
   }
 
+  // Draw a platform with its bored holes actually missing: everything is drawn
+  // inside an even-odd clip of (slab minus holes), so the backdrop shows
+  // through the gap instead of the hole being painted over the terrain.
+  function withHoles(holes, box, fn) {
+    if (!holes || !holes.length) { fn(); return; }
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(box.x - 12, box.y - 12, box.w + 24, box.h + 24);
+    for (const h of holes) {
+      ctx.moveTo(box.x + h.lx + h.r, box.y + h.ly);
+      ctx.arc(box.x + h.lx, box.y + h.ly, h.r, 0, Math.PI * 2);
+    }
+    ctx.clip("evenodd");
+    fn();
+    ctx.restore();
+    // a scorched rim so a fresh hole reads as bored, not as a gap in the art
+    for (const h of holes) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(20,16,12,0.75)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(box.x + h.lx, box.y + h.ly, h.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,210,150,0.28)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(box.x + h.lx, box.y + h.ly, h.r - 2.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function drawPlatforms(level) {
     const pal = level.palette;
     const t = world.time;
@@ -3889,12 +3984,14 @@
       const brk = props.breaks.get(p);
       if (brk && brk.dead) continue;
       const alpha = phaseAlpha(p, t);
-      drawPlatform(p, pal, alpha, p.ice, p.conveyor);
-      if (brk) drawBreakableOverlay(p, brk, pal);
+      withHoles(props.holes.get(p), p, () => {
+        drawPlatform(p, pal, alpha, p.ice, p.conveyor);
+        if (brk) drawBreakableOverlay(p, brk, pal);
+      });
     }
     for (const hg of props.hungs) {
       drawChains(hg, pal);                    // dead hungs keep their cut stubs
-      if (!hg.dead) drawPlatform(hg, pal, 1, hg.ice, 0);
+      if (!hg.dead) withHoles(props.holes.get(hg), hg, () => drawPlatform(hg, pal, 1, hg.ice, 0));
     }
     for (const s of props.slabs) {
       if (s.dead) continue;
@@ -3911,7 +4008,8 @@
     for (const m of level.movers || []) {
       const ph = (m.phase || 0) * Math.PI * 2;
       const s = (Math.sin((t / m.period) * Math.PI * 2 + ph) + 1) / 2;
-      drawPlatform({ ...m, x: m.x + m.dx * s, y: m.y + m.dy * s }, pal, 1, m.ice, m.conveyor, true);
+      const box = { ...m, x: m.x + m.dx * s, y: m.y + m.dy * s };
+      withHoles(props.holes.get(m), box, () => drawPlatform(box, pal, 1, m.ice, m.conveyor, true));
     }
     if (settings.hazards) {
       for (const h of level.hazards) drawHazard(h, pal);
@@ -5288,6 +5386,19 @@
   window.ROUNDERS.debug = {
     players: () => players,
     world,
+    // bored terrain, reported at LIVE positions (a mover's base x is not where
+    // it currently is, and the hole rides with it)
+    holes: () => activePlatforms(currentLevel(), world.time)
+      .filter(pl => pl.holes && pl.holes.length)
+      .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, holes: pl.holes.map(h => ({ ...h })) })),
+    probe: (px, py, rad = 27) => activePlatforms(currentLevel(), world.time)
+      .filter(pl => pl.holes && pl.holes.length)
+      .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, hasHoles: pl.holes.length, inHole: inHole(pl, px, py, rad) })),
+    punch: (px, py, r = 30) => {
+      const plats = activePlatforms(currentLevel(), world.time);
+      for (const pl of plats) if (circleRect({ x: px, y: py, r: 4 }, pl)) return punchHole(pl, px, py, r);
+      return false;
+    },
     grant(index, cardId) {
       const p = players[index];
       const c = CARDS.find(x => x.id === cardId);

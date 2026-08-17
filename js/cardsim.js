@@ -55,6 +55,30 @@
     return p.stats;
   }
 
+  // The game's own bullet radius formula (game.js tryShoot/fireVolley), so the
+  // preview and the bullet viewer show a round at true game size.
+  function bulletRadius(st) {
+    return (5.5 + Math.min(9, st.damage / 22)) * st.bulletSize;
+  }
+
+  // Which visual tells a card's bullet carries, for the bullet viewer.
+  function bulletSpec(card) {
+    const st = statsFor(card);
+    const b = baseStats();
+    const on = k => st[k] > b[k];
+    return {
+      r: bulletRadius(st),
+      color: st.goldenShot ? "#ffd700" : "#ff5277",
+      golden: Boolean(st.goldenShot),
+      pierce: st.pierce > 0, wallPierce: st.wallPierce > 0, holePunch: st.holePunch > 0,
+      explosive: st.explosive > 0, burn: on("burn"), poison: on("poison"), chill: on("chill"),
+      chain: on("chain"), homing: on("homing") || on("steer"), grow: on("grow"),
+      helium: on("helium"), boomerang: on("boomerang"), stink: on("stink"),
+      voidPull: on("voidPull"), shards: st.shards > 0, bounces: st.bounces > 0,
+      pellets: st.pellets, speed: st.bulletSpeed, damage: st.damage
+    };
+  }
+
   // ---------------------------------------------------------------- planning
   // What should this card's preview look like? Driven by the stats the card
   // actually changed, so a new card gets a sensible scene for free.
@@ -315,7 +339,7 @@
           owner: who, x: who.x + Math.cos(angle) * 26, y: who.y + Math.sin(angle) * 26,
           ox: who.x, oy: who.y,
           vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-          r: (5.5 + Math.min(9, st.damage / 22)) * st.bulletSize * 0.85,
+          r: bulletRadius(st),
           damage: st.damage * mul * (golden ? (st.pellets > 1 ? 2 : 3) : 1) * (empower ? 1 + 0.75 * empower : 1),
           gravity: (st.helium ? -st.bulletGravity * 0.35 : st.bulletGravity * (st.homing ? 0.4 : 1)) * SCALE,
           life: 3.4, bounces: st.bounces, pierce: st.pierce,
@@ -801,5 +825,63 @@
     };
   }
 
-  window.ROUNDERS.CARD_SIM = { createSim, planFor, statsFor, baseStats };
+  // Draw one bullet the way the game draws it, pointing right, centred at
+  // (0,0) in the current transform. `art` is an optional loaded image that
+  // replaces the procedural round; scale/rot are the viewer's tweaks.
+  function drawBullet(ctx, spec, opts = {}) {
+    const scale = opts.scale ?? 1;
+    const rot = (opts.rotation ?? 0) * Math.PI / 180;
+    const r = spec.r * scale;
+    ctx.save();
+    ctx.rotate(rot);
+    if (opts.art) {
+      const d = r * 2;
+      ctx.drawImage(opts.art, -d / 2, -d / 2, d, d);
+      ctx.restore();
+      return;
+    }
+    if (spec.golden || spec.explosive) { ctx.shadowColor = spec.golden ? "#ffd700" : "#ff7a3d"; ctx.shadowBlur = 14; }
+    const color = spec.burn ? "#ff9e3d" : spec.poison ? "#63d43a" : spec.chill ? "#8fd8ff" : spec.color;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "#15121c";
+    ctx.lineWidth = 3;
+    if (spec.pierce || spec.wallPierce) {
+      // drill slugs read as elongated along their flight
+      ctx.beginPath();
+      ctx.roundRect(-r * 1.9, -r * 0.72, r * 3.8, r * 1.44, r * 0.7);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath(); ctx.roundRect(r * 0.5, -r * 0.3, r * 1.1, r * 0.6, r * 0.3); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    if (spec.poison) {
+      ctx.strokeStyle = "rgba(99,212,58,0.9)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, r + 4, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (spec.chill) {
+      ctx.strokeStyle = "rgba(143,216,255,0.95)"; ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i += 1) {
+        const a = (i / 3) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+        ctx.lineTo(Math.cos(a) * (r + 5), Math.sin(a) * (r + 5));
+        ctx.stroke();
+      }
+    }
+    if (spec.holePunch) {
+      ctx.strokeStyle = "rgba(232,226,212,0.9)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, r + 5, -0.6, 0.6); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, r + 5, Math.PI - 0.6, Math.PI + 0.6); ctx.stroke();
+    }
+    if (spec.chain) {
+      ctx.strokeStyle = "rgba(255,233,94,0.9)"; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-r - 2, -r); ctx.lineTo(-r - 8, 0); ctx.lineTo(-r - 2, r);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  window.ROUNDERS.CARD_SIM = { createSim, planFor, statsFor, baseStats, bulletSpec, bulletRadius, drawBullet };
 })();

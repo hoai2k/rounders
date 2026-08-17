@@ -76,6 +76,15 @@
       .cw-btn.primary { background: #4da6ff; border-color: #4da6ff; color: #08111d; }
       .cw-watch { margin: 8px 0 0; padding: 0 0 0 18px; font-size: 12.5px; line-height: 1.5; opacity: 0.8; }
       .cw-watch li { margin: 1px 0; }
+      /* bullet viewer: 1:1 world pixels, so what you see is the in-game size */
+      #bulletCanvas {
+        width: 100%; aspect-ratio: 960 / 220; display: block;
+        border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.12); background: #0f111a;
+      }
+      .cw-sliders { display: grid; gap: 6px; margin-top: 8px; }
+      .cw-sliders label { display: flex; align-items: center; gap: 10px; font-size: 12px; opacity: 0.85; }
+      .cw-sliders input[type="range"] { flex: 1; }
+      .cw-sliders output { width: 56px; text-align: right; font-variant-numeric: tabular-nums; opacity: 0.75; }
       .cw-meta { text-align: center; padding: 10px 16px 4px; font-size: 13px; opacity: 0.75; }
       .cw-meta b { letter-spacing: 0.03em; }
       .cw-hint { text-align: center; font-size: 12px; opacity: 0.45; padding-bottom: 14px; }
@@ -109,6 +118,8 @@
       <h1>Card Workbench</h1>
       <span class="cw-count" id="count"></span>
       <span class="cw-filters" id="filters"></span>
+      <button class="cw-btn" id="exportBtn" title="Download the tweaks you've made as JSON">⬇ Export changes</button>
+      <span class="cw-count" id="tweakCount"></span>
       <a class="cw-back" href="index.html">Sprite workbench →</a>
     </header>
 
@@ -123,6 +134,17 @@
         </div>
         <canvas id="simCanvas" width="1440" height="640"></canvas>
         <ul class="cw-watch" id="watch"></ul>
+
+        <div class="cw-prev-head" style="margin-top:14px">
+          <strong>Bullet — game size</strong>
+          <span class="cw-count" id="bulletInfo"></span>
+          <button class="cw-btn" id="resetBullet">Reset</button>
+        </div>
+        <canvas id="bulletCanvas" width="960" height="220"></canvas>
+        <div class="cw-sliders">
+          <label>Size <input id="bScale" type="range" min="0.2" max="4" step="0.05" value="1" /><output id="bScaleOut">1.00×</output></label>
+          <label>Rotation <input id="bRot" type="range" min="-180" max="180" step="1" value="0" /><output id="bRotOut">0°</output></label>
+        </div>
       </section>
       <button class="cw-arrow" id="next" title="Next card (→)">→</button>
     </section>
@@ -208,12 +230,143 @@
         });
         document.getElementById("replayBtn").addEventListener("click", () => { if (sim) sim.replay(); });
 
+        // ------------------------------------------------- bullet viewer
+        // Tweaks live in localStorage while you work and come out of the
+        // Export button as JSON — the same shape the game would read from
+        // assets/images/bullets/tweaks.json.
+        const TWEAK_KEY = "rounders.bulletTweaks";
+        let tweaks = {};
+        try { tweaks = JSON.parse(localStorage.getItem(TWEAK_KEY) || "{}"); } catch { tweaks = {}; }
+
+        const bulletCanvas = document.getElementById("bulletCanvas");
+        const bctx = bulletCanvas.getContext("2d");
+        const bScale = document.getElementById("bScale");
+        const bRot = document.getElementById("bRot");
+        const bScaleOut = document.getElementById("bScaleOut");
+        const bRotOut = document.getElementById("bRotOut");
+        const bulletInfo = document.getElementById("bulletInfo");
+        const bulletArt = new Map();
+
+        function tweakCount() {
+          const n = Object.keys(tweaks).length;
+          document.getElementById("tweakCount").textContent = n ? `${n} tweaked` : "";
+        }
+
+        function loadBulletArt(id) {
+          if (bulletArt.has(id)) return bulletArt.get(id);
+          const entry = { img: new Image(), ok: false };
+          entry.img.onload = () => { entry.ok = true; drawBulletPane(); };
+          entry.img.onerror = () => { entry.ok = false; };
+          entry.img.src = `../assets/images/bullets/${id}.png`;
+          bulletArt.set(id, entry);
+          return entry;
+        }
+
+        function currentCard() { const l = visible(); return l[((index % l.length) + l.length) % l.length]; }
+
+        function drawBulletPane() {
+          const c = currentCard();
+          if (!c) return;
+          const { CARD_SIM } = window.ROUNDERS;
+          const spec = CARD_SIM.bulletSpec(c);
+          const tw = tweaks[c.id] || {};
+          const scale = tw.scale ?? 1;
+          const rotation = tw.rotation ?? 0;
+          const art = loadBulletArt(c.id);
+
+          // 1:1 world pixels: the canvas backing store is drawn at native size
+          // and only stretched by CSS, so this is the size the game draws.
+          const W = bulletCanvas.width, H = bulletCanvas.height;
+          bctx.clearRect(0, 0, W, H);
+          bctx.fillStyle = "#0f111a";
+          bctx.fillRect(0, 0, W, H);
+          // a fighter-radius circle for scale reference, and the ground line
+          bctx.save();
+          bctx.translate(W * 0.22, H / 2);
+          bctx.strokeStyle = "rgba(255,255,255,0.16)";
+          bctx.setLineDash([5, 5]);
+          bctx.lineWidth = 2;
+          bctx.beginPath(); bctx.arc(0, 0, 27 * 2, 0, Math.PI * 2); bctx.stroke();
+          bctx.setLineDash([]);
+          bctx.fillStyle = "rgba(255,255,255,0.35)";
+          bctx.font = "600 13px system-ui, sans-serif";
+          bctx.textAlign = "center";
+          bctx.fillText("fighter (r27)", 0, 27 * 2 + 18);
+          bctx.restore();
+
+          // the bullet itself, pointing right, at 2× backing scale
+          bctx.save();
+          bctx.translate(W * 0.62, H / 2);
+          bctx.scale(2, 2);
+          CARD_SIM.drawBullet(bctx, spec, { scale, rotation, art: art.ok ? art.img : null });
+          bctx.restore();
+          // an arrow showing the direction of travel
+          bctx.save();
+          bctx.strokeStyle = "rgba(255,255,255,0.3)";
+          bctx.lineWidth = 2;
+          bctx.beginPath();
+          bctx.moveTo(W * 0.62 + 70, H / 2); bctx.lineTo(W * 0.62 + 130, H / 2);
+          bctx.moveTo(W * 0.62 + 118, H / 2 - 8); bctx.lineTo(W * 0.62 + 130, H / 2);
+          bctx.lineTo(W * 0.62 + 118, H / 2 + 8);
+          bctx.stroke();
+          bctx.restore();
+
+          bulletInfo.textContent =
+            `r ${(spec.r * scale).toFixed(1)}px${spec.pellets > 1 ? ` · ${spec.pellets} pellets` : ""}` +
+            `${art.ok ? " · art loaded" : " · procedural (no art yet)"}`;
+          bScaleOut.textContent = `${scale.toFixed(2)}×`;
+          bRotOut.textContent = `${Math.round(rotation)}°`;
+          bScale.value = scale;
+          bRot.value = rotation;
+        }
+
+        function setTweak(key, value) {
+          const c = currentCard();
+          if (!c) return;
+          const t = tweaks[c.id] || {};
+          t[key] = value;
+          if ((t.scale ?? 1) === 1 && (t.rotation ?? 0) === 0) delete tweaks[c.id];
+          else tweaks[c.id] = t;
+          localStorage.setItem(TWEAK_KEY, JSON.stringify(tweaks));
+          tweakCount();
+          drawBulletPane();
+        }
+
+        bScale.addEventListener("input", () => setTweak("scale", Number(bScale.value)));
+        bRot.addEventListener("input", () => setTweak("rotation", Number(bRot.value)));
+        document.getElementById("resetBullet").addEventListener("click", () => {
+          const c = currentCard();
+          if (!c) return;
+          delete tweaks[c.id];
+          localStorage.setItem(TWEAK_KEY, JSON.stringify(tweaks));
+          tweakCount();
+          drawBulletPane();
+        });
+
+        document.getElementById("exportBtn").addEventListener("click", () => {
+          const payload = {
+            note: "Rounders card workbench — bullet tweaks. Hand this to Claude to apply.",
+            generated: new Date().toISOString(),
+            bullets: tweaks
+          };
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "card-workbench-changes.json";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        });
+        tweakCount();
+
         function renderFeatured() {
           const list = visible();
           if (!list.length) { featured.innerHTML = ""; meta.textContent = "No rarities selected."; stopSim(); return; }
           index = ((index % list.length) + list.length) % list.length;
           const c = list[index];
           buildSim(c);
+          if (previewOn) drawBulletPane();
           document.getElementById("previewBtn").textContent = previewOn ? "▣ Hide preview" : "▶ Preview this card";
           // the big face keeps the draft hand's "selected" pop, minus the tilt
           featured.innerHTML = cardHtml(c, true);

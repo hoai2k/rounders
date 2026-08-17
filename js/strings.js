@@ -109,7 +109,8 @@
       cardsNone: "None",
       cardsInvert: "Invert",
       cardPickerHintHtml: "<b>A</b> / click toggles a card · <b>X</b> or a rarity heading toggles that whole rarity · <b>LB</b> <b>RB</b> jump between rarities · hold a direction to move fast",
-      rarityToggle: "{rarity} — {on}/{total}"
+      rarityToggle: "{rarity} — {on}/{total}",
+      rarityHint: "toggles this whole rarity on or off"
     },
 
     // ----------------------------------------------------------- HOW TO PLAY

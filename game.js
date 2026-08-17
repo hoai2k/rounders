@@ -3209,6 +3209,7 @@
   const cardUi = {
     picker: null,
     grid: null,
+    detail: null,   // the line under the grid describing the card at the cursor
     cells: [],      // every focusable thing in the grid, in DOM order
     heads: [],      // indices of the rarity headings, for LB/RB section jumps
     byRarity: new Map(),
@@ -3238,13 +3239,14 @@
       html += `<button type="button" class="rarity-head" style="${style}" data-cell data-kind="rarity" data-rarity="${rarity}"></button>`;
       for (const c of list) {
         html += `<button type="button" class="card-cell" style="${style};--emblem:url('${cardArtUrl(c.id)}')" ` +
-          `data-cell data-kind="card" data-id="${c.id}" title="${escapeHtml(c.name)}">` +
+          `data-cell data-kind="card" data-id="${c.id}" title="${escapeHtml(`${c.name} — ${c.description}`)}">` +
           `<span class="cc-art"></span><span class="cc-name">${escapeHtml(c.name)}</span></button>`;
       }
     }
     cardUi.grid.innerHTML = html;
     cardUi.cells = [...cardUi.grid.querySelectorAll("[data-cell]")];
     cardUi.heads = cardUi.cells.map((el, i) => (el.dataset.kind === "rarity" ? i : -1)).filter(i => i >= 0);
+    cardUi.detail = document.getElementById("cardDetail");
     cardUi.grid.addEventListener("click", e => {
       const cell = e.target.closest("[data-cell]");
       if (!cell) return;
@@ -3252,6 +3254,27 @@
       if (i >= 0) cardUi.cursor = i;
       toggleCell(cell);
     });
+    cardUi.grid.addEventListener("pointerover", e => {
+      const cell = e.target.closest("[data-cell]");
+      if (cell) showCardDetail(cell);
+    });
+  }
+
+  // Nobody remembers what all eighty-odd cards do, and the cell only has room
+  // for a name — so the card under the cursor spells itself out underneath the
+  // grid. Mouse hover feeds it too.
+  function showCardDetail(cell) {
+    if (!cardUi.detail || !cell) return;
+    if (cell.dataset.kind === "rarity") {
+      const rar = RARITIES[cell.dataset.rarity];
+      cardUi.detail.style.setProperty("--rcol", rar.color);
+      cardUi.detail.innerHTML = `<b>${escapeHtml(rar.name)}</b> — <i>${escapeHtml(str("settings.rarityHint"))}</i>`;
+      return;
+    }
+    const c = CARDS.find(x => x.id === cell.dataset.id);
+    if (!c) return;
+    cardUi.detail.style.setProperty("--rcol", RARITIES[c.rarity].color);
+    cardUi.detail.innerHTML = `<b>${escapeHtml(c.name)}</b> — ${escapeHtml(c.description)} <i>${escapeHtml(c.effects.join(" · "))}</i>`;
   }
 
   function enabledCardCount() {
@@ -3361,6 +3384,7 @@
         });
       }
     }
+    showCardDetail(cardUi.cells[cardUi.cursor]);
   }
 
   // Rows come from where the cells actually landed, so ragged last rows and the
@@ -3393,6 +3417,7 @@
     // instant, not smooth: at eighteen moves a second a smooth scroll never
     // catches the cursor up
     el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    showCardDetail(el);
   }
 
   // Returns false when the move runs off the grid, so the caller can hand focus

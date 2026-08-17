@@ -256,10 +256,17 @@ Pillars:
 ### 7. Audio & FX polish
 - [x] Kept: synth SFX, rumble
 - [x] New: per-mechanic SFX hooks (burn, chain, teleport, bounce pad), weather particles
-- [x] Soundtrack: 16 tracks in `assets/music/` (manifest in `js/music.js`).
-      "Rounders Jazz 1" is the title/selection theme; every match rolls a random
-      non-title track. Streamed via byte-range requests (`server.mjs` serves 206),
-      with the next track warmed in the background so skips start instantly.
+- [x] Soundtrack: 28 tracks in `assets/music/` — 14 themes × 2 (manifest in
+      `js/music.js`). "Rounders Jazz 1" is the title/selection theme. Streamed via
+      byte-range requests (`server.mjs` serves 206), with the next track warmed in
+      the background so skips start instantly.
+- [x] Music is chosen per arena, not at random: `js/arena-music.js` is the config
+      table (arena id → song, one line each, with the reason). A board opens on
+      its song, then plays that song's partner ("Tango 2" → "Tango 1"), then
+      random non-repeating tracks. Every theme is used by at least one arena and
+      no two arenas open on the same song.
+- [x] Card draft ducks the music to 55% and keeps the board's song running; the
+      next board's song takes over when the round starts. Pause ducks to 22%.
 - [x] Now-playing readout bottom-right with ◀ / ▶ skip buttons
 
 ### 8. Audit (agent pass)

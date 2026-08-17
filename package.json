@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "intake": "node tools/intake.mjs",
+    "intake-art": "node tools/intake-art.mjs",
     "mock-parts": "node tools/mock-parts.mjs",
     "audit-keys": "node tools/audit-keys.mjs",
     "fitrig": "node tools/fitrig.mjs"

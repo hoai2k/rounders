@@ -801,6 +801,32 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   -webkit-line-clamp: 3;
 }
 
+/* Cards that only pay off when you press something wear the Xbox button in
+   the corner, so a draft shows at a glance which cards ask something of you. */
+.card-btns {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  display: flex;
+  gap: 3px;
+  z-index: 3;
+}
+
+.card-btns b {
+  display: grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 900;
+  color: #fff;
+  background: rgba(24, 27, 38, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
 /* the effect pills are the part you must not lose, so they keep their space
    and the description clamps around them */
 .stat-list { display: flex; flex-wrap: wrap; gap: 4px; flex: none; }

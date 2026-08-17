@@ -274,8 +274,8 @@
       ["bullets drill through walls", "−12% damage"], ["projectile"],
       p => { p.stats.wallPierce += 1; p.stats.damage *= 0.88; }),
 
-    card("skylight", "Skylight", "epic",
-      "Every wall wants a window.",
+    card("breakthrough", "Breakthrough", "epic",
+      "Make your own door.",
       "Shots chew a square bite out of whatever terrain they strike — two into a thick wall opens a permanent gap anyone can shoot or climb through. People still just get hit.",
       ["impacts bite squares out of terrain", "thick walls take 2 hits", "−10% damage"], ["projectile", "control"],
       p => { p.stats.holePunch += 1; p.stats.damage *= 0.9; }),
@@ -388,29 +388,11 @@
       ["hits stun 0.4s (then 2s immunity)", "−10% damage"], ["control"],
       p => { p.stats.dazzle += 1; p.stats.damage *= 0.9; }),
 
-    card("gag-order", "Gag Order", "rare",
-      "Talk to my lawyer.",
-      "Hits mute the victim: no blocking, no abilities for 1.5 seconds.",
-      ["hits disable block & actives (1.5s)", "−8% damage"], ["control"],
-      p => { p.stats.silence += 1; p.stats.damage *= 0.92; }),
-
-    card("cold-shoulder", "Cold Shoulder", "rare",
-      "You bring the weather with you.",
-      "Enemies near you are permanently chilled — slower feet, weaker jumps.",
-      ["chill aura around you"], ["control"],
-      p => { p.stats.chillAura += 1; }),
-
-    card("second-serve", "Second Serve", "rare",
+    card("second-defence", "Second Defence", "rare",
       "Advantage: you.",
       "Dealing bullet damage instantly returns your block. Deep breaths between rallies.",
       ["hits refresh your block (1s lockout)"], ["block"],
       p => { p.stats.blockRefresh += 1; }),
-
-    card("overflow", "Overflow", "rare",
-      "Waste not a drop.",
-      "Healing past full health becomes a shield instead, up to 40 points.",
-      ["overheal → shield (max 40)"], ["sustain", "defense"],
-      p => { p.stats.overflow += 40; }),
 
     card("boomerang", "Boomerang", "rare",
       "It misses you too.",
@@ -595,6 +577,37 @@
   // is missing). Callers draw the card either way.
   function cardArt(id) { return load(art, id, cardArtUrl(id)); }
   function cardScene(id) { return load(scenes, id, cardSceneUrl(id)); }
+
+  // ------------------------------------------------------------- controls
+  // Most cards are passive — they just change your numbers. The ones that only
+  // pay off when you PRESS something get a little Xbox badge on the face, so a
+  // draft tells you at a glance that a card asks something of you.
+  const BASE_PROBE = () => ({
+    blockPush: 0, echoBlock: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
+    blockReload: 0, healField: 0, frostBlock: 0, sawBlock: 0, empowerBlock: 0,
+    brickBlock: 0, decoy: 0, blockRefresh: 0, blockCooldown: 1.55, blockDuration: 0.25,
+    floatTime: 0, extraJumps: 0, jump: 880, jumpBlast: 0, stomp: 0, steer: 0,
+    active: null, autoBlock: 0
+  });
+
+  function buttonsFor(apply) {
+    const base = BASE_PROBE();
+    const st = BASE_PROBE();
+    try { apply({ stats: st }); } catch { return []; }
+    const on = k => (st[k] || 0) > (base[k] || 0);
+    const out = [];
+    if (st.active) out.push({ b: "Y", why: "ability" });
+    const blocky = ["blockPush", "echoBlock", "blockDash", "warpBlock", "stormBlock",
+      "blockReload", "healField", "frostBlock", "sawBlock", "empowerBlock",
+      "brickBlock", "decoy", "blockRefresh"].some(on) || st.blockCooldown !== base.blockCooldown;
+    if (blocky) out.push({ b: "LB", why: "block" });
+    if (on("floatTime")) out.push({ b: "A", why: "hold to float" });
+    else if (on("extraJumps") || on("jumpBlast") || on("stomp") || st.jump > base.jump) out.push({ b: "A", why: "jump" });
+    if (on("steer")) out.push({ b: "RS", why: "steer the shot" });
+    return out;
+  }
+
+  for (const c of CARDS) c.buttons = buttonsFor(c.apply);
 
   window.ROUNDERS.RARITIES = RARITIES;
   window.ROUNDERS.RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];

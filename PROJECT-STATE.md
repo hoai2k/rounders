@@ -40,10 +40,10 @@ Pillars:
 - [x] `CLAUDE.md` — repo policy (merge to main when a task is done)
 - [x] This state document
 
-### 2. Card system — 87 cards, designed from scratch
+### 2. Card system — 84 cards, designed from scratch
 - [x] New card schema: id, name, rarity, tagline (flavor), description (plain-English
       explanation), effect list, tags, apply()
-- [x] 15 Common / 24 Uncommon / 26 Rare / 14 Epic / 5 Legendary / 3 Mythic = **87 cards**
+- [x] 15 Common / 24 Uncommon / 23 Rare / 14 Epic / 5 Legendary / 3 Mythic = **84 cards**
 - [x] **Power-card audit** (AUDIT.md §6): homing reworked from a feeble nudge to
       real steering (visible curves, heat-seekers when stacked); three ROUNDS
       gaps filled — Aegis Bubble (regenerating shield with bubble/absorb/break
@@ -202,6 +202,25 @@ Pillars:
       card art is drawn with real `<img>` elements (scene → emblem → a plain
       "no art yet" badge), so a missing file is visible instead of silently
       falling through to the tinted panel
+- [x] **Art delivered and integrated 2026-08-17**: 115 files filed by the new
+      `npm run intake-art` (34 emblems + 34 scenes completing the set, 29
+      painted bullets, 18 effect sheets). 16 arrived on white/black backdrops
+      and were keyed on intake, originals kept in `assets/images/archive/`;
+      card scenes are exempt since they are meant to be opaque. Painted rounds
+      are now drawn in game (picked from the newest card a fighter holds that
+      changes the bullet) and the delivered explosion sheets, black hole,
+      sawblade and poison cloud replace their procedural drawings. Only
+      `fx/angel.png` is still outstanding
+- [x] **Controller badges on cards**: any card that only pays off when you
+      press something wears the Xbox button in its corner — **LB** for the
+      block family, **Y** for a Mythic ability, **A** for jump/float cards,
+      **RS** for Puppet Strings' steering. 22 of 84 cards carry one; the rest
+      are passive and stay clean. Derived from the stats a card changes, so a
+      new card gets its badge for free
+- [x] **Skylight renamed Breakthrough**; **Second Serve renamed Second
+      Defence**; **Gag Order, Cold Shoulder and Overflow cut** (their effects
+      were not pulling their weight). The engine still carries `silence`,
+      `chillAura` and `overflow` support, unused, in case they come back
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

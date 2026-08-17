@@ -985,6 +985,8 @@
           <p class="card-desc">${c.description}</p>
           <div class="stat-list">${c.effects.map(s => `<span>${s}</span>`).join("")}</div>
           <span class="card-pip flip">${rar.name[0]}</span>
+          ${(c.buttons || []).length ? `<span class="card-btns">${c.buttons.map(b =>
+            `<b title="${escapeHtml(b.why)}">${b.b}</b>`).join("")}</span>` : ""}
         `;
         el.addEventListener("pointerdown", event => {
           event.preventDefault();
@@ -5143,6 +5145,16 @@
       // grown bullets read bigger the farther they've flown
       const growF = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 1300) : 1;
       const r = b.r * growF;
+      const art = b.art !== undefined ? b.art : (b.art = bulletArtFor(b.owner));
+      if (art) {
+        // painted rounds are drawn pointing along their flight
+        const d = r * 3.4;
+        ctx.translate(b.x, b.y);
+        ctx.rotate(Math.atan2(b.vy, b.vx));
+        ctx.drawImage(art, -d / 2, -d / 2, d, d);
+        ctx.restore();
+        continue;
+      }
       if (b.explosive >= 2) {
         // white-hot centre, hot rim, so it reads as a star and not a pellet
         const cg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.9);
@@ -5242,6 +5254,16 @@
       if (f.type === "lightning-warn") continue;
       if (f.type === "blackhole") {
         const a = clamp(f.life / 3, 0, 1);
+        const hole = fxImage("black-hole");
+        if (hole) {
+          ctx.save();
+          ctx.globalAlpha = a;
+          ctx.translate(f.x, f.y);
+          ctx.rotate(world.time * 1.6);
+          const d = f.r * 1.9;
+          ctx.drawImage(hole, -d / 2, -d / 2, d, d);
+          ctx.restore();
+        }
         // debris spiralling inward, so the pull is visible even in empty air
         if (Math.random() < 0.6) {
           const ang = rand(0, Math.PI * 2), rr = f.r * rand(0.45, 0.95);
@@ -5391,6 +5413,14 @@
       } else if (f.type === "stink") {
         const a = clamp(f.life / 2.5, 0.1, 1);
         ctx.save();
+        const cloud = fxImage("poison-cloud");
+        if (cloud) {
+          ctx.globalAlpha = a * 0.9;
+          const d = f.r * 2.2;
+          ctx.drawImage(cloud, f.x - d / 2, f.y - d / 2, d, d);
+          ctx.restore();
+          continue;
+        }
         for (let i = 0; i < 5; i += 1) {
           const wob = Math.sin(world.time * 1.8 + i * 2.4);
           const px = f.x + Math.cos(i * 1.26 + world.time * 0.4) * f.r * 0.45;
@@ -5409,6 +5439,8 @@
         ctx.save();
         ctx.translate(f.x, f.y);
         ctx.rotate(world.time * 18);
+        const blade = fxImage("sawblade");
+        if (blade) { ctx.drawImage(blade, -20, -20, 40, 40); ctx.restore(); continue; }
         ctx.fillStyle = "#c8ccd8";
         ctx.strokeStyle = "#3a3f4d";
         ctx.lineWidth = 2;
@@ -6274,6 +6306,39 @@
       this.arcTo(x, y, x + w, y, rr);
       return this;
     };
+  }
+
+  // ------------------------------------------------------- delivered art
+  // Painted rounds live at assets/images/bullets/<card-id>.png and effects at
+  // assets/images/fx/<name>.png. Both load on demand and cache; anything
+  // missing simply keeps the procedural drawing, so art can land piecemeal.
+  const artCache = new Map();
+  function loadArt(kind, name) {
+    const key = `${kind}/${name}`;
+    let entry = artCache.get(key);
+    if (!entry) {
+      const img = new Image();
+      entry = { img, ok: false };
+      artCache.set(key, entry);
+      img.onload = () => { entry.ok = true; };
+      img.onerror = () => { entry.ok = false; };
+      img.src = `${window.ROUNDERS_ASSET_BASE || ""}assets/images/${kind}/${name}.png`;
+    }
+    return entry.ok ? entry.img : null;
+  }
+  const fxImage = name => loadArt("fx", name);
+  window.ROUNDERS.fxImage = fxImage;
+
+  // The round a player fires is the painted one from the newest card they hold
+  // that changes how the bullet looks; everything else keeps the procedural
+  // tells layered on top.
+  function bulletArtFor(p) {
+    if (!p || !p.cards) return null;
+    for (let i = p.cards.length - 1; i >= 0; i -= 1) {
+      const img = loadArt("bullets", p.cards[i].id);
+      if (img) return img;
+    }
+    return null;
   }
 
   // Tiny dev/test hooks: grant a card by id mid-match, peek at the fighters.

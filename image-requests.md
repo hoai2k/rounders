@@ -1,7 +1,12 @@
 # Image Generation Requests — Rounders
 
-**Two batches outstanding: art for the 3 audit cards (§1) and the 32
-gap-audit cards (§2)** (below). Everything else
+**Four batches outstanding:** card art for the 3 audit cards (§1) and the 33
+gap-audit cards (§2) — **36 cards with no art at all** — plus the new
+**bullet art** (§3) and **effect art** (§4) batches.
+
+> Audited 2026-08-17 against `js/cards.js`: 88 cards, 52 have emblem + scene,
+> **36 have neither**. Every card listed in §1 and §2 is currently drawing the
+> plain tinted fallback panel. Nothing is orphaned (no art without a card). Everything else
 the game asks for has been generated and is in the repo; the prompts they were
 made from are in `image-requests-history.md`, which is where a re-generation or
 a style question goes looking.
@@ -84,8 +89,93 @@ centered subject) and an **art panel** (`assets/images/cards/art/<id>.png`,
 | **Return to Sender** (epic) | `return-to-sender.png` + `art/return-to-sender.png` | A golden supercharged bullet stamped like certified mail, carrying a shrunken storm of block energy (nova ring, frost, shockwave) to a distant impact point. Gold and postal red. |
 | **Puppet Strings** (epic) | `puppet-strings.png` + `art/puppet-strings.png` | A bullet flying on glowing marionette strings from a puppeteer's control bar held by a round fighter, mid-turn around a wall. Theater purple and spotlight gold. |
 | **Bricklayer** (epic) | `bricklayer.png` + `art/bricklayer.png` | A round fighter in a hard hat conjuring a floating stone slab out of dust and glow in front of them, trowel in hand, the slab mid-drop. Sandstone and blueprint blue. |
-| **Open Plan** (rare) | `open-plan.png` + `art/open-plan.png` | A bullet boring clean through a brick wall, leaving a neat glowing hole with dust and chips bursting from both faces, a target silhouette visible through the gap. Sandstone and hot orange bore-glow. |
+| **Drill Rounds** (rare) | `drill-rounds.png` + `art/drill-rounds.png` | A bullet boring clean through a brick wall, leaving a neat glowing hole with dust and chips bursting from both faces, a target silhouette visible through the gap. Sandstone and hot orange bore-glow. *(replaces the old pierce-a-player idea — this card is now the wall-driller)* |
+| **Skylight** (epic) | `skylight.png` + `art/skylight.png` | A perfectly round hole blasted clean through a stone platform, daylight streaming down through it, a small round fighter dropping through the gap feet-first with rubble still falling. Dust-gold light shaft on cool stone. |
 | **Encore** (epic) | `encore.png` + `art/encore.png` | A round fighter taking a stage bow while behind them a ghostly translucent copy of their last shot re-fires itself, red curtain backdrop. Stage crimson and spotlight blue-white. |
+
+Also still missing card art from the earlier §1 batch, listed there:
+`lowrider`, `aegis-bubble`, `pocket-void`.
+
+---
+
+## 3. Bullet art (29 cards × 1 image = 29 files) — NEW
+
+Bullets are drawn procedurally today (a tinted round plus per-effect tells).
+These 29 cards change what the bullet *looks like*, so each can take a painted
+round. Everything else keeps the procedural bullet, which is correct — a card
+that only changes reload speed should not change the shot's appearance.
+
+- **Path:** `assets/images/bullets/<card-id>.png`
+- **Size:** 128×128, transparent, the round centred and filling ~80% of frame
+- **Orientation:** pointing **RIGHT** (the game rotates it to the flight path)
+- **Drawn at:** roughly 6–14px across in game, so it must read *tiny* — bold
+  silhouette, one or two colors, no fine detail or text
+- Check any delivered round in the card workbench: `/workbench?edit=cards` →
+  Preview → the **Bullet — game size** pane shows it at true size next to a
+  fighter-radius circle, with size/rotation sliders and an Export button.
+
+| Card | File | Bullet |
+|---|---|---|
+| Big Bore | `big-bore.png` | A fat brass slug, blunt-nosed, comically oversized |
+| Boxing Glove | `boxing-glove.png` | A tiny red boxing glove flying fist-first |
+| Buckshot Buttons | `buckshot-buttons.png` | A single colourful button-pellet, shirt-button holes and all |
+| Double Dutch | `double-dutch.png` | A slim twinned round, two barrels' worth fused side by side |
+| Bullet Ballet | `bullet-ballet.png` | An elegant tapered dart with a ribbon trail |
+| Ricochet Romance | `ricochet-romance.png` | A glossy pink rubber ball, heart-shaped highlight |
+| Bank Shot | `bank-shot.png` | A polished billiard-ball round with a chalked cue-tip mark |
+| Wasp Venom | `wasp-venom.png` | A yellow-and-black striped stinger dart, green venom bead at the tip |
+| Cinder Shot | `cinder-shot.png` | A glowing ember lump trailing sparks, orange-hot core |
+| Permafrost | `permafrost.png` | A pale blue ice shard with frost spikes |
+| Magnet Fingers | `magnet-fingers.png` | A round with small horseshoe-magnet fins, faint red/blue pole tint |
+| Black Mamba | `black-mamba.png` | A matte-black fanged dart dripping green |
+| Popcorn Payload | `popcorn-payload.png` | A kernel mid-pop, half corn half burst |
+| Cluster Bomb / Party Favor | `cluster-bomb.png` | A tiny party popper round with confetti flecks |
+| Supernova | `supernova.png` | A blinding white-hot star core with a compressed corona |
+| Shrapnel Burst | `shrapnel-burst.png` | A segmented casing scored to break apart |
+| Comet Trail | `comet-trail.png` | A small comet head with an icy tail |
+| Chain Letter | `chain-lightning.png` | A crackling ball of yellow electricity, arc stubs |
+| Storm Caller | `storm-caller.png` | A frost-blue round wrapped in lightning |
+| Lowrider | `lowrider.png` | A flattened disc round riding low, dust curl under it |
+| Helium Rounds | `helium-rounds.png` | A pastel balloon-round with a little knot at the back |
+| Drill Rounds | `drill-rounds.png` | An elongated tungsten drill bit, spiral flutes, glowing tip |
+| Skylight | `skylight.png` | A ring-shaped cutter round, hollow centre, sparking edge |
+| Railgun | `railgun.png` | A long dark sabot slug wrapped in blue induction rings |
+| Puppet Strings | `puppet-strings.png` | A round trailing two fine glowing marionette threads |
+| Boomerang | `boomerang.png` | A small curved wooden boomerang round |
+| Stink Bomb | `stink-bomb.png` | A round glass flask of sloshing green muck |
+| Pocket Void | `pocket-void.png` | A pure black sphere with a violet event-horizon rim |
+| Golden Gun | `golden-gun.png` | A gleaming solid-gold bullet, engraved band |
+
+## 4. Effect art (18 files) — NEW
+
+Every combat effect is procedural canvas today. These are the ones that would
+gain most from painted art. All are **transparent PNGs**, drawn as a single
+centred element on nothing, so the engine can tint, scale, rotate and fade
+them. Sprite sheets are welcome where noted (left-to-right frames, equal
+cells) — otherwise a single image the engine animates by scaling/fading.
+
+- **Path:** `assets/images/fx/<name>.png`
+
+| File | Size | Subject |
+|---|---|---|
+| `explosion.png` | 256×256, 6-frame sheet 1536×256 | Orange-white fireball bloom with smoke edge, cartoon-chunky |
+| `explosion-big.png` | 384×384, 6-frame sheet | Supernova-scale detonation, white core, shockwave ring |
+| `shockwave-ring.png` | 256×256 | A thin expanding white pressure ring, slight lens warp |
+| `poison-cloud.png` | 256×256 | Bubbling sickly-green gas puff, soft edges |
+| `frost-burst.png` | 256×256 | Radial ice crystals blooming outward, pale blue |
+| `chill-aura.png` | 256×256 | Soft ring of cold vapour with frost flecks |
+| `lightning-arc.png` | 512×128 | A horizontal jagged bolt, bright core + glow, so it can stretch between two points |
+| `storm-nova.png` | 384×384 | A crown of lightning bursting outward from a centre |
+| `black-hole.png` | 320×320 | Violet accretion swirl around a black core, warped starlight |
+| `heal-field.png` | 256×256 | Soft citrus-green dome of light with rising plus signs |
+| `sawblade.png` | 128×128 | A circular saw seen face-on, steel teeth, worn centre boss |
+| `shield-bubble.png` | 256×256 | A translucent cyan hex-faceted sphere, bright rim |
+| `shield-break.png` | 256×256, 5-frame sheet | That bubble shattering into glassy shards |
+| `armor-plates.png` | 192×192 | Golden hexagonal armour scales curving around nothing |
+| `bore-hole.png` | 128×128 | A scorched round hole decal: dark ring, cracked stone lip, embers — laid over terrain where Skylight punches through |
+| `dust-puff.png` | 128×128 | A pale drifting dust/rubble puff for impacts and bore-through |
+| `stun-stars.png` | 192×96 | Three cartoon stars circling, for a dazzled fighter |
+| `muzzle-flash.png` | 128×128 | A short bright star-burst flash, drawn pointing right |
 
 ---
 

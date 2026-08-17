@@ -73,9 +73,19 @@ Pillars:
       chill/repel auras, underdog comeback scaling. Art prompts for all 32 in
       `image-requests.md` §2 (procedural fallbacks until delivered).
       Headless smoke-tested: full bot/human match with all 32 granted, clean
-- [x] **Open Plan** (rare, 88th card): the last unfilled ROUNDS gap — bullets
-      bore through thin walls (`wallPierce`, `drillThrough()` in game.js).
-      Drill Rounds' text now says plainly that it pierces players, not walls
+- [x] **Drill Rounds is the wall-driller** (`wallPierce`, `drillThrough()`):
+      bullets bore through walls and keep flying. The old pierce-a-player
+      version and its stand-in card (Open Plan) are gone; `pierce` survives
+      only as one clause of Railgun
+- [x] **Skylight** (epic): impacts blow *permanent holes* in terrain that
+      anyone can shoot or climb through. Holes live in `props.holes`, keyed by
+      the source platform and stored in local space so a hole rides a moving
+      platform; `inHole()` treats one as a doorway bored across the slab's
+      short axis (a sphere test spat a falling player back out halfway
+      through a thick floor); rendering punches them out with an even-odd
+      clip so the backdrop shows through, with a scorched rim. Terrain heals
+      between rounds. Verified: a fighter falls through a bored shaft while
+      the solid part of the same slab still holds them up
 - [x] **Card preview simulator** (`js/cardsim.js`): the workbench's ▶ Preview
       button runs a small self-contained fight that illustrates the selected
       card — the scenario is chosen from the stats the card actually changes
@@ -89,6 +99,14 @@ Pillars:
       every card rendered with the game's own card-face markup and stylesheet —
       featured card with ←/→ flipping, rarity filter chips, full-set grid;
       `server.mjs` now redirects bare directory paths so the query URL works
+- [x] **Bullet viewer + export** in the card workbench: a pane under the
+      preview draws the selected card's bullet at true game size (same formula
+      the game uses), pointing right, beside a fighter-radius circle for
+      scale, with size and rotation sliders. Tweaks persist in localStorage
+      and come out of **⬇ Export changes** as `card-workbench-changes.json`.
+      Painted rounds are picked up from `assets/images/bullets/<id>.png`
+- [ ] **Art outstanding** (`image-requests.md`): 36 cards have no emblem or
+      scene at all, plus the new bullet (29) and effect (18) batches
 - [ ] Balance pass on the 32 new cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

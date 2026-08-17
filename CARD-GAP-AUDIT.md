@@ -94,7 +94,7 @@ The 55 cards in `js/cards.js` group into these families (stat names from
 | Homing | Bullets home | Magnet Fingers / Black Mamba | ✅ |
 | Remote | **Steer bullets manually with your aim** | — | ❌ |
 | Sneaky | Bullets curve over terrain | Lowrider (inverse: hugs ground) | ✅ |
-| Drill Ammo | **Bullets pass through walls** | **Open Plan** (added 2026-08-17 — `wallPierce`) | ✅ |
+| Drill Ammo | **Bullets pass through walls** | **Drill Rounds** (reworked 2026-08-17 — `wallPierce`) | ✅ |
 | Grow | Damage grows in flight | Comet Trail | ✅ |
 | Thruster | **Bullets shove targets (knockback)** | — | ❌ |
 

@@ -252,6 +252,30 @@ Pillars:
       makes that view jump the queue instead of waiting behind 16MB of scenes
       queued at page load. A card scrolled past before its art arrives has the
       request dropped rather than left holding a connection
+- [x] **Effect legibility pass 2026-08-17 (4)**: **Guardian Halo**'s glow, halo
+      and rising angel existed only in the game — the workbench preview showed
+      a "SAVED" float and nothing else. The preview now draws the whole
+      intervention. **Lightning** clears in the direction it travelled: the
+      tail lets go first and the vanishing edge chases the head, so an
+      instantaneous strike still shows you which way it went. A **Storm Caller
+      bolt with nobody to jump to and nothing to earth on** now crawls over the
+      victim as dying static instead of striking off into empty sky, and the
+      preview stands a wall behind the target so the there-and-back strike is
+      actually visible. **Railgun**'s round disagreed with the bullet pane —
+      the preview drew every bullet as a plain circle while the pane and the
+      game drew pierce rounds elongated; the preview now uses the same
+      `drawBullet` renderer as the pane, so the two can no longer diverge.
+      **Juggernaut** wears its bulk: a studded iron shell drawn behind the
+      fighter and slightly wider, so they read as armoured rather than merely
+      large (shared helper `ROUNDERS.drawIronHull`, stacks add plate and
+      rivets). **Breakthrough**'s bores are no longer outlined — the drawn box
+      is gone and the gap is simply empty space; what sells the break is a
+      shower of ~30 wall-coloured tumbling chunks plus dust, thrown from
+      `punchHole` itself so every bore throws debris whatever punched it
+- [x] **Second Defence needs new art**: the rename kept its files, which are a
+      tennis serve from when it was Second Serve. Re-requested in
+      `image-requests.md` §2. Breakthrough's painting already showed a fighter
+      smashing through a stone wall and needs nothing
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

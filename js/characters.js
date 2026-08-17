@@ -1068,8 +1068,51 @@
     ctx.roundRect(x, y, w, h, rad);
   }
 
+  // Juggernaut's shell. Drawn BEHIND the fighter and a little wider than they
+  // are, so it reads as their outline thickening into studded iron rather than
+  // as a separate object hovering around them. Stacks add plate and rivets.
+  function drawIronHull(ctx, r, stacks = 1, t = 0) {
+    const n = Math.max(1, stacks);
+    const outer = r * (1.2 + 0.05 * (n - 1));
+    const inner = r * 0.98;
+    ctx.save();
+    // the ring itself, lit from above like rolled steel
+    const g = ctx.createLinearGradient(0, -outer, 0, outer);
+    g.addColorStop(0, "#9aa3b4");
+    g.addColorStop(0.35, "#5d6675");
+    g.addColorStop(0.62, "#3b4250");
+    g.addColorStop(1, "#22262f");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, outer, 0, Math.PI * 2);
+    ctx.arc(0, 0, inner, 0, Math.PI * 2, true);   // even-odd leaves a band
+    ctx.fill("evenodd");
+    // a bright top edge and a dark seam, so the band has thickness
+    ctx.strokeStyle = "rgba(226,234,246,0.55)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(0, 0, outer - 0.8, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+    ctx.strokeStyle = "rgba(10,12,16,0.75)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, 0, outer, 0, Math.PI * 2); ctx.stroke();
+    // rivets, marching slowly round the rim
+    const studs = 10 + (n - 1) * 4;
+    const rr = (outer + inner) / 2;
+    const spin = t * 0.35;
+    for (let i = 0; i < studs; i += 1) {
+      const a = spin + (i / studs) * Math.PI * 2;
+      const sx = Math.cos(a) * rr, sy = Math.sin(a) * rr;
+      const sr = Math.max(1.5, (outer - inner) * 0.32);
+      ctx.fillStyle = "#20242c";
+      ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#aab3c4";
+      ctx.beginPath(); ctx.arc(sx - sr * 0.28, sy - sr * 0.32, sr * 0.62, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   window.ROUNDERS.CHARACTERS = CHARACTERS;
   window.ROUNDERS.drawCharacter = drawCharacter;
+  window.ROUNDERS.drawIronHull = drawIronHull;
   window.ROUNDERS.setProceduralCharacters = setProceduralCharacters;
   window.ROUNDERS.characterImage = { has: hasImage, get: getImage };
 })();

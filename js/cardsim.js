@@ -15,6 +15,7 @@
   window.ROUNDERS = window.ROUNDERS || {};
 
   const rand = (min, max) => min + Math.random() * (max - min);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
   // World is authored at this size and scaled to whatever canvas it gets.
   const W = 720, H = 320;
@@ -58,7 +59,7 @@
       groundHug: 0, voidPull: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
-      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0,
+      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0,
       goldenShot: 0, killHeal: false,
       active: null, activeCooldown: 10,
       kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0, wallPierce: 0, holePunch: 0,
@@ -152,7 +153,7 @@
     // a skip shot off the floor: reliable to stage, and it reads as a bounce
     // far better than a bank off a floating slab, which lands anywhere
     else if (on("bounces") || on("bankShot")) { plan.skip = true; watch.push("the shot skips off the floor instead of dying on it"); }
-    if (on("chain")) { plan.secondTarget = true; watch.push("with nobody else to jump to, the bolt earths on the wall above and comes back — hitting them twice"); }
+    if (on("chain")) { plan.wall = "perch"; watch.push("with nobody else to jump to, the bolt earths on the wall behind and comes back — hitting them twice"); }
     if (on("homing") || on("steer")) { plan.aimUp = -0.6; watch.push("fired well off-target, the bullet curves back onto them"); }
     if (on("helium")) { plan.aimUp = 0.12; watch.push("the bullet falls upward instead of dropping"); }
     if (on("grow")) watch.push("the bullet swells and hits harder the farther it flies");
@@ -225,7 +226,7 @@
     const chB = CH[opts.targetChar ?? 3] || null;
 
     let a, bb, bullets, fields, parts, floaters, decoys, slabs, t, cycle, raf = 0, running = false;
-    // holes Skylight blows in the preview's pillar, in the pillar's own space
+    // holes Breakthrough blows in the preview's pillar, in the pillar's own space
     let pillarHoles = [];
 
     function makeFighter(x, holder, color, character, facing) {
@@ -257,15 +258,73 @@
     // --------------------------------------------------------------- helpers
     const walls = () => {
       const list = [{ x: -40, y: GROUND, w: W + 80, h: 90, ground: true }];
-      // Skylight's pillar is chunky, so a bored hole is unmistakable
+      // Breakthrough's pillar is chunky, so a bored hole is unmistakable
       if (plan.wall === "thin") list.push({ x: 336, y: 118, w: plan.stats.holePunch ? 92 : 26, h: GROUND - 118, holes: pillarHoles });
       if (plan.wall === "bounce") list.push({ x: 360, y: 60, w: 30, h: 120 });
+      // a slab BEHIND the target, clear of the flight path, so a chain bolt has
+      // something real to earth itself on where you can watch it happen
+      if (plan.wall === "perch") list.push({ x: 660, y: 96, w: 34, h: GROUND - 96 });
       for (const s of slabs) list.push({ x: s.x - s.w / 2, y: s.y - s.h / 2, w: s.w, h: s.h, slab: true });
       return list;
     };
     const hitRect = (x, y, r, w) =>
       x + r > w.x && x - r < w.x + w.w && y + r > w.y && y - r < w.y + w.h;
     const enemies = who => (who === a ? [bb] : [a]);
+
+    // the nearest non-ground wall above head height — what a stray bolt earths
+    // itself on, struck at its top edge (or halfway up a towering one)
+    function simPerch(who) {
+      const headY = who.y - 24;
+      let best = null, bestD = Infinity;
+      for (const w of walls()) {
+        if (w.ground || w.y >= headY - 10) continue;
+        const px = clamp(who.x, w.x, w.x + w.w);
+        const d = Math.hypot(px - who.x, w.y - who.y);
+        if (d < bestD && d < 420) { bestD = d; best = { x: px, y: w.y }; }
+      }
+      if (!best) return null;
+      const rise = who.y - best.y;
+      return rise > 320 ? { x: best.x, y: who.y - rise / 2 } : best;
+    }
+
+    // charge with nowhere to go: short arcs crawl over the fighter and spit
+    // sparks, dying out in place instead of striking off into empty sky
+    function simFizzle(who, color) {
+      const rad = 30;
+      for (let i = 0; i < 7; i += 1) {
+        const a1 = Math.random() * Math.PI * 2, a2 = a1 + rand(0.7, 2.1);
+        const life = rand(0.12, 0.34);
+        parts.push({
+          bolt: true, fizzle: true, life, max: life, color,
+          x1: who.x + Math.cos(a1) * rad, y1: who.y + Math.sin(a1) * rad * 0.8,
+          x2: who.x + Math.cos(a2) * rad, y2: who.y + Math.sin(a2) * rad * 0.8
+        });
+      }
+      puff(who.x, who.y, color, 16, 90);
+    }
+
+    // a wall coming apart: chunks of its own colour thrown out of the impact
+    // and tumbling away, plus dust. The gap they leave is just empty space.
+    function simRubble(x, y, size, dir, base) {
+      const cols = [base, "rgba(255,255,255,0.16)", base];
+      for (let i = 0; i < 20; i += 1) {
+        const away = dir + rand(-1.1, 1.1), sp = rand(80, 300);
+        const life = rand(0.5, 1.0);
+        parts.push({
+          chunk: true, x: x + rand(-size / 3, size / 3), y: y + rand(-size / 3, size / 3),
+          vx: Math.cos(away) * sp, vy: Math.sin(away) * sp - rand(40, 170),
+          life, max: life, r: rand(1.8, 4.6), rot: Math.random() * Math.PI, spin: rand(-9, 9),
+          color: i % 3 === 1 ? cols[1] : base
+        });
+      }
+      for (let i = 0; i < 8; i += 1) {
+        const life = rand(0.4, 0.9);
+        parts.push({
+          smoke: true, x: x + rand(-size / 2, size / 2), y: y + rand(-size / 2, size / 2),
+          vx: rand(-35, 35), vy: rand(-25, 8), life, max: life, r: rand(3, 8), color: base
+        });
+      }
+    }
 
     function float(x, y, text, color) { floaters.push({ x, y, text, color, life: 0.9 }); }
     function puff(x, y, color, n = 8, sp = 150) {
@@ -320,6 +379,15 @@
       if (lethal && who.guardian > 0) {
         who.guardian -= 1; who.hp = who.maxHp * 0.25;
         float(who.x, who.y - 52, "SAVED", "#ffd700"); puff(who.x, who.y, "#ffd700", 22, 380);
+        // same intervention the game draws: a glow, a halo, and an angel away
+        fields.push({ type: "guardian", owner: who, x: who.x, y: who.y, r: 22, life: 1.6 });
+        for (let i = 0; i < 16; i += 1) {
+          parts.push({
+            x: who.x + rand(-20, 20), y: who.y + rand(-16, 16),
+            vx: rand(-30, 30), vy: rand(-90, -30), life: rand(0.6, 1.1), max: 1.1,
+            r: rand(1.5, 3.2), color: Math.random() < 0.5 ? "#fff3b0" : "#ffd700"
+          });
+        }
         return;
       }
       who.hp -= amount;
@@ -708,7 +776,7 @@
             }
             if (w.holes.length < 6) w.holes.push(bite);
             b.life = -1;
-            puff(x, y, "#e8e2d4", 18, 300);
+            simRubble(x, y, size, Math.atan2(b.vy, b.vx), w.slab ? "#6d6152" : "#4a5266");
             boom(b);
             continue;
           }
@@ -775,13 +843,18 @@
               parts.push({ bolt: true, x1: who.x, y1: who.y, x2: third.x, y2: third.y, life: 0.22, max: 0.22, color: "#ffe95e" });
               damage(third, dmg * 0.55, b.owner, 0, 0, false);
             } else {
-              // nobody else to jump to: the bolt earths itself on the ledge
-              // above and comes straight back, catching them twice
-              const perch = { x: who.x + rand(-30, 30), y: Math.max(24, who.y - 150) };
-              parts.push({ bolt: true, x1: who.x, y1: who.y, x2: perch.x, y2: perch.y, life: 0.3, max: 0.3, color: "#ffe95e" });
-              parts.push({ bolt: true, x1: perch.x, y1: perch.y, x2: who.x, y2: who.y, life: 0.42, max: 0.42, color: "#fff6a8" });
-              damage(who, dmg * 0.35, b.owner, 0, 0, false);
-              damage(who, dmg * 0.35, b.owner, 0, 0, false);
+              // nobody else to jump to: the bolt earths itself on the wall
+              // behind and comes straight back, catching them twice
+              const perch = simPerch(who);
+              if (perch) {
+                parts.push({ bolt: true, x1: who.x, y1: who.y, x2: perch.x, y2: perch.y, life: 0.34, max: 0.34, color: "#ffe95e" });
+                parts.push({ bolt: true, x1: perch.x, y1: perch.y, x2: who.x, y2: who.y, life: 0.46, max: 0.46, color: "#fff6a8", delay: 0.12 });
+                damage(who, dmg * 0.35, b.owner, 0, 0, false);
+                damage(who, dmg * 0.35, b.owner, 0, 0, false);
+              } else {
+                // nothing to earth on: the charge crawls over them and dies
+                simFizzle(who, "#ffe95e");
+              }
             }
           }
           if (b.empowered) { blockEffects(b.owner, who.x, who.y); b.empowered = 0; }
@@ -795,7 +868,7 @@
       // fields
       for (const f of fields) {
         f.life -= dt;
-        if (f.type === "boom") continue;     // visual only
+        if (f.type === "boom" || f.type === "guardian") continue;     // visual only
         if (f.type === "heal") { const o = f.owner; if (Math.hypot(o.x - f.x, o.y - f.y) < f.r) heal(o, f.hps * dt); }
         if (f.type === "saw") {
           f.angle += dt * 7;
@@ -847,10 +920,13 @@
       }
       fields = fields.filter(f => f.life > 0);
       for (const p of parts) {
+        // a delayed bolt holds its full life until its beat comes round
+        if (p.delay > 0) { p.delay -= dt; continue; }
         p.life -= dt;
         if (p.trail || p.bolt) continue;
         p.x += p.vx * dt; p.y += p.vy * dt;
         if (p.smoke) { p.vy -= 55 * dt; p.vx *= Math.pow(0.9, dt * 60); }
+        else if (p.chunk) { p.vy += 900 * dt; p.rot += p.spin * dt; }
         else if (p.flame) p.vy -= 120 * dt;
         else if (p.spark) { /* vortex debris flies its own way */ }
         else p.vy += 400 * dt;
@@ -862,7 +938,7 @@
 
       // loop the scene once it has made its point
       const quiet = !bullets.length && !fields.length;
-      // Skylight needs longer: one bite, a second to hole right through, then
+      // Breakthrough needs longer: one bite, a second to hole right through, then
       // shots flying through the gap. Cutting at 5s reset the wall every time.
       const soft = plan.stats.holePunch ? 9 : 4.6;
       const hard = plan.stats.holePunch ? 12 : 7.5;
@@ -920,6 +996,10 @@
       if (who.chillT > 0) { ctx.shadowColor = "#8fd8ff"; ctx.shadowBlur = 16; }
       if (who.burnT > 0) { ctx.shadowColor = "#ff7a26"; ctx.shadowBlur = 18 + Math.sin(t * 22) * 6; }
       if (who.stunT > 0) ctx.rotate(Math.sin(t * 40) * 0.07);
+      // Juggernaut's studded iron shell, behind the body, same as in game
+      if (who.stats.ironHull > 0 && window.ROUNDERS.drawIronHull) {
+        window.ROUNDERS.drawIronHull(ctx, who.stats.radius, who.stats.ironHull, t);
+      }
       if (ch && window.ROUNDERS.drawCharacter) {
         window.ROUNDERS.drawCharacter(ctx, ch, who.stats.radius, { t, aimX: who.aimX, aimY: who.aimY });
       } else {
@@ -1002,15 +1082,8 @@
         ctx.fillStyle = "rgba(255,255,255,0.10)";
         ctx.fillRect(w.x, w.y, w.w, 3);
         ctx.restore();
-        if (holes) for (const h of holes) {
-          ctx.save();
-          ctx.beginPath(); ctx.rect(w.x, w.y, w.w, w.h); ctx.clip();
-          ctx.strokeStyle = "rgba(20,16,12,0.78)"; ctx.lineWidth = 2.5;
-          ctx.strokeRect(w.x + h.lx, w.y + h.ly, h.w, h.h);
-          ctx.strokeStyle = "rgba(255,210,150,0.3)"; ctx.lineWidth = 1.2;
-          ctx.strokeRect(w.x + h.lx + 2, w.y + h.ly + 2, h.w - 4, h.h - 4);
-          ctx.restore();
-        }
+        // no rim, no outline: a bored gap is just empty space. The break is
+        // sold by the wall-coloured rubble thrown at the moment of impact.
       }
       // fields
       for (const f of fields) {
@@ -1051,6 +1124,45 @@
           ctx.strokeStyle = `rgba(255,255,255,${0.5 * a01})`;
           ctx.lineWidth = 2;
           ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 0.3, 0, Math.PI * 2); ctx.stroke();
+        } else if (f.type === "guardian") {
+          // mirrors game.js: a warm glow on the fighter who was spared, a halo
+          // over their head, and an angel rising away and thinning to nothing
+          const k = 1 - Math.max(0, f.life) / 1.6;
+          const o = f.owner;
+          const px = o ? o.x : f.x, py = o ? o.y : f.y;
+          ctx.save();
+          const glow = ctx.createRadialGradient(px, py, 0, px, py, f.r * 2.6);
+          glow.addColorStop(0, `rgba(255,240,180,${(1 - k) * 0.55})`);
+          glow.addColorStop(0.6, `rgba(255,215,90,${(1 - k) * 0.25})`);
+          glow.addColorStop(1, "rgba(255,200,60,0)");
+          ctx.fillStyle = glow;
+          ctx.beginPath(); ctx.arc(px, py, f.r * 2.6, 0, Math.PI * 2); ctx.fill();
+          const hy = py - f.r - 16 - k * 6;
+          ctx.strokeStyle = `rgba(255,226,120,${1 - k})`;
+          ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.ellipse(px, hy, f.r * 0.72, f.r * 0.24, 0, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.8})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.ellipse(px, hy, f.r * 0.72, f.r * 0.24, 0, 0, Math.PI * 2); ctx.stroke();
+          ctx.globalAlpha = (1 - k) * 0.85;
+          ctx.translate(px, py - 20 - k * 130);
+          ctx.scale(0.7 + k * 0.5, 0.7 + k * 0.5);
+          const ang = window.ROUNDERS.fxImage && window.ROUNDERS.fxImage("angel");
+          if (ang) {
+            ctx.drawImage(ang, -26, -30, 52, 60);
+          } else {
+            ctx.fillStyle = "rgba(255,248,214,0.95)";
+            ctx.beginPath(); ctx.arc(0, -12, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(0, 6, 7, 14, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "rgba(255,248,214,0.95)";
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(-14, 2, 12, -1.2, 0.9); ctx.stroke();
+            ctx.beginPath(); ctx.arc(14, 2, 12, Math.PI - 0.9, Math.PI + 1.2); ctx.stroke();
+            ctx.strokeStyle = "rgba(255,226,120,0.95)";
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.ellipse(0, -22, 8, 3, 0, 0, Math.PI * 2); ctx.stroke();
+          }
+          ctx.restore();
         } else if (f.type === "stink") {
           ctx.fillStyle = `rgba(110,190,60,${0.22 * Math.min(1, f.life)})`;
           ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
@@ -1103,25 +1215,48 @@
       for (const p of parts) {
         const al = p.life / p.max;
         if (p.bolt) {
-          // forked, with a glow, so a zap reads at a glance
-          ctx.save();
-          ctx.globalAlpha = al;
-          ctx.shadowColor = p.color; ctx.shadowBlur = 10;
-          ctx.strokeStyle = p.color;
-          ctx.lineWidth = 3.5;
-          ctx.beginPath();
-          ctx.moveTo(p.x1, p.y1);
-          const segs = 4;
+          if (p.delay > 0) continue;                  // the return leg, not yet
+          // Forked and glowing so a zap reads at a glance, and cleared in the
+          // direction it travelled: the tail lets go first and the vanishing
+          // edge chases the head, so you can see which way the bolt went.
+          const segs = 6;
+          const edge = p.fizzle ? -1 : (1 - al) * 1.35 - 0.35;
+          const jit = p.fizzle ? 3 : 9;
+          const pts = [{ x: p.x1, y: p.y1 }];
+          const nx = -(p.y2 - p.y1), ny = p.x2 - p.x1;
+          const nl = Math.hypot(nx, ny) || 1;
           for (let i = 1; i < segs; i += 1) {
             const k = i / segs;
-            const mx = p.x1 + (p.x2 - p.x1) * k, my = p.y1 + (p.y2 - p.y1) * k;
-            const nx = -(p.y2 - p.y1), ny = p.x2 - p.x1;
-            const nl = Math.hypot(nx, ny) || 1;
-            const j = (i % 2 ? 1 : -1) * 9 * (1 - k);
-            ctx.lineTo(mx + (nx / nl) * j, my + (ny / nl) * j);
+            const j = (i % 2 ? 1 : -1) * jit * (1 - k);
+            pts.push({
+              x: p.x1 + (p.x2 - p.x1) * k + (nx / nl) * j,
+              y: p.y1 + (p.y2 - p.y1) * k + (ny / nl) * j
+            });
           }
-          ctx.lineTo(p.x2, p.y2);
-          ctx.stroke();
+          pts.push({ x: p.x2, y: p.y2 });
+          ctx.save();
+          ctx.shadowColor = p.color; ctx.shadowBlur = 10;
+          ctx.strokeStyle = p.color;
+          ctx.lineCap = "round"; ctx.lineJoin = "round";
+          for (let i = 0; i < pts.length - 1; i += 1) {
+            const u = i / (pts.length - 1);
+            const lit = clamp((u - edge) / 0.35, 0, 1);
+            if (lit <= 0.01) continue;
+            ctx.globalAlpha = lit * (0.35 + al * 0.65);
+            ctx.lineWidth = 3.5 * (0.5 + lit * 0.5);
+            ctx.beginPath();
+            ctx.moveTo(pts[i].x, pts[i].y);
+            ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
+            ctx.stroke();
+          }
+          ctx.restore();
+        } else if (p.chunk) {
+          // masonry: an angular shard of the wall, tumbling as it falls
+          ctx.save();
+          ctx.globalAlpha = al;
+          ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.r, -p.r * 0.8, p.r * 2, p.r * 1.6);
           ctx.restore();
         } else if (p.smoke) {
           ctx.globalAlpha = al * 0.55; ctx.fillStyle = p.color;
@@ -1146,8 +1281,6 @@
       for (const b of bullets) {
         ctx.save();
         if (b.golden || b.empowered) {
-          ctx.shadowColor = "#ffd700";
-          ctx.shadowBlur = 22;
           if (Math.random() < 0.8) {
             const ang = Math.random() * Math.PI * 2, rr = b.r * rand(0.6, 1.8);
             parts.push({
@@ -1158,42 +1291,21 @@
             });
           }
         }
-        if (b.explosive >= 2) { ctx.shadowColor = "#fff0c0"; ctx.shadowBlur = 26; }
-        if (b.empowered) {
-          const rr = b.r * 2.6 + 3;
-          ctx.strokeStyle = `rgba(255,255,255,${0.75 + 0.25 * Math.sin(t * 16)})`;
-          ctx.lineWidth = 2.2;
-          ctx.beginPath(); ctx.arc(b.x, b.y, rr, 0, Math.PI * 2); ctx.stroke();
-          ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fill();
-        }
-        ctx.fillStyle = b.color; ctx.strokeStyle = "#15121c"; ctx.lineWidth = 2;
+        // The round in flight is drawn by the SAME renderer as the bullet
+        // viewer, from a spec read off the bullet itself — so a Railgun slug is
+        // the elongated drill round in both places, and the pane can never
+        // disagree with the preview.
         const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 600) : 1;
-        const r = b.r * gr * tScale;
-        if (b.explosive >= 2) {
-          const cg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.9);
-          cg.addColorStop(0, "rgba(255,255,255,1)");
-          cg.addColorStop(0.45, "rgba(255,240,190,0.95)");
-          cg.addColorStop(0.75, "rgba(255,170,70,0.55)");
-          cg.addColorStop(1, "rgba(255,120,40,0)");
-          ctx.fillStyle = cg;
-          ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.9, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = "#ffffff";
-          ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.72, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
-          continue;
-        }
-        if (tRot || b.art) {
-          // a tweaked round is drawn in its own frame, turned to its flight
-          // path plus the tweak, so rotation is visible on a moving bullet
-          ctx.translate(b.x, b.y);
-          ctx.rotate(Math.atan2(b.vy, b.vx) + tRot);
-          ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-          // a nose mark, so the rotation you dialled in is actually legible
-          ctx.fillStyle = "rgba(255,255,255,0.65)";
-          ctx.beginPath(); ctx.arc(r * 0.45, 0, Math.max(1.2, r * 0.22), 0, Math.PI * 2); ctx.fill();
-        } else {
-          ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        }
+        ctx.translate(b.x, b.y);
+        ctx.rotate(Math.atan2(b.vy, b.vx));
+        drawBullet(ctx, {
+          r: b.r, color: b.color,
+          golden: Boolean(b.golden), empowered: Boolean(b.empowered),
+          explosive: b.explosive > 0, explosivePower: b.explosive,
+          burn: b.burn > 0, poison: b.poison > 0, chill: b.chill > 0,
+          chain: b.chain > 0, pierce: b.pierce > 0,
+          wallPierce: b.wallPierce > 0, holePunch: b.holePunch > 0
+        }, { scale: gr * tScale, rotation: tRot * 180 / Math.PI, art: b.art || null });
         ctx.restore();
       }
       // Chronoshift: the undone path, drawn as a fading ghost of the fighter

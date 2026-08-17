@@ -206,7 +206,7 @@
       groundHug: 0, voidPull: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
-      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0,
+      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0,
       goldenShot: 0, killHeal: false,
       active: null, activeCooldown: 10,
       // gap-audit wave (CARD-GAP-AUDIT.md): offense & bullets
@@ -365,7 +365,7 @@
   }
 
   // ------------------------------------------------------------------ holes
-  // Skylight bores permanent gaps in terrain. Holes are stored in the source
+  // Breakthrough bores permanent gaps in terrain. Holes are stored in the source
   // object's local space and read back through the live platform each frame,
   // so a hole in a mover travels with it.
 
@@ -375,7 +375,7 @@
   // takes a square bite out of the face it strikes, so anything thicker than
   // one bite needs a second shot to finish the job. Overlapping bites merge
   // into one opening, which is what deepens a hole into a passage.
-  function punchHole(platform, wx, wy, size) {
+  function punchHole(platform, wx, wy, size, dir = 0) {
     const src = platform.holeSrc;
     if (!src || platform.isCrate) return false;
     const list = props.holes.get(src) || [];
@@ -399,6 +399,10 @@
     if (list.length > 10) return false;          // a wall can only be so much lace
     list.push(bite);
     props.holes.set(src, list);
+    // the material has to go somewhere: it comes out as wall-coloured chunks,
+    // which is the whole visual for the break — the gap itself is drawn as
+    // nothing at all
+    rubble(wx, wy, size, dir);
     return true;
   }
 
@@ -2780,9 +2784,9 @@
             if (!solidAt(bx, by)) continue;    // the way through is already clear
           }
           // a bite wide enough for a fighter (radius 27) to climb through
-          if (b.holePunch && !platform.isCrate && punchHole(platform, bx, by, 64 + 14 * (b.holePunch - 1))) {
+          if (b.holePunch && !platform.isCrate &&
+              punchHole(platform, bx, by, 64 + 14 * (b.holePunch - 1), Math.atan2(b.vy, b.vx))) {
             b.life = -1;
-            burst(bx, by, "#e8e2d4", 26, 380);
             world.shake = Math.max(world.shake, 7);
             sfx("boom");
             explodeBullet(b);
@@ -2947,10 +2951,36 @@
           victim, damage: damage * 0.35 * b.chain, owner: b.owner, pending: true, life: 0.3, points: [], color: "#ffe95e" });
         sfx("chain");
       } else {
-        // no perch: it arcs up and out into nowhere
-        boltVisual(victim.x, victim.y, victim.x + rand(-60, 60), -40, "#ffe95e", 0.22);
+        // Nothing to earth on and nobody to jump to: rather than a bolt to
+        // nowhere, the charge has no way out and fizzles across the victim as
+        // crawling static.
+        staticFizzle(victim, "#ffe95e");
         sfx("chain");
       }
+    }
+  }
+
+  // Charge with nowhere to go: short arcs crawl around the fighter and spit
+  // sparks, dying out in place instead of striking off into empty sky.
+  function staticFizzle(victim, color) {
+    const rad = (victim.stats ? victim.stats.radius : 24) + 6;
+    for (let i = 0; i < 7; i += 1) {
+      const a1 = Math.random() * Math.PI * 2;
+      const a2 = a1 + rand(0.7, 2.1);
+      boltVisual(
+        victim.x + Math.cos(a1) * rad, victim.y + Math.sin(a1) * rad * 0.8,
+        victim.x + Math.cos(a2) * rad, victim.y + Math.sin(a2) * rad * 0.8,
+        color, rand(0.12, 0.34)
+      );
+    }
+    for (let i = 0; i < 18; i += 1) {
+      const a1 = Math.random() * Math.PI * 2;
+      particles.push({
+        x: victim.x + Math.cos(a1) * rad, y: victim.y + Math.sin(a1) * rad * 0.8,
+        vx: Math.cos(a1) * rand(20, 70), vy: Math.sin(a1) * rand(20, 70) - 30,
+        life: rand(0.25, 0.6), maxLife: 0.6, r: rand(1, 2.4),
+        color: Math.random() < 0.5 ? color : "#ffffff", spark: true
+      });
     }
   }
 
@@ -4771,21 +4801,9 @@
     ctx.clip("evenodd");
     fn();
     ctx.restore();
-    // a scorched rim so a fresh hole reads as bored, not as a gap in the art —
-    // clipped to the slab, so no part of the ring floats off its edge
-    for (const h of holes) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(box.x, box.y, box.w, box.h);
-      ctx.clip();
-      ctx.strokeStyle = "rgba(20,16,12,0.78)";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(box.x + h.lx, box.y + h.ly, h.w, h.h);
-      ctx.strokeStyle = "rgba(255,210,150,0.3)";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(box.x + h.lx + 2.5, box.y + h.ly + 2.5, h.w - 5, h.h - 5);
-      ctx.restore();
-    }
+    // No rim, no outline: a bored gap is simply empty space. What sells the
+    // break is the shower of wall-coloured debris thrown at the moment of
+    // impact (see punchHole), not a box drawn where the material used to be.
   }
 
   function drawPlatforms(level) {
@@ -5095,6 +5113,10 @@
         }
         ctx.restore();
       }
+
+      // Juggernaut wears its bulk: a studded iron shell sitting just proud of
+      // the body, so the fighter reads as armoured rather than merely large
+      if (p.stats.ironHull > 0) window.ROUNDERS.drawIronHull(ctx, r, p.stats.ironHull, world.time + p.botSeed);
 
       // shadow
       ctx.fillStyle = "rgba(0,0,0,0.28)";
@@ -5670,14 +5692,17 @@
     }
   }
 
-  function boltVisual(x1, y1, x2, y2, color, life) {
+  // jitter is scaled to the span so a hand-sized crackle does not wander as
+  // far off its line as a bolt thrown at a wall
+  function boltVisual(x1, y1, x2, y2, color, life, jitter) {
     const points = [];
     const segs = 8;
+    const j = jitter ?? Math.min(26, Math.hypot(x2 - x1, y2 - y1) * 0.18);
     for (let i = 0; i <= segs; i += 1) {
       const t = i / segs;
       points.push({
-        x: x1 + (x2 - x1) * t + (i > 0 && i < segs ? rand(-26, 26) : 0),
-        y: y1 + (y2 - y1) * t + (i > 0 && i < segs ? rand(-26, 26) : 0)
+        x: x1 + (x2 - x1) * t + (i > 0 && i < segs ? rand(-j, j) : 0),
+        y: y1 + (y2 - y1) * t + (i > 0 && i < segs ? rand(-j, j) : 0)
       });
     }
     bolts.push({ points, life, maxLife: life, color });
@@ -5698,16 +5723,31 @@
     bolts = bolts.filter(b => b.life > 0);
   }
 
+  // The strike itself is instantaneous, but it CLEARS in the direction it
+  // travelled: the tail lets go first and the vanishing edge chases the head
+  // down the path, so you can read which way a bolt went after the flash.
   function drawBoltsAll() {
     for (const b of bolts) {
+      if (!b.points.length) continue;
       const a = clamp(b.life / b.maxLife, 0, 1);
-      ctx.strokeStyle = hexAlpha(b.color, a);
-      ctx.lineWidth = 4 * a + 1;
+      const edge = (1 - a) * 1.35 - 0.35;   // the path is gone up to here
+      const n = b.points.length - 1;
       ctx.lineJoin = "round";
-      ctx.beginPath();
-      b.points.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
-      ctx.stroke();
+      ctx.lineCap = "round";
+      for (let i = 0; i < n; i += 1) {
+        const u = i / n;
+        const lit = clamp((u - edge) / 0.35, 0, 1);
+        if (lit <= 0.01) continue;
+        // the head stays bright while the tail wipes away behind it
+        ctx.strokeStyle = hexAlpha(b.color, lit * (0.35 + a * 0.65));
+        ctx.lineWidth = (4 * a + 1) * (0.5 + lit * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(b.points[i].x, b.points[i].y);
+        ctx.lineTo(b.points[i + 1].x, b.points[i + 1].y);
+        ctx.stroke();
+      }
     }
+    ctx.lineCap = "butt";
   }
 
   // While the world unwinds, say so: a cold wash over the arena, a rewind
@@ -5932,6 +5972,7 @@
       if (p.smoke) { p.vy -= 60 * dt; p.vx *= Math.pow(0.9, dt * 60); }
       else if (p.flame) p.vy -= 130 * dt;
       else if (p.spark) { p.vx *= Math.pow(0.94, dt * 60); p.vy = p.vy * Math.pow(0.94, dt * 60) + 40 * dt; }
+      else if (p.chunk) { p.vy += 900 * dt; p.rot += p.spin * dt; }
       else p.vy += 360 * dt;
     }
     particles = particles.filter(p => p.life > 0);
@@ -5963,6 +6004,16 @@
         ctx.fill();
         continue;
       }
+      if (p.chunk) {
+        // masonry: an angular shard of the wall, tumbling as it falls
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.r, -p.r * 0.8, p.r * 2, p.r * 1.6);
+        ctx.restore();
+        continue;
+      }
       if (p.spark) {
         ctx.save();
         ctx.shadowColor = p.color;
@@ -5980,6 +6031,34 @@
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+
+  // A wall coming apart: chunks of the terrain's own colour thrown out of the
+  // impact and tumbling to the ground, plus a haze of dust. This is what sells
+  // a Breakthrough bite — the gap it leaves behind is simply empty space.
+  function rubble(x, y, size = 64, dir = 0) {
+    const pal = currentLevel().palette;
+    const cols = [pal.plat, pal.platEdge || pal.plat, pal.accent || pal.plat];
+    for (let i = 0; i < 22; i += 1) {
+      const away = dir + rand(-1.1, 1.1);
+      const sp = rand(90, 340);
+      particles.push({
+        x: x + rand(-size / 3, size / 3), y: y + rand(-size / 3, size / 3),
+        vx: Math.cos(away) * sp, vy: Math.sin(away) * sp - rand(40, 190),
+        life: rand(0.5, 1.1), maxLife: 1.1, r: rand(2, 5.5),
+        rot: Math.random() * Math.PI, spin: rand(-9, 9),
+        color: cols[i % cols.length], chunk: true
+      });
+    }
+    // dust hanging in the gap
+    for (let i = 0; i < 10; i += 1) {
+      particles.push({
+        x: x + rand(-size / 2, size / 2), y: y + rand(-size / 2, size / 2),
+        vx: rand(-40, 40), vy: rand(-30, 10),
+        life: rand(0.5, 1.0), maxLife: 1.0, r: rand(4, 9),
+        color: pal.plat, smoke: true
+      });
+    }
   }
 
   // Fire and smoke, used by everything that should look genuinely alight:

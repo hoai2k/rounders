@@ -429,7 +429,7 @@
       "Built like a planet.",
       "More than double health and a bigger body, in exchange for slower movement.",
       ["+110% health", "+14% size", "−14% speed"], ["defense"],
-      p => { p.stats.maxHp *= 2.1; p.stats.radius *= 1.14; p.stats.speed *= 0.86; }),
+      p => { p.stats.maxHp *= 2.1; p.stats.radius *= 1.14; p.stats.speed *= 0.86; p.stats.ironHull += 1; }),
 
     card("warp-block", "French Exit", "epic",
       "Be somewhere else.",

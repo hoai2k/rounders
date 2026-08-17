@@ -10,7 +10,7 @@
     <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon/favicon-64.png">
     <link rel="icon" type="image/png" sizes="256x256" href="assets/favicon/favicon-256.png">
     <link rel="apple-touch-icon" sizes="512x512" href="assets/favicon/favicon-512.png">
-    <link rel="stylesheet" href="styles.css?v=28">
+    <link rel="stylesheet" href="styles.css?v=29">
   </head>
   <body>
     <canvas id="game" aria-label="Rounders game canvas"></canvas>
@@ -73,6 +73,26 @@
         <input id="hazards" type="checkbox" checked>
       </label>
 
+      <h3 class="settings-group" data-str="settings.groupCards"></h3>
+      <div class="card-mode" id="cardMode" role="group">
+        <button type="button" data-mode="default" data-str="settings.cardModeDefault"></button>
+        <button type="button" data-mode="equalize" data-str="settings.cardModeEqualize"></button>
+        <button type="button" data-mode="choose" data-str="settings.cardModeChoose"></button>
+      </div>
+      <p class="card-note" id="cardModeNote"></p>
+
+      <div id="cardPicker" class="card-picker hidden">
+        <div class="card-picker-bar">
+          <span class="card-count" id="cardCount"></span>
+          <button type="button" id="cardsAll" data-str="settings.cardsAll"></button>
+          <button type="button" id="cardsNone" data-str="settings.cardsNone"></button>
+          <button type="button" id="cardsInvert" data-str="settings.cardsInvert"></button>
+        </div>
+        <p class="card-hint" data-str-html="settings.cardPickerHintHtml"></p>
+        <div id="cardGrid" class="card-grid"></div>
+      </div>
+
+      <div id="rarityGroup">
       <h3 class="settings-group" data-str="settings.groupRarity"></h3>
       <label class="r-common">
         <span data-str="settings.common"></span>
@@ -104,6 +124,7 @@
         <input id="mythicWeight" type="range" min="0" max="20" value="1">
         <span id="mythicWeightValue">1</span>
       </label>
+      </div>
 
       <h3 class="settings-group" data-str="settings.groupVisuals"></h3>
       <label>
@@ -305,15 +326,15 @@
       <button id="musicNext" type="button" class="np-btn" title="Next track" aria-label="Next track">▶</button>
     </section>
 
-    <script src="js/strings.js?v=28"></script>
+    <script src="js/strings.js?v=29"></script>
     <script src="js/gameplay.js?v=1"></script>
-    <script src="js/cards.js?v=28"></script>
-    <script src="js/chroma.js?v=28"></script>
-    <script src="js/rig.js?v=28"></script>
-    <script src="js/characters.js?v=28"></script>
-    <script src="js/levels.js?v=28"></script>
-    <script src="js/music.js?v=28"></script>
-    <script src="js/arena-music.js?v=28"></script>
-    <script src="game.js?v=28"></script>
+    <script src="js/cards.js?v=29"></script>
+    <script src="js/chroma.js?v=29"></script>
+    <script src="js/rig.js?v=29"></script>
+    <script src="js/characters.js?v=29"></script>
+    <script src="js/levels.js?v=29"></script>
+    <script src="js/music.js?v=29"></script>
+    <script src="js/arena-music.js?v=29"></script>
+    <script src="game.js?v=29"></script>
   </body>
 </html>

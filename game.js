@@ -56,8 +56,45 @@
     shake: true,
     music: true,
     musicVolume: 0.2,
-    rarityWeights: Object.fromEntries(Object.entries(RARITIES).map(([k, v]) => [k, v.weight]))
+    rarityWeights: Object.fromEntries(Object.entries(RARITIES).map(([k, v]) => [k, v.weight])),
+    // Choose Cards: which cards can be drafted, and how their odds are rolled.
+    //   default  — every card, weighted by the rarity rates below
+    //   equalize — every card, all equally likely (rarity rates ignored)
+    //   choose   — only the cards left enabled in the grid, rarity-weighted
+    cardMode: "default",
+    // Card ids the player has switched off. Kept whatever the mode is, so
+    // flipping to Default to see everything and back to Choose later finds the
+    // same selection waiting.
+    disabledCards: new Set()
   };
+
+  // Only the Choose Cards state persists — it is the one setting a player builds
+  // up over sessions rather than dials in for a match.
+  const CARD_PREF_KEY = "rounders.cards.v1";
+  const CARD_MODES = ["default", "equalize", "choose"];
+
+  function loadCardPrefs() {
+    try {
+      const raw = localStorage.getItem(CARD_PREF_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (CARD_MODES.includes(saved.mode)) settings.cardMode = saved.mode;
+      if (Array.isArray(saved.disabled)) {
+        const known = new Set(CARDS.map(c => c.id));
+        // ids from an older card set are dropped, so a renamed card comes back on
+        settings.disabledCards = new Set(saved.disabled.filter(id => known.has(id)));
+      }
+    } catch { /* private mode, file:// with no storage — defaults are fine */ }
+  }
+
+  function saveCardPrefs() {
+    try {
+      localStorage.setItem(CARD_PREF_KEY, JSON.stringify({
+        mode: settings.cardMode,
+        disabled: [...settings.disabledCards]
+      }));
+    } catch { /* nothing to do but keep the choice for this session */ }
+  }
 
   const world = {
     width: 1600,
@@ -719,11 +756,25 @@
   }
 
   // ---------------------------------------------------------------- drafting
+  // The cards a draft is allowed to offer. In Choose mode that is whatever the
+  // player left enabled — unless they switched everything off, which is not a
+  // playable state, so an empty pool falls back to the full set (the settings
+  // panel says as much under the counter).
+  function cardPool() {
+    if (settings.cardMode !== "choose") return CARDS;
+    const on = CARDS.filter(c => !settings.disabledCards.has(c.id));
+    return on.length ? on : CARDS;
+  }
+
   function drawCards(count, exclude = []) {
-    const bag = CARDS.filter(c => !exclude.includes(c));
+    const bag = cardPool().filter(c => !exclude.includes(c));
     const weighted = [];
     for (const c of bag) {
-      const n = Math.max(0, Math.round(settings.rarityWeights[c.rarity] ?? 1));
+      // Equalize flattens the rarity ladder: one ticket each, so a Mythic is
+      // exactly as likely as a Common.
+      const n = settings.cardMode === "equalize"
+        ? 1
+        : Math.max(0, Math.round(settings.rarityWeights[c.rarity] ?? 1));
       for (let i = 0; i < n; i += 1) weighted.push(c);
     }
     const picked = [];
@@ -3149,11 +3200,360 @@
     return Math.hypot(c.x - cx, c.y - cy) <= (c.r || (c.stats && c.stats.radius) || 0);
   }
 
+  // ------------------------------------------------------------ choose cards
+  // The card grid is its own focus region inside Settings. Eighty-odd cells is
+  // far too many for the panel's generic cursor — that is one button press per
+  // card and a rect measured per candidate — so the grid keeps its own cursor,
+  // its own row map built from live geometry, and its own held-direction
+  // repeat, and hands focus back to the panel at its top and bottom edges.
+  const cardUi = {
+    picker: null,
+    grid: null,
+    cells: [],      // every focusable thing in the grid, in DOM order
+    heads: [],      // indices of the rarity headings, for LB/RB section jumps
+    byRarity: new Map(),
+    rows: [],       // [[cellIndex, …], …], rebuilt whenever the grid reflows
+    rowOf: [],      // cell index → row index
+    cursor: 0,
+    active: false,  // true while the grid, not the panel, is driving the cursor
+    layoutW: -1,    // grid width the row map was measured at
+    nav: { axis: null, value: 0, timer: 0 }
+  };
+
+  const GRID_REPEAT_DELAY = 0.3;   // hold this long before it starts repeating
+  const GRID_REPEAT_RATE = 0.055;  // ≈18 cells a second once it does
+
+  function buildCardPicker() {
+    cardUi.picker = document.getElementById("cardPicker");
+    cardUi.grid = document.getElementById("cardGrid");
+    if (!cardUi.grid) return;
+    for (const rarity of window.ROUNDERS.RARITY_ORDER) {
+      cardUi.byRarity.set(rarity, CARDS.filter(c => c.rarity === rarity));
+    }
+    let html = "";
+    for (const [rarity, list] of cardUi.byRarity) {
+      if (!list.length) continue;
+      const rar = RARITIES[rarity];
+      const style = `--rcol:${rar.color};--rglow:${rar.glow}`;
+      html += `<button type="button" class="rarity-head" style="${style}" data-cell data-kind="rarity" data-rarity="${rarity}"></button>`;
+      for (const c of list) {
+        html += `<button type="button" class="card-cell" style="${style};--emblem:url('${cardArtUrl(c.id)}')" ` +
+          `data-cell data-kind="card" data-id="${c.id}" title="${escapeHtml(c.name)}">` +
+          `<span class="cc-art"></span><span class="cc-name">${escapeHtml(c.name)}</span></button>`;
+      }
+    }
+    cardUi.grid.innerHTML = html;
+    cardUi.cells = [...cardUi.grid.querySelectorAll("[data-cell]")];
+    cardUi.heads = cardUi.cells.map((el, i) => (el.dataset.kind === "rarity" ? i : -1)).filter(i => i >= 0);
+    cardUi.grid.addEventListener("click", e => {
+      const cell = e.target.closest("[data-cell]");
+      if (!cell) return;
+      const i = cardUi.cells.indexOf(cell);
+      if (i >= 0) cardUi.cursor = i;
+      toggleCell(cell);
+    });
+  }
+
+  function enabledCardCount() {
+    return CARDS.reduce((n, c) => n + (settings.disabledCards.has(c.id) ? 0 : 1), 0);
+  }
+
+  function setCardMode(mode) {
+    if (!CARD_MODES.includes(mode) || mode === settings.cardMode) return;
+    settings.cardMode = mode;
+    sfx("card");
+    saveCardPrefs();
+    refreshCardPicker();
+  }
+
+  function toggleCell(cell) {
+    if (!cell) return;
+    if (cell.dataset.kind === "rarity") toggleRarity(cell.dataset.rarity);
+    else toggleCard(cell.dataset.id);
+    saveCardPrefs();
+    refreshCardPicker();
+  }
+
+  function toggleCard(id) {
+    const turningOn = settings.disabledCards.has(id);
+    if (turningOn) settings.disabledCards.delete(id);
+    else settings.disabledCards.add(id);
+    sfx(turningOn ? "parry" : "thud");
+  }
+
+  // A rarity heading switches its whole block: all on → all off, anything else
+  // → all on, so half a block of greyed-out cards is one press from whole.
+  function toggleRarity(rarity) {
+    const list = cardUi.byRarity.get(rarity) || [];
+    const allOn = list.every(c => !settings.disabledCards.has(c.id));
+    for (const c of list) {
+      if (allOn) settings.disabledCards.add(c.id);
+      else settings.disabledCards.delete(c.id);
+    }
+    sfx(allOn ? "thud" : "parry");
+  }
+
+  function toggleCursorRarity() {
+    const cell = cardUi.cells[cardUi.cursor];
+    if (!cell) return;
+    const rarity = cell.dataset.rarity || (CARDS.find(c => c.id === cell.dataset.id) || {}).rarity;
+    if (!rarity) return;
+    toggleRarity(rarity);
+    saveCardPrefs();
+    refreshCardPicker();
+  }
+
+  function setAllCards(on) {
+    if (on) settings.disabledCards.clear();
+    else for (const c of CARDS) settings.disabledCards.add(c.id);
+    sfx(on ? "parry" : "thud");
+    saveCardPrefs();
+    refreshCardPicker();
+  }
+
+  function invertCards() {
+    const next = new Set();
+    for (const c of CARDS) if (!settings.disabledCards.has(c.id)) next.add(c.id);
+    settings.disabledCards = next;
+    sfx("card");
+    saveCardPrefs();
+    refreshCardPicker();
+  }
+
+  function refreshCardPicker() {
+    const modeBar = document.getElementById("cardMode");
+    if (!modeBar || !cardUi.picker) return;
+    for (const b of modeBar.querySelectorAll("button[data-mode]")) {
+      const on = b.dataset.mode === settings.cardMode;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", String(on));
+    }
+    const mode = settings.cardMode;
+    const note = document.getElementById("cardModeNote");
+    if (note) note.textContent = str(`settings.cardNote${mode[0].toUpperCase()}${mode.slice(1)}`);
+    const rarityGroup = document.getElementById("rarityGroup");
+    // Equalize ignores the rarity ladder, so its sliders read as switched off
+    if (rarityGroup) rarityGroup.classList.toggle("muted", mode === "equalize");
+
+    const choosing = mode === "choose";
+    const wasHidden = cardUi.picker.classList.contains("hidden");
+    cardUi.picker.classList.toggle("hidden", !choosing);
+    if (!choosing) return;
+    if (wasHidden) cardUi.rows = [];   // measured at zero width while hidden
+
+    const on = enabledCardCount();
+    const count = document.getElementById("cardCount");
+    if (count) {
+      count.textContent = on ? str("settings.cardCount", { on, total: CARDS.length }) : str("settings.cardNoneWarning");
+      count.classList.toggle("warn", on === 0);
+    }
+    for (const cell of cardUi.cells) {
+      if (cell.dataset.kind === "card") {
+        const off = settings.disabledCards.has(cell.dataset.id);
+        cell.classList.toggle("off", off);
+        cell.setAttribute("aria-pressed", String(!off));
+      } else {
+        const list = cardUi.byRarity.get(cell.dataset.rarity) || [];
+        cell.textContent = str("settings.rarityToggle", {
+          rarity: RARITIES[cell.dataset.rarity].name,
+          on: list.filter(c => !settings.disabledCards.has(c.id)).length,
+          total: list.length
+        });
+      }
+    }
+  }
+
+  // Rows come from where the cells actually landed, so ragged last rows and the
+  // full-width rarity headings need no special case. Re-measured only when the
+  // grid's width changes.
+  function measureCardRows() {
+    const grid = cardUi.grid;
+    if (!grid || !cardUi.cells.length) return;
+    if (cardUi.rows.length && cardUi.layoutW === grid.clientWidth) return;
+    cardUi.layoutW = grid.clientWidth;
+    const rows = [];
+    const rowOf = [];
+    let top = null;
+    cardUi.cells.forEach((el, i) => {
+      if (top === null || Math.abs(el.offsetTop - top) > 4) { rows.push([]); top = el.offsetTop; }
+      rows[rows.length - 1].push(i);
+      rowOf[i] = rows.length - 1;
+    });
+    cardUi.rows = rows;
+    cardUi.rowOf = rowOf;
+  }
+
+  function setCardCursor(i) {
+    cardUi.cursor = clamp(i, 0, cardUi.cells.length - 1);
+    for (const el of document.querySelectorAll(".controller-focus")) el.classList.remove("controller-focus");
+    const el = cardUi.cells[cardUi.cursor];
+    if (!el) return;
+    el.classList.add("controller-focus");
+    el.focus({ preventScroll: true });
+    // instant, not smooth: at eighteen moves a second a smooth scroll never
+    // catches the cursor up
+    el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
+  // Returns false when the move runs off the grid, so the caller can hand focus
+  // back to the rest of the panel.
+  function moveCardCursor(axis, dir) {
+    measureCardRows();
+    const rows = cardUi.rows;
+    if (!rows.length) return true;
+    const r = cardUi.rowOf[cardUi.cursor] || 0;
+    const row = rows[r];
+    if (axis === "x") {
+      const at = row.indexOf(cardUi.cursor) + dir;
+      if (at >= 0 && at < row.length) { setCardCursor(row[at]); return true; }
+      // stepping off the end of a row wraps onto the next one, the way reading
+      // down a list does
+      const wrap = rows[r + dir];
+      if (!wrap) return false;
+      setCardCursor(dir > 0 ? wrap[0] : wrap[wrap.length - 1]);
+      return true;
+    }
+    const next = rows[r + dir];
+    if (!next) return false;
+    setCardCursor(nearestInRow(next, cardUi.cursor));
+    return true;
+  }
+
+  // Keeps the column when moving between rows: land on whichever cell in the
+  // next row sits nearest across.
+  function nearestInRow(row, fromIndex) {
+    const from = cardUi.cells[fromIndex];
+    const x = from.offsetLeft + from.offsetWidth / 2;
+    let best = row[0], bestD = Infinity;
+    for (const i of row) {
+      const el = cardUi.cells[i];
+      const d = Math.abs(el.offsetLeft + el.offsetWidth / 2 - x);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+
+  // LB / RB skip a whole rarity: forward to the next heading, back to the top of
+  // this block and then to the one before it.
+  function jumpRarity(dir) {
+    const heads = cardUi.heads;
+    if (!heads.length) return;
+    if (dir > 0) {
+      const next = heads.find(i => i > cardUi.cursor);
+      setCardCursor(next === undefined ? heads[0] : next);
+      return;
+    }
+    const here = [...heads].reverse().find(i => i <= cardUi.cursor);
+    if (here === undefined) { setCardCursor(heads[heads.length - 1]); return; }
+    if (here < cardUi.cursor) { setCardCursor(here); return; }
+    const prev = [...heads].reverse().find(i => i < cardUi.cursor);
+    setCardCursor(prev === undefined ? heads[heads.length - 1] : prev);
+  }
+
+  function cardGridFocused(controls) {
+    if (!cardUi.grid || !cardUi.picker || cardUi.picker.classList.contains("hidden")) return false;
+    const el = controls[world.menuIndex];
+    return Boolean(el && cardUi.grid.contains(el));
+  }
+
+  // Runs instead of the panel's generic cursor while the grid holds focus.
+  function updateCardGrid(pads, dt) {
+    if (menuBack(pads)) { closePanel(settingsPanel); return; }
+    let jumped = 0;
+    for (const pad of pads) {
+      if (buttonEdge(pad, 5)) jumped = 1;
+      if (buttonEdge(pad, 4)) jumped = -1;
+      if (buttonEdge(pad, 2)) { toggleCursorRarity(); return; }
+    }
+    if (pressed.has("BracketRight")) jumped = 1;
+    if (pressed.has("BracketLeft")) jumped = -1;
+    if (jumped) { jumpRarity(jumped); return; }
+    if (menuConfirm(pads)) { toggleCell(cardUi.cells[cardUi.cursor]); return; }
+    const step = gridRepeat(pads, dt);
+    if (!step) return;
+    if (!moveCardCursor(step.axis, step.value) && step.axis === "y") leaveCardGrid(step.value);
+  }
+
+  // The grid stands in the panel's cursor list as a single cell, so the control
+  // either side of it in that list is the one just outside the grid. The cursor
+  // is parked on the edge it left by, which both keeps the stand-in cell on
+  // screen — the panel's spatial search has to be able to see it — and puts you
+  // back where you were when you walk into the grid again.
+  function leaveCardGrid(dir) {
+    const controls = visibleControls();
+    const at = controls.indexOf(cardUi.cells[cardUi.cursor]);
+    if (at < 0 || !controls[at + dir]) return;
+    setCardCursor(dir > 0 ? cardUi.cells.length - 1 : 0);
+    setMenuIndex(at + dir, controls);
+  }
+
+  // A direction still held from the panel brought the cursor in here; it must
+  // not also count as a press inside the grid. Adopt the hold as it stands, so
+  // keeping it down carries on scrolling after the usual repeat delay.
+  function seedGridNav(pads) {
+    const d = heldMenuDirection(pads);
+    const nav = cardUi.nav;
+    nav.axis = d.x ? "x" : d.y ? "y" : null;
+    nav.value = nav.axis === "x" ? d.x : nav.axis === "y" ? d.y : 0;
+    nav.timer = GRID_REPEAT_DELAY;
+  }
+
+  // Held-direction auto-repeat: first press moves at once, then a pause, then a
+  // fast steady walk. The axis that started the hold keeps it until released,
+  // so a sloppy diagonal on the stick doesn't wander off the row.
+  function gridRepeat(pads, dt) {
+    const d = heldMenuDirection(pads);
+    const nav = cardUi.nav;
+    let ax = nav.axis;
+    if ((ax === "x" && !d.x) || (ax === "y" && !d.y)) ax = null;
+    if (!ax) ax = d.x ? "x" : d.y ? "y" : null;
+    const value = ax === "x" ? d.x : ax === "y" ? d.y : 0;
+    if (!value) { nav.axis = null; nav.value = 0; nav.timer = 0; return null; }
+    if (nav.axis !== ax || nav.value !== value) {
+      nav.axis = ax;
+      nav.value = value;
+      nav.timer = GRID_REPEAT_DELAY;
+      return { axis: ax, value };
+    }
+    nav.timer -= dt;
+    if (nav.timer > 0) return null;
+    nav.timer = GRID_REPEAT_RATE;
+    return { axis: ax, value };
+  }
+
+  // menuNav() is edge-triggered — one move per press. This is the held state,
+  // which is what an auto-repeating cursor needs.
+  function heldMenuDirection(pads) {
+    let x = 0, y = 0;
+    for (const sc of keyboardSchemes) {
+      if (keys.has(sc.right)) x = 1;
+      if (keys.has(sc.left)) x = -1;
+      if (keys.has(sc.down)) y = 1;
+      if (keys.has(sc.up)) y = -1;
+    }
+    for (const pad of pads) {
+      const ax = axis(pad.axes[0]), ay = axis(pad.axes[1]);
+      if (button(pad, 15) || ax > 0.55) x = 1;
+      if (button(pad, 14) || ax < -0.55) x = -1;
+      if (button(pad, 13) || ay > 0.55) y = 1;
+      if (button(pad, 12) || ay < -0.55) y = -1;
+    }
+    return { x, y };
+  }
+
   // ------------------------------------------------------------------- menus
   function updateMenuControls(pads) {
     const controls = visibleControls();
     if (!controls.length) return;
     world.menuIndex = clamp(world.menuIndex, 0, controls.length - 1);
+
+    // The card grid drives itself while the cursor is inside it.
+    const inGrid = cardGridFocused(controls);
+    if (inGrid !== cardUi.active) {
+      cardUi.active = inGrid;
+      if (inGrid) seedGridNav(pads);
+    }
+    if (inGrid) { updateCardGrid(pads, world.dt); return; }
 
     // The bumpers walk the icon row (how to play, sound, settings, fullscreen)
     // from anywhere, so those are reachable without first locking in or
@@ -3275,7 +3675,12 @@
     const out = [];
     for (const root of roots) {
       for (const el of root.querySelectorAll("button, input, select")) {
-        if (!el.disabled && el.offsetParent !== null) out.push(el);
+        if (el.disabled || el.offsetParent === null) continue;
+        // The card grid appears here as its own cursor cell and nothing else:
+        // eighty-odd buttons would otherwise flood the spatial search, and
+        // crossing them one press at a time is nobody's idea of comfortable.
+        if (el.dataset.cell !== undefined && el !== cardUi.cells[cardUi.cursor]) continue;
+        out.push(el);
       }
     }
     return out;
@@ -5258,6 +5663,18 @@
     for (const rarity of window.ROUNDERS.RARITY_ORDER) {
       bindSetting(`${rarity}Weight`, `${rarity}WeightValue`, v => settings.rarityWeights[rarity] = Number(v));
     }
+    // Choose Cards — the saved selection has to be in before the grid is built
+    loadCardPrefs();
+    buildCardPicker();
+    document.getElementById("cardMode").addEventListener("click", e => {
+      const b = e.target.closest("button[data-mode]");
+      if (b) setCardMode(b.dataset.mode);
+    });
+    document.getElementById("cardsAll").addEventListener("click", () => setAllCards(true));
+    document.getElementById("cardsNone").addEventListener("click", () => setAllCards(false));
+    document.getElementById("cardsInvert").addEventListener("click", invertCards);
+    refreshCardPicker();
+
     document.getElementById("hazards").addEventListener("change", e => settings.hazards = e.target.checked);
     document.getElementById("proceduralCharacters").addEventListener("change", e => {
       settings.proceduralCharacters = e.target.checked;
@@ -5328,6 +5745,8 @@
   });
   addEventListener("keyup", e => keys.delete(e.code));
   addEventListener("blur", () => { keys.clear(); pressed.clear(); });
+  // the card grid reflows with the window, so its row map has to be remeasured
+  addEventListener("resize", () => { cardUi.rows = []; cardUi.layoutW = -1; });
   addEventListener("pointerdown", () => {
     ensureAudio();
     // a pad-started session gets music on the first real user gesture
@@ -5374,6 +5793,10 @@
   window.ROUNDERS.debug = {
     players: () => players,
     world,
+    settings,
+    // what a draft is allowed to offer, and a real hand rolled from it
+    cardPool,
+    drawCards,
     // bored terrain, reported at LIVE positions (a mover's base x is not where
     // it currently is, and the hole rides with it)
     holes: () => activePlatforms(currentLevel(), world.time)

@@ -70,6 +70,7 @@
     settings: {
       title: "Settings",
       groupMatch: "Match",
+      groupCards: "Choose Cards",
       groupRarity: "Card Rarity Rates",
       groupVisuals: "Visuals",
       groupFeel: "Feel",
@@ -93,7 +94,22 @@
       difficultyEasy: "Easy",
       difficultyNormal: "Normal",
       difficultyHard: "Hard",
-      back: "Back"
+      back: "Back",
+
+      // ---- Choose Cards (card pool mode + the card grid)
+      cardModeDefault: "Default",
+      cardModeEqualize: "Equalize",
+      cardModeChoose: "Choose",
+      cardNoteDefault: "Every card is in, drafted at the rarity rates below.",
+      cardNoteEqualize: "Every card is in and equally likely — rarity rates are ignored.",
+      cardNoteChoose: "Only the cards you leave lit can be drafted, at the rarity rates below.",
+      cardCount: "{on} of {total} cards enabled",
+      cardNoneWarning: "Nothing is enabled — drafts fall back to the full set.",
+      cardsAll: "All",
+      cardsNone: "None",
+      cardsInvert: "Invert",
+      cardPickerHintHtml: "<b>A</b> / click toggles a card · <b>X</b> or a rarity heading toggles that whole rarity · <b>LB</b> <b>RB</b> jump between rarities · hold a direction to move fast",
+      rarityToggle: "{rarity} — {on}/{total}"
     },
 
     // ----------------------------------------------------------- HOW TO PLAY

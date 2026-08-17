@@ -45,6 +45,8 @@
         --cardw: clamp(240px, 34vh, 340px);
       }
       .cw-stage .card { cursor: default; margin: 0; animation: none; }
+      /* the viewer has room the draft hand doesn't — show the whole rules text */
+      .cw-stage .card-desc { -webkit-line-clamp: unset; overflow: visible; }
       .cw-stage .card:hover { transform: none; }
       .cw-arrow {
         width: 52px; height: 52px; border-radius: 50%;
@@ -53,6 +55,27 @@
         color: #fff; font-size: 22px; cursor: pointer; flex: none;
       }
       .cw-arrow:hover { background: rgba(255, 255, 255, 0.14); }
+      /* the preview: a live sim of the card, next to the card itself */
+      .cw-preview { display: none; flex: none; width: min(720px, 46vw); }
+      .cw-preview.on { display: block; }
+      .cw-preview canvas {
+        width: 100%; aspect-ratio: 720 / 320; display: block;
+        border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.14);
+        background: #12141c;
+      }
+      .cw-prev-head {
+        display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+      }
+      .cw-prev-head strong { font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
+      .cw-btn {
+        border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.08);
+        color: #f5f2ff; border-radius: 8px; padding: 5px 12px; font-size: 12px;
+        font-weight: 700; cursor: pointer;
+      }
+      .cw-btn:hover { background: rgba(255, 255, 255, 0.16); }
+      .cw-btn.primary { background: #4da6ff; border-color: #4da6ff; color: #08111d; }
+      .cw-watch { margin: 8px 0 0; padding: 0 0 0 18px; font-size: 12.5px; line-height: 1.5; opacity: 0.8; }
+      .cw-watch li { margin: 1px 0; }
       .cw-meta { text-align: center; padding: 10px 16px 4px; font-size: 13px; opacity: 0.75; }
       .cw-meta b { letter-spacing: 0.03em; }
       .cw-hint { text-align: center; font-size: 12px; opacity: 0.45; padding-bottom: 14px; }
@@ -92,15 +115,30 @@
     <section class="cw-stage">
       <button class="cw-arrow" id="prev" title="Previous card (←)">←</button>
       <div id="featured"></div>
+      <section class="cw-preview" id="preview">
+        <div class="cw-prev-head">
+          <strong>Preview</strong>
+          <button class="cw-btn" id="replayBtn">↻ Replay</button>
+          <button class="cw-btn" id="closePrev">Close</button>
+        </div>
+        <canvas id="simCanvas" width="1440" height="640"></canvas>
+        <ul class="cw-watch" id="watch"></ul>
+      </section>
       <button class="cw-arrow" id="next" title="Next card (→)">→</button>
     </section>
+    <p style="text-align:center;margin:6px 0 0">
+      <button class="cw-btn primary" id="previewBtn">▶ Preview this card</button>
+    </p>
     <p class="cw-meta" id="meta"></p>
     <p class="cw-hint">← / → or click a card below to flip through the set. Number keys toggle rarities.</p>
 
     <main class="cw-grid" id="grid"></main>
 
     <script>window.ROUNDERS_ASSET_BASE = "../";</script>
+    <script src="../js/chroma.js"></script>
+    <script src="../js/characters.js"></script>
     <script src="../js/cards.js"></script>
+    <script src="../js/cardsim.js"></script>
     <script>
       (() => {
         "use strict";
@@ -136,11 +174,47 @@
 
         function visible() { return ordered.filter(c => shown.has(c.rarity)); }
 
+        // ------------------------------------------------------- preview sim
+        const previewEl = document.getElementById("preview");
+        const watchEl = document.getElementById("watch");
+        const simCanvas = document.getElementById("simCanvas");
+        let sim = null;
+        let previewOn = new URLSearchParams(location.search).get("preview") === "1";
+
+        function stopSim() { if (sim) { sim.stop(); sim = null; } }
+
+        function buildSim(card) {
+          stopSim();
+          if (!previewOn) { previewEl.classList.remove("on"); return; }
+          previewEl.classList.add("on");
+          sim = window.ROUNDERS.CARD_SIM.createSim(simCanvas, card);
+          watchEl.innerHTML = sim.plan.watch.map(w => `<li>${w}</li>`).join("");
+          sim.start();
+        }
+
+        document.getElementById("previewBtn").addEventListener("click", () => {
+          previewOn = !previewOn;
+          const url = new URL(location);
+          if (previewOn) url.searchParams.set("preview", "1"); else url.searchParams.delete("preview");
+          history.replaceState(null, "", url);
+          renderFeatured();
+        });
+        document.getElementById("closePrev").addEventListener("click", () => {
+          previewOn = false;
+          const url = new URL(location);
+          url.searchParams.delete("preview");
+          history.replaceState(null, "", url);
+          renderFeatured();
+        });
+        document.getElementById("replayBtn").addEventListener("click", () => { if (sim) sim.replay(); });
+
         function renderFeatured() {
           const list = visible();
-          if (!list.length) { featured.innerHTML = ""; meta.textContent = "No rarities selected."; return; }
+          if (!list.length) { featured.innerHTML = ""; meta.textContent = "No rarities selected."; stopSim(); return; }
           index = ((index % list.length) + list.length) % list.length;
           const c = list[index];
+          buildSim(c);
+          document.getElementById("previewBtn").textContent = previewOn ? "▣ Hide preview" : "▶ Preview this card";
           // the big face keeps the draft hand's "selected" pop, minus the tilt
           featured.innerHTML = cardHtml(c, true);
           featured.querySelector(".card").style.transform = "none";

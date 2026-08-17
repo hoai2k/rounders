@@ -275,10 +275,16 @@
 
     // -------------------------------------------------------------- RARE (26)
     card("drill-rounds", "Drill Rounds", "rare",
-      "Through, not around.",
-      "Bullets punch straight through the first player they hit and keep flying.",
+      "Through people, not walls.",
+      "Bullets punch straight through the first player they hit and keep flying. Walls still stop them — that's Open Plan's job.",
       ["pierce 1 player", "−15% damage"], ["projectile"],
       p => { p.stats.pierce += 1; p.stats.damage *= 0.85; }),
+
+    card("open-plan", "Open Plan", "rare",
+      "Load-bearing is a matter of opinion.",
+      "Your bullets bore straight through thin walls and floors, so cover stops being cover.",
+      ["bullets drill through walls", "−12% damage"], ["projectile"],
+      p => { p.stats.wallPierce += 1; p.stats.damage *= 0.88; }),
 
     card("chain-lightning", "Chain Letter", "rare",
       "Sharing is shocking.",

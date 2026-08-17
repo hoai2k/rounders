@@ -167,7 +167,7 @@
       goldenShot: false, killHeal: false,
       active: null, activeCooldown: 10,
       // gap-audit wave (CARD-GAP-AUDIT.md): offense & bullets
-      kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0,
+      kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0, wallPierce: 0,
       steer: 0, helium: 0, boomerang: 0, encore: 0, burstFire: 0,
       bloodMoney: 0, underdog: 0,
       // block toolkit
@@ -2226,6 +2226,8 @@
         grow: p.stats.grow,
         groundHug: p.stats.groundHug,
         voidPull: p.stats.voidPull,
+        // Open Plan: how much solid a shot can bore through, in px of thickness
+        wallPierce: p.stats.wallPierce ? 70 + 50 * (p.stats.wallPierce - 1) : 0,
         bankShot: p.stats.bankShot,
         stink: p.stats.stink,
         dazzle: p.stats.dazzle,
@@ -2448,6 +2450,8 @@
               b.life = -1;
               explodeBullet(b);
             }
+          } else if (b.wallPierce > 0 && drillThrough(b, platform)) {
+            sfx("block");
           } else if (b.bounces > 0) {
             bounceBullet(b, platform);
             b.bounces -= 1;
@@ -2710,6 +2714,38 @@
       b.damage *= 1 + 0.3 * b.bankShot;
       puff(b.x, b.y, "#ffe169", 5);
     }
+  }
+
+  // Open Plan: bore straight through a platform and come out the far side,
+  // spending thickness from the bullet's drill budget. Returns false when the
+  // wall is too thick to finish, so the shot dies in it like any other.
+  function drillThrough(b, platform) {
+    const vx = b.vx, vy = b.vy;
+    const mag = Math.hypot(vx, vy) || 1;
+    const dx = vx / mag, dy = vy / mag;
+    // walk forward until we're clear of this platform (bounded, so a shot that
+    // enters along a wall's length can't loop forever)
+    const step = 4;
+    let dist = 0;
+    let x = b.x, y = b.y;
+    while (dist < b.wallPierce) {
+      x += dx * step;
+      y += dy * step;
+      dist += step;
+      const inside = x + b.r > platform.x && x - b.r < platform.x + platform.w &&
+                     y + b.r > platform.y && y - b.r < platform.y + platform.h;
+      if (!inside) {
+        b.x = x + dx * 2;
+        b.y = y + dy * 2;
+        b.wallPierce -= dist;
+        b.drilled = (b.drilled || 0) + 1;
+        // dust on both faces so the hole is legible
+        puff(b.x, b.y, "#e8e2d4", 7);
+        world.shake = Math.max(world.shake, 3);
+        return true;
+      }
+    }
+    return false;
   }
 
   // Boomerang: a shot that dies without touching anyone turns for home instead

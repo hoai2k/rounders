@@ -73,6 +73,18 @@ Pillars:
       chill/repel auras, underdog comeback scaling. Art prompts for all 32 in
       `image-requests.md` §2 (procedural fallbacks until delivered).
       Headless smoke-tested: full bot/human match with all 32 granted, clean
+- [x] **Open Plan** (rare, 88th card): the last unfilled ROUNDS gap — bullets
+      bore through thin walls (`wallPierce`, `drillThrough()` in game.js).
+      Drill Rounds' text now says plainly that it pierces players, not walls
+- [x] **Card preview simulator** (`js/cardsim.js`): the workbench's ▶ Preview
+      button runs a small self-contained fight that illustrates the selected
+      card — the scenario is chosen from the stats the card actually changes
+      (a pillar to drill, a second body for pierce/chain, a deliberate miss for
+      seekers and boomerangs, a blocking receiver for block/silence cards, the
+      card-holder taking fire for shields and armor), with health bars, ammo
+      pips and floating numbers so pure-stat cards read too. Shots are aimed
+      with a real ballistic solution so they connect. Verified: all 88 cards
+      simulate without throwing and land damage
 - [x] **Card workbench** (`/workbench?edit=cards` → `workbench/cards.html`):
       every card rendered with the game's own card-face markup and stylesheet —
       featured card with ←/→ flipping, rarity filter chips, full-set grid;

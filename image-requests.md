@@ -84,6 +84,7 @@ centered subject) and an **art panel** (`assets/images/cards/art/<id>.png`,
 | **Return to Sender** (epic) | `return-to-sender.png` + `art/return-to-sender.png` | A golden supercharged bullet stamped like certified mail, carrying a shrunken storm of block energy (nova ring, frost, shockwave) to a distant impact point. Gold and postal red. |
 | **Puppet Strings** (epic) | `puppet-strings.png` + `art/puppet-strings.png` | A bullet flying on glowing marionette strings from a puppeteer's control bar held by a round fighter, mid-turn around a wall. Theater purple and spotlight gold. |
 | **Bricklayer** (epic) | `bricklayer.png` + `art/bricklayer.png` | A round fighter in a hard hat conjuring a floating stone slab out of dust and glow in front of them, trowel in hand, the slab mid-drop. Sandstone and blueprint blue. |
+| **Open Plan** (rare) | `open-plan.png` + `art/open-plan.png` | A bullet boring clean through a brick wall, leaving a neat glowing hole with dust and chips bursting from both faces, a target silhouette visible through the gap. Sandstone and hot orange bore-glow. |
 | **Encore** (epic) | `encore.png` + `art/encore.png` | A round fighter taking a stage bow while behind them a ghostly translucent copy of their last shot re-fires itself, red curtain backdrop. Stage crimson and spotlight blue-white. |
 
 ---

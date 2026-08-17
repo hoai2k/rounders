@@ -2622,13 +2622,28 @@
     }
     if (b.explosive) {
       fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: 95 + b.explosive * 20, life: 0.14, force: 760 });
+      // The player the bullet actually hit is not immune to its own blast —
+      // that read as "the explosion did nothing" in a duel, where there is
+      // nobody else for the splash to catch (a legendary Supernova was just
+      // +30% damage). They take a *share* of it instead of the full double-dip
+      // that AUDIT C1 rightly called broken, and the share grows with the size
+      // of the bang: a little uncommon pop stays a pop, a legendary detonation
+      // is felt by whoever it went off against.
+      const coreShare = clamp(0.25 + 0.12 * b.explosive, 0, 0.6);
       for (const p of players) {
-        if (!p.alive || p === b.owner || b.hitIds.has(p.id)) continue;
+        if (!p.alive || p === b.owner) continue;
+        const direct = b.hitIds.has(p.id);
         const radius = 105 + b.explosive * 12;
         const d = Math.hypot(p.x - b.x, p.y - b.y);
-        if (d < radius) hurt(p, (1 - d / radius) * (26 + b.explosive * 9), b.owner, p.x - b.x, p.y - b.y);
+        if (d < radius) {
+          const splash = (1 - d / radius) * (26 + b.explosive * 9) * (direct ? coreShare : 1);
+          // the direct victim already took knockback from the bullet, so the
+          // blast only adds damage, not a second shove
+          if (direct) hurtRaw(p, splash, b.owner);
+          else hurt(p, splash, b.owner, p.x - b.x, p.y - b.y);
+        }
       }
-      world.shake = Math.max(world.shake, 9);
+      world.shake = Math.max(world.shake, 9 + b.explosive * 2);
       sfx("boom");
       // splash also batters nearby crates and cracked platforms
       const radius = 105 + b.explosive * 12;

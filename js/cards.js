@@ -513,8 +513,10 @@
     card("supernova", "Supernova", "legendary",
       "Astronomers hate this one trick.",
       "Every bullet detonates in a huge explosion and hits far harder. Reloads are slow.",
-      ["big explosion on hit", "+30% damage", "+0.3s reload"], ["aoe", "damage"],
-      p => { p.stats.explosive += 2; p.stats.damage *= 1.3; p.stats.reload += 0.3; }),
+      ["huge explosion on hit", "+30% damage", "+0.3s reload"], ["aoe", "damage"],
+      // the biggest bang in the set: it must out-hit epic Party Favor, whose
+      // point-blank shards otherwise stack past it
+      p => { p.stats.explosive += 2.8; p.stats.damage *= 1.3; p.stats.reload += 0.3; }),
 
     card("golden-gun", "Golden Gun", "legendary",
       "The first word is the last word.",

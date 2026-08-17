@@ -844,12 +844,30 @@
           ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
         }
       }
+      // The bullet viewer's size/rotation tweaks are read live (opts.tweak is a
+      // getter, not a snapshot), so dragging a slider re-sizes the rounds in
+      // flight here without restarting the fight.
+      const tweak = (opts.tweak && opts.tweak()) || null;
+      const tScale = tweak && tweak.scale ? tweak.scale : 1;
+      const tRot = tweak && tweak.rotation ? tweak.rotation * Math.PI / 180 : 0;
       for (const b of bullets) {
         ctx.save();
         if (b.golden || b.empowered) { ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 12; }
         ctx.fillStyle = b.color; ctx.strokeStyle = "#15121c"; ctx.lineWidth = 2;
         const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 600) : 1;
-        ctx.beginPath(); ctx.arc(b.x, b.y, b.r * gr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        const r = b.r * gr * tScale;
+        if (tRot || b.art) {
+          // a tweaked round is drawn in its own frame, turned to its flight
+          // path plus the tweak, so rotation is visible on a moving bullet
+          ctx.translate(b.x, b.y);
+          ctx.rotate(Math.atan2(b.vy, b.vx) + tRot);
+          ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          // a nose mark, so the rotation you dialled in is actually legible
+          ctx.fillStyle = "rgba(255,255,255,0.65)";
+          ctx.beginPath(); ctx.arc(r * 0.45, 0, Math.max(1.2, r * 0.22), 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
         ctx.restore();
       }
       drawFighter(a); drawFighter(bb);

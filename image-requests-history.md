@@ -251,3 +251,17 @@ Midnight Library, Lantern Festival, Aurora Summit. Each prompt carried
 geometry notes (alley chasm, torii span, hull mass, central bookcase, pagoda,
 left-peak ridge) so the painting agrees with the play space. Delivered
 2026-08-16, replacing the originals at `assets/images/arenas/<id>.png`.
+
+## 9. Audit card art — Lowrider, Aegis Bubble, Pocket Void (delivered 2026-08-17)
+
+The three cards the power-card audit added (AUDIT.md §6). Both shapes each:
+emblem `assets/images/cards/<id>.png` 256×256 transparent, art panel
+`assets/images/cards/art/<id>.png` 512×384 full-bleed. Verified on intake:
+emblems are RGBA with fully transparent corners (no keying needed), scenes are
+512×384 opaque as intended.
+
+| Card | Files | Subject |
+|---|---|---|
+| **Lowrider** (uncommon) | `lowrider.png` + `art/lowrider.png` | A bullet skimming along the ground hugging the terrain — a glowing round tracer hovering just above a rolling floor line, kicking up a little dust trail behind it, dipping over the lip of a ledge. Cool teal/green energy. |
+| **Aegis Bubble** (rare) | `aegis-bubble.png` + `art/aegis-bubble.png` | A translucent cyan energy bubble wrapped around a small round fighter silhouette, a bullet splashing harmlessly against its rim in a hard ring of light. Cyan/ice-blue glow on dark. |
+| **Pocket Void** (epic) | `pocket-void.png` + `art/pocket-void.png` | A tiny black hole torn open in mid-air at a bullet's point of impact — swirling violet accretion arc, debris and sparks bending into it, space warping at the edges. Deep purple/magenta. |

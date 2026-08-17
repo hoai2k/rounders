@@ -1,15 +1,14 @@
 # Image Generation Requests — Rounders
 
-**Four batches outstanding:** card art for the 3 audit cards (§1) and the 33
-gap-audit cards (§2) — **36 cards with no art at all** — plus the new
-**bullet art** (§3) and **effect art** (§4) batches.
+**Three batches outstanding:** card art for **33 cards** (§1), plus
+**bullet art** (§2) and **effect art** (§3).
 
-> Audited 2026-08-17 against `js/cards.js`: 88 cards, 52 have emblem + scene,
-> **36 have neither**. Every card listed in §1 and §2 is currently drawing the
-> plain tinted fallback panel. Nothing is orphaned (no art without a card). Everything else
-the game asks for has been generated and is in the repo; the prompts they were
-made from are in `image-requests-history.md`, which is where a re-generation or
-a style question goes looking.
+> Re-audited 2026-08-17 after the Lowrider / Aegis Bubble / Pocket Void
+> delivery: 88 cards, **55 have emblem + scene**, 33 have neither and are
+> drawing the plain tinted fallback panel. No card is half-delivered, and
+> nothing is orphaned (no art without a card). The delivered prompts have
+> moved to `image-requests-history.md` §9, which is where a re-generation or a
+> style question goes looking.
 
 The game ships with procedural fallbacks, so art can be dropped in incrementally:
 any missing file is fine and simply falls back.
@@ -34,25 +33,9 @@ any missing file is fine and simply falls back.
 
 ---
 
-## 1. New card art (3 cards × 2 images = 6 files)
+## 1. Card art still outstanding (33 cards × 2 images = 66 files)
 
-The power-card audit (AUDIT.md §6) added three cards. Each wants both shapes —
-an **emblem** (`assets/images/cards/<id>.png`, 256×256, transparent, single
-centered subject) and an **art panel** (`assets/images/cards/art/<id>.png`,
-512×384, full-bleed painted scene, key subject inside the middle 80%).
-
-| Card | Files | Subject |
-|---|---|---|
-| **Lowrider** (uncommon) | `lowrider.png` + `art/lowrider.png` | A bullet skimming along the ground hugging the terrain — a glowing round tracer hovering just above a rolling floor line, kicking up a little dust trail behind it, dipping over the lip of a ledge. Cool teal/green energy. |
-| **Aegis Bubble** (rare) | `aegis-bubble.png` + `art/aegis-bubble.png` | A translucent cyan energy bubble wrapped around a small round fighter silhouette, a bullet splashing harmlessly against its rim in a hard ring of light. Cyan/ice-blue glow on dark. |
-| **Pocket Void** (epic) | `pocket-void.png` + `art/pocket-void.png` | A tiny black hole torn open in mid-air at a bullet's point of impact — swirling violet accretion arc, debris and sparks bending into it, space warping at the edges. Deep purple/magenta. |
-
----
-
-## 2. Gap-audit card art (32 cards × 2 images = 64 files)
-
-The ROUNDS gap audit (`CARD-GAP-AUDIT.md`) added 32 cards. Same two shapes as
-§1: an **emblem** (`assets/images/cards/<id>.png`, 256×256, transparent, single
+These 33 cards have no art at all yet. Two shapes each — an **emblem** (`assets/images/cards/<id>.png`, 256×256, transparent, single
 centered subject) and an **art panel** (`assets/images/cards/art/<id>.png`,
 512×384, full-bleed painted scene, key subject inside the middle 80%).
 
@@ -93,12 +76,9 @@ centered subject) and an **art panel** (`assets/images/cards/art/<id>.png`,
 | **Skylight** (epic) | `skylight.png` + `art/skylight.png` | A perfectly round hole blasted clean through a stone platform, daylight streaming down through it, a small round fighter dropping through the gap feet-first with rubble still falling. Dust-gold light shaft on cool stone. |
 | **Encore** (epic) | `encore.png` + `art/encore.png` | A round fighter taking a stage bow while behind them a ghostly translucent copy of their last shot re-fires itself, red curtain backdrop. Stage crimson and spotlight blue-white. |
 
-Also still missing card art from the earlier §1 batch, listed there:
-`lowrider`, `aegis-bubble`, `pocket-void`.
-
 ---
 
-## 3. Bullet art (29 cards × 1 image = 29 files) — NEW
+## 2. Bullet art (29 cards × 1 image = 29 files) — NEW
 
 Bullets are drawn procedurally today (a tinted round plus per-effect tells).
 These 29 cards change what the bullet *looks like*, so each can take a painted
@@ -146,7 +126,7 @@ that only changes reload speed should not change the shot's appearance.
 | Pocket Void | `pocket-void.png` | A pure black sphere with a violet event-horizon rim |
 | Golden Gun | `golden-gun.png` | A gleaming solid-gold bullet, engraved band |
 
-## 4. Effect art (18 files) — NEW
+## 3. Effect art (18 files) — NEW
 
 Every combat effect is procedural canvas today. These are the ones that would
 gain most from painted art. All are **transparent PNGs**, drawn as a single

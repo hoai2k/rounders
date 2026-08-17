@@ -123,8 +123,12 @@ Pillars:
       held-direction auto-repeat (0.3s, then ~18 cells a second), A to toggle,
       X for the whole rarity, LB/RB to jump between rarities, and focus handed
       back to the panel at the top and bottom edges
-- [ ] **Art outstanding** (`image-requests.md`): 36 cards have no emblem or
-      scene at all, plus the new bullet (29) and effect (18) batches
+- [x] **Card art delivered 2026-08-17**: Lowrider, Aegis Bubble and Pocket
+      Void (emblem + scene each). Verified on arrival — emblems are RGBA with
+      transparent corners, so no `npm run intake` keying was needed; prompts
+      moved to `image-requests-history.md` §9
+- [ ] **Art outstanding** (`image-requests.md`): 33 cards have no emblem or
+      scene at all, plus the bullet (29) and effect (18) batches
 - [ ] Balance pass on the 32 new cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

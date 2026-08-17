@@ -315,7 +315,9 @@
           const c = currentCard();
           if (!c) return;
           stopSim();
-          sim = CARD_SIM.createSim(simCanvas, c);
+          // the tweak is passed as a getter so slider drags land in the running
+          // preview immediately, without rebuilding the fight
+          sim = CARD_SIM.createSim(simCanvas, c, { tweak: () => tweaks[c.id] || null });
           sim.start();
           simState.textContent = "running";
         }

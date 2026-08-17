@@ -112,8 +112,8 @@
 
     card("boxing-glove", "Boxing Glove", "common",
       "Float like a truck.",
-      "Your shots hit like a haymaker — they send people flying, and they hit a little softer for it.",
-      ["+300% knockback dealt", "+10% bullet size", "−10% damage"], ["control"],
+      "Your shots hit like a haymaker — they send people flying, and a block stops the damage but not the punch. They hit a little softer for it.",
+      ["+300% knockback dealt", "shoves through blocks", "+10% bullet size", "−10% damage"], ["control"],
       p => { p.stats.kbDeal += 3; p.stats.bulletSize *= 1.1; p.stats.damage *= 0.9; }),
 
     card("sugar-rush", "Sugar Rush", "common",

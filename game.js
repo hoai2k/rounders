@@ -2610,6 +2610,7 @@
         wallPierce: p.stats.wallPierce ? 70 + 50 * (p.stats.wallPierce - 1) : 0,
         holePunch: p.stats.holePunch,
         bankShot: p.stats.bankShot,
+        kbDeal: p.stats.kbDeal,
         stink: p.stats.stink,
         dazzle: p.stats.dazzle,
         silence: p.stats.silence,
@@ -2922,10 +2923,24 @@
           if (p.blockTimer > 0) {
             // parry: reflect the bullet back
             const mag = Math.hypot(b.vx, b.vy) || 1;
+            const inX = b.vx / mag, inY = b.vy / mag;
+            // Boxing Glove: a block stops the DAMAGE, not the punch. The shove
+            // lands through the parry, so a gloved round still shifts whoever
+            // just caught it — you can be knocked off a ledge holding a block.
+            if (b.kbDeal) {
+              const kb = (1 - clamp(p.stats.kbResist, 0, 0.9)) * b.kbDeal;
+              p.vx += inX * 300 * kb;
+              p.vy += (inY * 150 - 130) * kb;
+              pulse(p, 0.3, 110);
+              world.shake = Math.max(world.shake, Math.min(10, 3 * b.kbDeal));
+              burst(p.x - inX * p.stats.radius, p.y - inY * p.stats.radius, "#ffe169", 14, 300);
+              sfx("hit");
+            }
             b.owner = p;
             b.hitIds = new Set();
-            b.vx = -(b.vx / mag) * p.stats.bulletSpeed * 1.05;
-            b.vy = -(b.vy / mag) * p.stats.bulletSpeed * 1.05;
+            b.kbDeal = p.stats.kbDeal;      // the punch belongs to whoever fires it
+            b.vx = -inX * p.stats.bulletSpeed * 1.05;
+            b.vy = -inY * p.stats.bulletSpeed * 1.05;
             b.color = p.color;
             b.x += b.vx * dt * 2;
             b.y += b.vy * dt * 2;

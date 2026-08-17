@@ -366,6 +366,13 @@ Pillars:
       copy, which is what the card was always meant to do. The preview stages
       a long enough flight to see the copy standing before the round arrives,
       and the copy fades out where it fell rather than vanishing mid-frame
+- [x] **Boxing Glove punches through a block**: a parry stops the DAMAGE, not
+      the shove. A gloved round moves a blocking target 101px where a plain one
+      moves 7px, and they still take no damage and keep their block — so you
+      can be knocked off a ledge while guarding. The punch belongs to whoever
+      fired the round, so a parried shot carries the *blocker's* gloves back
+- [x] **Base fire delay 0.26s**: 0.22 was too quick to read. Split the
+      difference with the original 0.30 (`GAMEPLAY.gun.fireDelay`)
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

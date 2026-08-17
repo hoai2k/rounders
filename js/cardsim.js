@@ -208,7 +208,10 @@
     if (on("decay")) watch.push("damage arrives as a slow drip, not all at once");
     if (on("regen")) watch.push("health climbs back on its own");
     if (on("kbResist")) watch.push("they barely budge when hit");
-    if (on("kbDeal")) watch.push("the victim is launched much farther than usual");
+    if (on("kbDeal")) {
+      watch.push("the victim is launched much farther than usual");
+      watch.push("and a block stops the damage, not the punch — they get shoved anyway");
+    }
     if (on("repel")) watch.push("incoming bullets bend away from them");
     if (on("guardian") || on("revives")) watch.push("a lethal hit doesn't finish them");
     if (on("pellets")) watch.push("one trigger pull throws several pellets");
@@ -564,7 +567,7 @@
           explosive: st.explosive, shards: st.shards, chain: st.chain, popcorn: st.popcorn,
           poison: st.poison, burn: st.burn, chill: st.chill, stink: st.stink,
           voidPull: st.voidPull, dazzle: st.dazzle, silence: st.silence,
-          bankShot: st.bankShot, boomerang: st.boomerang, empowered: empower,
+          bankShot: st.bankShot, boomerang: st.boomerang, empowered: empower, kbDeal: st.kbDeal,
           golden, hit: new Set(), color: golden || empower ? "#ffd700" : who.color,
           art: bulletArt(plan.card.id),
           // Supernova flies white-hot and Golden Gun flies gold, so their
@@ -1087,8 +1090,18 @@
           if (who.blockT > 0) {
             // parried: send it back
             const mag = Math.hypot(b.vx, b.vy) || 1;
-            b.vx = -(b.vx / mag) * 340; b.vy = -(b.vy / mag) * 340;
+            const inX = b.vx / mag, inY = b.vy / mag;
+            // Boxing Glove: a block stops the damage, not the punch
+            if (b.kbDeal) {
+              const kb = (1 - Math.min(0.9, who.stats.kbResist)) * b.kbDeal;
+              who.vx += inX * 300 * SCALE * kb;
+              who.vy += (inY * 150 - 130) * SCALE * kb;
+              puff(who.x - inX * who.stats.radius, who.y - inY * who.stats.radius, "#ffe169", 14, 300);
+              float(who.x, who.y - 62, "SHOVED ANYWAY", "#ffe169");
+            }
+            b.vx = -inX * 340; b.vy = -inY * 340;
             b.owner = who; b.hit = new Set(); b.color = who.color;
+            b.kbDeal = who.stats.kbDeal;      // the punch belongs to whoever fires it
             float(who.x, who.y - 46, "PARRY", "#ffffff");
             continue;
           }

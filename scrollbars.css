@@ -1,0 +1,88 @@
+/* Rounders — scrollbars
+ *
+ * Shared by the game and every workbench page, so a scrollbar looks the same
+ * wherever one turns up. The default bar is a grey slab that sits outside the
+ * design; this makes it a slim pill in the same gunmetal-and-neon palette as
+ * the panels it scrolls, with the track left empty so it reads as part of the
+ * surface rather than a gutter cut into it.
+ *
+ * TWO MECHANISMS, AND THE ORDER MATTERS:
+ *
+ *   `scrollbar-width` / `scrollbar-color` are the standard properties. They
+ *   are what Firefox and Chromium 121+ honour, and where either is set on an
+ *   element Chromium IGNORES the ::-webkit- pseudo elements entirely. So these
+ *   lead — they are what nearly everyone actually sees.
+ *
+ *   `::-webkit-scrollbar` is the legacy path, kept for Safari and older
+ *   Chromium, and scoped behind @supports so it only takes over on engines
+ *   that cannot do the standard properties. It buys a little more (a rounded
+ *   floating thumb, a hover colour); the standard path cannot express those,
+ *   which is the trade for working everywhere.
+ *
+ * Checked by sampling the scrollbar strip's pixels rather than by eye: the
+ * ::-webkit- rules reserve width but paint nothing in headless Chromium, which
+ * is exactly the trap this ordering avoids.
+ */
+:root {
+  --scroll-thumb: rgba(196, 206, 224, 0.38);
+  --scroll-thumb-hover: rgba(69, 208, 255, 0.62);
+  --scroll-thumb-active: rgba(69, 208, 255, 0.85);
+  --scroll-size: 12px;
+  --scroll-inset: 3px;          /* transparent border: what makes it float */
+}
+
+/* the standard path — thin bar, our thumb colour, no track */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+
+/* the legacy path, only where the standard properties do not exist */
+@supports not (scrollbar-width: thin) {
+  ::-webkit-scrollbar {
+    width: var(--scroll-size);
+    height: var(--scroll-size);
+  }
+
+  /* no gutter: the surface underneath shows through */
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* The thumb is drawn inside a transparent border, which is what gives it
+     breathing room either side — without it a pill this round looks wedged
+     in. background-clip keeps the colour off the border. */
+  ::-webkit-scrollbar-thumb {
+    background: var(--scroll-thumb);
+    background-clip: padding-box;
+    border: var(--scroll-inset) solid transparent;
+    border-radius: 999px;
+  }
+
+  /* it lights up in the UI's own cyan when you reach for it */
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scroll-thumb-hover);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: var(--scroll-thumb-active);
+    background-clip: padding-box;
+  }
+
+  /* some platforms draw stepper buttons; we want none */
+  ::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
+/* Scrolling panels reserve the bar's width up front, so content does not jump
+   sideways the moment a list grows long enough to need one. */
+.panel,
+.cw-pick,
+.cw-view {
+  scrollbar-gutter: stable;
+}

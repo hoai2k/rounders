@@ -373,6 +373,18 @@ Pillars:
       fired the round, so a parried shot carries the *blocker's* gloves back
 - [x] **Base fire delay 0.26s**: 0.22 was too quick to read. Split the
       difference with the original 0.30 (`GAMEPLAY.gun.fireDelay`)
+- [x] **Scrollbars styled to match the UI**: new `scrollbars.css`, linked from
+      the game and all three workbench pages, so a bar looks the same wherever
+      one appears — a slim thumb in the panel palette on an empty track, and
+      `scrollbar-gutter: stable` on the scrolling panels so content does not
+      shift sideways when a list grows long enough to need one. The standard
+      `scrollbar-width` / `scrollbar-color` lead (Firefox and Chromium 121+,
+      and where either is set Chromium ignores the `::-webkit-` pseudo elements
+      entirely); the `::-webkit-` rules are kept behind `@supports not
+      (scrollbar-width: thin)` for Safari and older Chromium. Note headless
+      Chromium paints no scrollbar thumb at all, so the appearance could not be
+      confirmed by screenshot — what is verified is that the stylesheet loads
+      and the values resolve on every page
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

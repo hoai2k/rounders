@@ -211,6 +211,7 @@
     <script src="../js/rig.js"></script>
     <script src="../js/characters.js"></script>
     <script src="../js/cards.js"></script>
+    <script src="../js/bullet-art.js"></script>
     <script src="../js/gameplay.js"></script>
     <script src="../js/cardsim.js"></script>
     <script>
@@ -465,14 +466,25 @@
           return entry;
         }
 
+        // The pane starts from what the GAME actually draws (js/bullet-art.js)
+        // and a slider tweak is a change on top of that, so opening a card
+        // shows its real round rather than an untransformed one.
+        function baseLook(id) {
+          const k = (window.ROUNDERS.BULLET_ART || {})[id] || {};
+          return { scale: k.scale ?? 1, rotation: k.rotation ?? 0, procedural: Boolean(k.procedural) };
+        }
+        function liveLook(id) {
+          const base = baseLook(id);
+          const tw = tweaks[id] || {};
+          return { scale: tw.scale ?? base.scale, rotation: tw.rotation ?? base.rotation, procedural: base.procedural };
+        }
+
         function drawBulletPane() {
           const c = currentCard();
           if (!c) return;
           const spec = CARD_SIM.bulletSpec(c);
-          const tw = tweaks[c.id] || {};
-          const scale = tw.scale ?? 1;
-          const rotation = tw.rotation ?? 0;
-          const art = loadBulletArt(c.id);
+          const { scale, rotation, procedural } = liveLook(c.id);
+          const art = procedural ? { ok: false } : loadBulletArt(c.id);
 
           const W = bulletCanvas.width, H = bulletCanvas.height;
           bctx.clearRect(0, 0, W, H);
@@ -521,7 +533,10 @@
           if (!c) return;
           const t = tweaks[c.id] || {};
           t[key] = value;
-          if ((t.scale ?? 1) === 1 && (t.rotation ?? 0) === 0) delete tweaks[c.id];
+          // only a difference from what the game already draws is a "change" —
+          // dialling a slider back to the applied value clears the tweak
+          const base = baseLook(c.id);
+          if ((t.scale ?? base.scale) === base.scale && (t.rotation ?? base.rotation) === base.rotation) delete tweaks[c.id];
           else tweaks[c.id] = t;
           localStorage.setItem(TWEAK_KEY, JSON.stringify(tweaks));
           tweakCount();
@@ -533,7 +548,7 @@
         document.getElementById("resetBullet").addEventListener("click", () => {
           const c = currentCard();
           if (!c) return;
-          delete tweaks[c.id];
+          delete tweaks[c.id];              // back to what the game draws
           localStorage.setItem(TWEAK_KEY, JSON.stringify(tweaks));
           tweakCount();
           drawBulletPane();

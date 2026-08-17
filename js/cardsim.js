@@ -35,6 +35,20 @@
   }
   window.ROUNDERS.bulletArt = bulletArt;
 
+  // How this card's round is drawn, from js/bullet-art.js — the same table the
+  // game reads, so the preview, the bullet pane and the match all agree.
+  function bulletLook(cardId) {
+    const k = (window.ROUNDERS.BULLET_ART || {})[cardId] || {};
+    return {
+      art: k.procedural ? null : bulletArt(cardId),
+      scale: k.scale || 1,
+      rotation: (k.rotation || 0) * Math.PI / 180,
+      color: k.color || null,
+      procedural: Boolean(k.procedural)
+    };
+  }
+  window.ROUNDERS.bulletLook = bulletLook;
+
   // World is authored at this size and scaled to whatever canvas it gets.
   const W = 720, H = 320;
   const GROUND = 252;
@@ -582,12 +596,13 @@
           voidPull: st.voidPull, dazzle: st.dazzle, silence: st.silence,
           bankShot: st.bankShot, boomerang: st.boomerang, empowered: empower, kbDeal: st.kbDeal,
           golden, hit: new Set(), color: golden || empower ? "#ffd700" : who.color,
-          art: bulletArt(plan.card.id),
+          cardId: plan.card.id,
           // Supernova flies white-hot and Golden Gun flies gold, so their
           // trails must too — a pink streak behind a white star reads wrong
-          trailColor: st.explosive >= 2 ? "#ffb03a"
-            : golden || empower ? "#ffd700"
-            : st.burn ? "#ff9e3d" : who.color
+          // the streak takes the round's own colour, so sprite and trail match
+          trailColor: golden || empower ? "#ffd700"
+            : bulletLook(plan.card.id).color
+            || (st.burn ? "#ff9e3d" : who.color)
         });
       }
       // only a real trigger pull spawns echoes — an echo that echoed itself
@@ -1646,8 +1661,6 @@
       // getter, not a snapshot), so dragging a slider re-sizes the rounds in
       // flight here without restarting the fight.
       const tweak = (opts.tweak && opts.tweak()) || null;
-      const tScale = tweak && tweak.scale ? tweak.scale : 1;
-      const tRot = tweak && tweak.rotation ? tweak.rotation * Math.PI / 180 : 0;
       for (const b of bullets) {
         ctx.save();
         if (b.banked && Math.random() < 0.85) {
@@ -1706,6 +1719,7 @@
         // the elongated drill round in both places, and the pane can never
         // disagree with the preview.
         const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 600) : 1;
+        const look = b.cardId ? bulletLook(b.cardId) : { art: null, scale: 1, rotation: 0 };
         ctx.translate(b.x, b.y);
         ctx.rotate(Math.atan2(b.vy, b.vx));
         drawBullet(ctx, {
@@ -1715,7 +1729,15 @@
           burn: b.burn > 0, poison: b.poison > 0, chill: b.chill > 0,
           chain: b.chain > 0, pierce: b.pierce > 0,
           wallPierce: b.wallPierce > 0, holePunch: b.holePunch > 0
-        }, { scale: gr * tScale, rotation: tRot * 180 / Math.PI, art: b.art || null });
+        }, {
+          // Resolved here rather than on the bullet, so a sprite that finished
+          // loading after the shot was fired still shows on it. A workbench
+          // slider OVERRIDES the config rather than multiplying it, so the
+          // number on the slider is the number the round is drawn at.
+          scale: gr * (tweak && tweak.scale != null ? tweak.scale : look.scale),
+          rotation: ((tweak && tweak.rotation != null ? tweak.rotation * Math.PI / 180 : look.rotation)) * 180 / Math.PI,
+          art: look.art
+        });
         ctx.restore();
       }
       // Chronoshift: while the board runs backwards, everything on it leaves a

@@ -10,7 +10,7 @@
 // repel; see CARD-GAP-AUDIT.md).
 //
 // STACKING RULE: every numeric effect uses += or *= so drafting a card twice
-// compounds it (two Big Bores = fatter still; two Magnet Fingers = a true
+// compounds it (two Cannonballs = harder still; two Magnet Fingers = a true
 // heat-seeker). The only exceptions are the boolean legendaries (Golden Gun,
 // kill-heal) and the Mythic actives, where a duplicate replaces/no-ops.
 (() => {
@@ -31,7 +31,7 @@
   }
 
   const CARDS = [
-    // ------------------------------------------------------------- COMMON (16)
+    // ------------------------------------------------------------- COMMON (15)
     card("bubblegum-rounds", "Bubblegum Rounds", "common",
       "Chews through magazines.",
       "Carry 2 extra bullets per magazine, but each one hits a little softer.",
@@ -70,15 +70,15 @@
 
     card("grasshopper", "Grasshopper", "common",
       "The floor is merely a suggestion.",
-      "Jump noticeably higher and drift a little better while airborne.",
-      ["+20% jump height", "+8% air control"], ["movement"],
-      p => { p.stats.jump *= 1.2; p.stats.airAccel *= 1.08; }),
+      "Launch off the floor like you were fired from it — a much faster, much higher jump.",
+      ["+38% jump speed & height", "+8% air control"], ["movement"],
+      p => { p.stats.jump *= 1.38; p.stats.airAccel *= 1.08; }),
 
     card("longshot", "Longshot", "common",
       "Practically a laser.",
-      "Bullets fly faster and drop less over distance — great for cross-map duels.",
-      ["+28% bullet speed", "−15% bullet drop"], ["accuracy"],
-      p => { p.stats.bulletSpeed *= 1.28; p.stats.bulletGravity *= 0.85; }),
+      "Bullets fly twice as fast and drop less over distance — great for cross-map duels.",
+      ["+100% bullet speed", "−15% bullet drop"], ["accuracy"],
+      p => { p.stats.bulletSpeed *= 2; p.stats.bulletGravity *= 0.85; }),
 
     card("brick-wall", "Brick Wall", "common",
       "You shall not pass. Probably.",
@@ -94,9 +94,9 @@
 
     card("moon-shoes", "Moon Shoes", "common",
       "One small hop for a rounder…",
-      "Gain one extra jump you can use in mid-air. Slightly slower on the ground.",
-      ["+1 air jump", "−8% speed"], ["movement"],
-      p => { p.stats.extraJumps += 1; p.stats.speed *= 0.92; }),
+      "Gain one extra jump you can use in mid-air. No catch.",
+      ["+1 air jump"], ["movement"],
+      p => { p.stats.extraJumps += 1; }),
 
     card("sticky-soles", "Sticky Soles", "common",
       "Grip for days.",
@@ -106,27 +106,21 @@
 
     card("tailwind", "Tailwind", "common",
       "The sky likes you today.",
-      "Steer far better while airborne. Jumps feel weightless.",
-      ["+50% air control"], ["movement"],
-      p => { p.stats.airAccel *= 1.5; }),
-
-    card("big-bore", "Big Bore", "common",
-      "Comically large. Comically effective.",
-      "Fire fatter, harder-hitting slugs that travel a bit slower.",
-      ["+18% damage", "+25% bullet size", "−12% bullet speed"], ["damage"],
-      p => { p.stats.damage *= 1.18; p.stats.bulletSize *= 1.25; p.stats.bulletSpeed *= 0.88; }),
+      "Steer far better while airborne, and hold the jump button to hang in the air for up to 2 seconds.",
+      ["+50% air control", "hold jump to float (2s)"], ["movement"],
+      p => { p.stats.airAccel *= 1.5; p.stats.floatTime += 2; }),
 
     card("boxing-glove", "Boxing Glove", "common",
       "Float like a truck.",
-      "Your shots hit like a haymaker — massively more knockback, slightly bigger, slightly softer.",
-      ["+120% knockback dealt", "+10% bullet size", "−10% damage"], ["control"],
-      p => { p.stats.kbDeal += 1.2; p.stats.bulletSize *= 1.1; p.stats.damage *= 0.9; }),
+      "Your shots hit like a haymaker — they send people flying, and they hit a little softer for it.",
+      ["+300% knockback dealt", "+10% bullet size", "−10% damage"], ["control"],
+      p => { p.stats.kbDeal += 3; p.stats.bulletSize *= 1.1; p.stats.damage *= 0.9; }),
 
     card("sugar-rush", "Sugar Rush", "common",
       "Hits taste like candy.",
-      "Landing a hit makes you giddy: +35% move speed for 2.5 seconds.",
-      ["+35% speed for 2.5s after a hit"], ["movement"],
-      p => { p.stats.sugarRush += 0.35; }),
+      "Landing a hit makes you giddy: double move speed for 2.5 seconds.",
+      ["+100% speed for 2.5s after a hit"], ["movement"],
+      p => { p.stats.sugarRush += 1; }),
 
     // ---------------------------------------------------------- UNCOMMON (24)
     card("ricochet-romance", "Ricochet Romance", "uncommon",
@@ -551,19 +545,19 @@
     // ------------------------------------------------------------- MYTHIC (3)
     card("starfall-protocol", "Starfall Protocol", "mythic",
       "The sky picks a side.",
-      "ACTIVE (G / LB): call a volley of 5 meteors crashing down toward your aim point. 12s cooldown. Passive: +10% damage.",
+      "ACTIVE (Y / LB): call a volley of 5 meteors crashing down toward your aim point. 12s cooldown. Passive: +10% damage.",
       ["ACTIVE: meteor volley", "12s cooldown", "+10% damage"], ["active", "aoe"],
       p => { p.stats.active = "starfall"; p.stats.activeCooldown = 12; p.stats.damage *= 1.1; }),
 
     card("event-horizon", "Event Horizon", "mythic",
       "Everything falls. Eventually.",
-      "ACTIVE (G / LB): open a black hole at your aim point that drags enemies in and crushes them for 3s. 14s cooldown. Passive: +10% health.",
+      "ACTIVE (Y / LB): open a black hole at your aim point that drags enemies in and crushes them for 3s. 14s cooldown. Passive: +10% health.",
       ["ACTIVE: black hole (3s)", "14s cooldown", "+10% health"], ["active", "control"],
       p => { p.stats.active = "eventHorizon"; p.stats.activeCooldown = 14; p.stats.maxHp *= 1.1; }),
 
     card("chronoshift", "Chronoshift", "mythic",
       "You were never there.",
-      "ACTIVE (G / LB): rewind to where you were 2 seconds ago and heal 35 HP. 10s cooldown. Passive: +8% speed.",
+      "ACTIVE (Y / LB): rewind to where you were 2 seconds ago and heal 35 HP. 10s cooldown. Passive: +8% speed.",
       ["ACTIVE: rewind 2s + heal 35", "10s cooldown", "+8% speed"], ["active", "clutch"],
       p => { p.stats.active = "chronoshift"; p.stats.activeCooldown = 10; p.stats.speed *= 1.08; })
   ];

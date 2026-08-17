@@ -14,6 +14,8 @@
   "use strict";
   window.ROUNDERS = window.ROUNDERS || {};
 
+  const rand = (min, max) => min + Math.random() * (max - min);
+
   // World is authored at this size and scaled to whatever canvas it gets.
   const W = 720, H = 320;
   const GROUND = 252;
@@ -64,7 +66,7 @@
       bloodMoney: 0, underdog: 0,
       blockReload: 0, healField: 0, frostBlock: 0, sawBlock: 0,
       empowerBlock: 0, autoBlock: 0, brickBlock: 0, decoy: 0, blockRefresh: 0,
-      scavenge: 0, reloadPulse: 0, sugarRush: 0, hotStreak: 0, overflow: 0,
+      scavenge: 0, reloadPulse: 0, sugarRush: 0, hotStreak: 0, overflow: 0, floatTime: 0,
       decay: 0, freshCoat: 0, chillAura: 0, stomp: 0, jumpBlast: 0, repel: 0
     };
   }
@@ -429,8 +431,31 @@
         who.silenceT = Math.max(0, who.silenceT - dt);
         who.chillT = Math.max(0, who.chillT - dt);
         if (who.echoT > 0) { who.echoT -= dt; if (who.echoT <= 0) { who.blockT = Math.max(who.blockT, 0.3); blockEffects(who, who.x, who.y); puff(who.x, who.y, "#fff", 10, 180); } }
-        if (who.poisonT > 0) { who.poisonT -= dt; who.hp = Math.max(1, who.hp - who.dotDps * dt); }
-        if (who.burnT > 0) { who.burnT -= dt; who.hp = Math.max(1, who.hp - who.dotDps * dt); }
+        if (who.poisonT > 0) {
+          who.poisonT -= dt; who.hp = Math.max(1, who.hp - who.dotDps * dt);
+          if (Math.random() < dt * 14) parts.push({ x: who.x + rand(-14, 14), y: who.y + rand(-14, 14), vx: rand(-10, 10), vy: rand(-40, -12), life: 0.5, max: 0.5, r: rand(2, 3.5), color: "#63d43a" });
+        }
+        if (who.burnT > 0) {
+          who.burnT -= dt; who.hp = Math.max(1, who.hp - who.dotDps * dt);
+          // flames off the body and smoke peeling up, so "burning" reads
+          for (let i = 0; i < 2; i += 1) {
+            if (Math.random() > dt * 30) continue;
+            const a = rand(0, Math.PI * 2), rr = who.stats.radius * rand(0.35, 1);
+            parts.push({
+              x: who.x + Math.cos(a) * rr, y: who.y + Math.sin(a) * rr * 0.8,
+              vx: rand(-20, 20), vy: rand(-120, -60),
+              life: 0.4, max: 0.4, r: rand(2.5, 5),
+              color: Math.random() < 0.55 ? "#ffcf4d" : "#ff7a26", flame: true
+            });
+          }
+          if (Math.random() < dt * 12) {
+            parts.push({
+              x: who.x + rand(-11, 11), y: who.y - who.stats.radius * 0.7,
+              vx: rand(-14, 14), vy: rand(-60, -30),
+              life: 1, max: 1, r: rand(4.5, 8), color: "rgba(70,66,72,0.55)", smoke: true
+            });
+          }
+        }
         if (who.decayPool > 0) { const bite = Math.min(who.decayPool, Math.max(who.decayPool / 3, 3) * dt); who.decayPool -= bite; who.hp = Math.max(0, who.hp - bite); }
         if (who.stats.regen) heal(who, who.stats.regen * dt);
         if (who.stats.hotStreak && who.hotWant) { who.temp = Math.max(who.temp, 25 * who.stats.hotStreak); who.hotWant = false; }
@@ -661,7 +686,14 @@
         }
       }
       fields = fields.filter(f => f.life > 0);
-      for (const p of parts) { p.life -= dt; if (!p.trail && !p.bolt) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 400 * dt; } }
+      for (const p of parts) {
+        p.life -= dt;
+        if (p.trail || p.bolt) continue;
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        if (p.smoke) { p.vy -= 55 * dt; p.vx *= Math.pow(0.9, dt * 60); }
+        else if (p.flame) p.vy -= 120 * dt;
+        else p.vy += 400 * dt;
+      }
       parts = parts.filter(p => p.life > 0);
       for (const f of floaters) { f.life -= dt; f.y -= 26 * dt; }
       floaters = floaters.filter(f => f.life > 0);
@@ -708,6 +740,7 @@
       ctx.save();
       ctx.translate(who.x, who.y);
       if (who.chillT > 0) { ctx.shadowColor = "#8fd8ff"; ctx.shadowBlur = 16; }
+      if (who.burnT > 0) { ctx.shadowColor = "#ff7a26"; ctx.shadowBlur = 18 + Math.sin(t * 22) * 6; }
       if (who.stunT > 0) ctx.rotate(Math.sin(t * 40) * 0.07);
       if (ch && window.ROUNDERS.drawCharacter) {
         window.ROUNDERS.drawCharacter(ctx, ch, who.stats.radius, { t, aimX: who.aimX, aimY: who.aimY });
@@ -839,6 +872,15 @@
         if (p.bolt) {
           ctx.strokeStyle = p.color; ctx.globalAlpha = al; ctx.lineWidth = 2.5;
           ctx.beginPath(); ctx.moveTo(p.x1, p.y1); ctx.lineTo(p.x2, p.y2); ctx.stroke(); ctx.globalAlpha = 1;
+        } else if (p.smoke) {
+          ctx.globalAlpha = al * 0.55; ctx.fillStyle = p.color;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.6 - al * 0.6), 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+        } else if (p.flame) {
+          ctx.globalAlpha = al; ctx.fillStyle = p.color;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r * al * 1.15, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = al * 0.4; ctx.fillStyle = "#ffe9a8";
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r * al * 0.5, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 1;
         } else {
           ctx.globalAlpha = al; ctx.fillStyle = p.color;
           ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;

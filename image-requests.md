@@ -6,7 +6,9 @@
 > Re-audited 2026-08-17 after the Lowrider / Aegis Bubble / Pocket Void
 > delivery: 88 cards, **55 have emblem + scene**, 33 have neither and are
 > drawing the plain tinted fallback panel. No card is half-delivered, and
-> nothing is orphaned (no art without a card). The delivered prompts have
+> **Big Bore was cut** (it was a strictly worse Cannonball), so its delivered
+> `cards/big-bore.png` + `art/big-bore.png` are now unused — kept in the repo
+> in case the card ever returns, but nothing draws them. The delivered prompts have
 > moved to `image-requests-history.md` §9, which is where a re-generation or a
 > style question goes looking.
 
@@ -78,10 +80,10 @@ centered subject) and an **art panel** (`assets/images/cards/art/<id>.png`,
 
 ---
 
-## 2. Bullet art (29 cards × 1 image = 29 files) — NEW
+## 2. Bullet art (28 cards × 1 image = 28 files) — NEW
 
 Bullets are drawn procedurally today (a tinted round plus per-effect tells).
-These 29 cards change what the bullet *looks like*, so each can take a painted
+These 28 cards change what the bullet *looks like*, so each can take a painted
 round. Everything else keeps the procedural bullet, which is correct — a card
 that only changes reload speed should not change the shot's appearance.
 

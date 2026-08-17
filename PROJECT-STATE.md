@@ -43,7 +43,7 @@ Pillars:
 ### 2. Card system — 87 cards, designed from scratch
 - [x] New card schema: id, name, rarity, tagline (flavor), description (plain-English
       explanation), effect list, tags, apply()
-- [x] 16 Common / 24 Uncommon / 26 Rare / 13 Epic / 5 Legendary / 3 Mythic = **87 cards**
+- [x] 15 Common / 24 Uncommon / 26 Rare / 14 Epic / 5 Legendary / 3 Mythic = **87 cards**
 - [x] **Power-card audit** (AUDIT.md §6): homing reworked from a feeble nudge to
       real steering (visible curves, heat-seekers when stacked); three ROUNDS
       gaps filled — Aegis Bubble (regenerating shield with bubble/absorb/break
@@ -129,7 +129,21 @@ Pillars:
       moved to `image-requests-history.md` §9
 - [ ] **Art outstanding** (`image-requests.md`): 33 cards have no emblem or
       scene at all, plus the bullet (29) and effect (18) batches
-- [ ] Balance pass on the 32 new cards once they've been played for real
+- [x] **Play-feel pass 2026-08-17**: Big Bore cut (a strictly worse
+      Cannonball); Boxing Glove +300% knockback; Sugar Rush +100% speed;
+      Longshot +100% bullet speed; Grasshopper is a hard launch (+38% jump
+      speed); Moon Shoes lost its speed penalty; Tailwind gained **hold-jump
+      float** (new `floatTime` stat, budget refills on landing)
+- [x] **Mythic actives moved to their own button**: Y (pad button 3) fires the
+      ability, so a Mythic no longer eats your block press — B / LB / LT still
+      block. Card text and the controller diagram name the pad button only
+      ("Y / LB"), and Y has its own label on the How to Play pad
+- [x] **Fire & smoke particles**: buoyant `flame`/`smoke` particle kinds (they
+      rise, flames shrink, smoke swells) driving burning fighters, explosions,
+      meteor trails, incendiary rounds in flight, Firecracker Heels, and
+      contact with *hot* hazards only — the arena's own hazard colour decides,
+      so lava burns and ice spikes don't. Mirrored in the preview sim
+- [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality
 - [x] Level schema: name, theme blurb, full palette (sky gradient, platform colors,

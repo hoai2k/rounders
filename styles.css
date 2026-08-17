@@ -1189,6 +1189,7 @@ h1.title-logo .logo-img {
 .pad-label.f-move { fill: var(--sky); }
 .pad-label.f-shoot { fill: var(--coral); }
 .pad-label.f-block { fill: var(--mint); }
+.pad-label.f-mythic { fill: var(--mythic); }
 .pad-label.f-jump { fill: var(--lemon); }
 .pad-label.f-menu { fill: #d9d5f0; }
 

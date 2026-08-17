@@ -208,7 +208,7 @@
       blockReload: 0, healField: 0, frostBlock: 0, sawBlock: 0,
       empowerBlock: 0, autoBlock: 0, brickBlock: 0, decoy: 0, blockRefresh: 0,
       // reload / sustain / triggered
-      scavenge: 0, reloadPulse: 0, sugarRush: 0, hotStreak: 0, overflow: 0,
+      scavenge: 0, reloadPulse: 0, sugarRush: 0, hotStreak: 0, overflow: 0, floatTime: 0,
       decay: 0, freshCoat: 0, chillAura: 0, stomp: 0, jumpBlast: 0, repel: 0
     };
   }
@@ -233,7 +233,7 @@
       chillTimer: 0,
       teleCooldown: 0,
       guardianCharges: 0, roundRevives: 0,
-      sugarTimer: 0, stunTimer: 0, silenceTimer: 0, dazzleImmune: 0,
+      sugarTimer: 0, stunTimer: 0, silenceTimer: 0, dazzleImmune: 0, floatLeft: 0,
       sawGrace: 0, stompGrace: 0, refreshLock: 0, pulseClock: 0,
       decayPool: 0, decayAttacker: null, freshPool: 0, hotShield: 0, overShield: 0,
       empowerShot: 0, steeredBullet: null, burstQueue: [], encoreQueue: [],
@@ -257,8 +257,8 @@
   function emptyInput() {
     return {
       move: 0, aimX: 0, aimY: 0,
-      jump: false, shoot: false, block: false, pause: false,
-      jumpPressed: false, shootPressed: false, blockPressed: false, pausePressed: false,
+      jump: false, shoot: false, block: false, special: false, pause: false,
+      jumpPressed: false, shootPressed: false, blockPressed: false, specialPressed: false, pausePressed: false,
       menuPressed: false, leftPressed: false, rightPressed: false
     };
   }
@@ -612,7 +612,7 @@
     // prime inputs so a held Start/Enter doesn't edge-trigger pause on frame one
     applyInputs(getPads());
     for (const p of players) {
-      p.input.jumpPressed = p.input.shootPressed = p.input.blockPressed = p.input.pausePressed = false;
+      p.input.jumpPressed = p.input.shootPressed = p.input.blockPressed = p.input.specialPressed = p.input.pausePressed = false;
     }
   }
 
@@ -705,6 +705,7 @@
       p.shieldFlash = 0;
       p.trail = [];
       p.sugarTimer = 0; p.stunTimer = 0; p.silenceTimer = 0; p.dazzleImmune = 0;
+      p.floatLeft = p.stats.floatTime;
       p.sawGrace = 0; p.stompGrace = 0; p.refreshLock = 0; p.pulseClock = 0;
       p.decayPool = 0; p.decayAttacker = null;
       p.freshPool = p.stats.maxHp * p.stats.freshCoat; // shatters on first hit
@@ -1053,6 +1054,7 @@
       input.jumpPressed = input.jump && !prev.jump;
       input.shootPressed = input.shoot && !prev.shoot;
       input.blockPressed = input.block && !prev.block;
+      input.specialPressed = input.special && !prev.special;
       input.pausePressed = input.pause && !prev.pause;
       p.input = input;
     }
@@ -1090,7 +1092,10 @@
     }
     input.jump ||= button(pad, 0) || dUp;
     input.shoot ||= button(pad, 2) || button(pad, 5) || button(pad, 7);
-    input.block ||= button(pad, 1) || button(pad, 3) || button(pad, 4) || button(pad, 6);
+    input.block ||= button(pad, 1) || button(pad, 4) || button(pad, 6);
+    // Y is the special: with a Mythic in hand the active no longer eats the
+    // block press, so you can still parry while your ability is charged
+    input.special ||= button(pad, 3);
     input.pause ||= button(pad, 9);
     input.menuPressed ||= buttonEdge(pad, 9);
     input.leftPressed ||= buttonEdge(pad, 14) || axisEdge(pad, 0, -1);
@@ -1841,7 +1846,34 @@
       if (p.burnTimer > 0) {
         p.burnTimer -= dt;
         hurtRaw(p, p.burnDps * dt, p.burnAttacker);
-        if (Math.random() < dt * 20) puffOne(p.x + rand(-14, 14), p.y - rand(0, 20), "#ff9e3d");
+        // Actually on fire: licking flames off the body, dark smoke peeling up
+        // off them, and the odd ember dropping. A single orange puff read as
+        // "hit", not "burning".
+        const heat = Math.min(1, p.burnDps / 14);
+        for (let i = 0; i < 3; i += 1) {
+          if (Math.random() > dt * 34 * (0.6 + heat)) continue;
+          const a = rand(0, Math.PI * 2), rr = p.stats.radius * rand(0.35, 1);
+          particles.push({
+            x: p.x + Math.cos(a) * rr, y: p.y + Math.sin(a) * rr * 0.8,
+            vx: rand(-26, 26) + p.vx * 0.16, vy: rand(-150, -70) + p.vy * 0.1,
+            life: 0.42, maxLife: 0.42, r: rand(2.5, 5.5),
+            color: Math.random() < 0.55 ? "#ffcf4d" : "#ff7a26", flame: true
+          });
+        }
+        if (Math.random() < dt * 14) {
+          particles.push({
+            x: p.x + rand(-12, 12), y: p.y - p.stats.radius * 0.7,
+            vx: rand(-18, 18), vy: rand(-70, -34),
+            life: 1.1, maxLife: 1.1, r: rand(5, 9), color: "rgba(70,66,72,0.55)", smoke: true
+          });
+        }
+        if (Math.random() < dt * 6) {
+          particles.push({
+            x: p.x + rand(-14, 14), y: p.y + rand(-8, 10),
+            vx: rand(-40, 40), vy: rand(-20, 40),
+            life: 0.7, maxLife: 0.7, r: rand(1.2, 2.2), color: "#ffb02e"
+          });
+        }
       }
       if (p.chillTimer > 0) p.chillTimer -= dt;
       if (p.stats.regen > 0) p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.regen * dt);
@@ -1941,6 +1973,8 @@
               if (d < 110) hurt(q, (1 - d / 110) * dmg + 4, p, q.x - p.x, q.y - p.y);
             }
             burst(p.x, p.y + 16, "#ff9e3d", 18, 320);
+            flames(p.x, p.y + 18, 8, 12, 0.9);
+            smoke(p.x, p.y + 16, 2, 10, 0.8);
             world.shake = Math.max(world.shake, 5);
             sfx("boom");
           }
@@ -1954,10 +1988,24 @@
         }
       }
 
+      if (p.input.specialPressed && !stunned) tryActive(p);
       if (p.input.blockPressed && !stunned && !tryActive(p)) tryBlock(p);
       if (p.input.shoot && !stunned) tryShoot(p);
 
       p.vy += levelGravity() * dt;
+      // Tailwind: holding jump in mid-air spends a float budget to hang, and
+      // the budget refills once you touch down again
+      if (p.stats.floatTime > 0) {
+        if (p.grounded) p.floatLeft = p.stats.floatTime;
+        else if (p.input.jump && p.floatLeft > 0 && p.vy > -30) {
+          p.floatLeft = Math.max(0, p.floatLeft - dt);
+          p.vy = Math.min(p.vy, 26);
+          p.vy -= levelGravity() * dt * 0.92;
+          if (Math.random() < dt * 26) {
+            puffOne(p.x + rand(-16, 16), p.y + p.stats.radius * 0.6, "rgba(220,240,255,0.75)");
+          }
+        }
+      }
       // hugging a wall slows the fall, giving you time to line up the next kick
       if (!p.grounded && p.wallTimer > 0 && p.vy > WALL_SLIDE_MAX) {
         p.vy = WALL_SLIDE_MAX;
@@ -2078,6 +2126,7 @@
         p.grounded = true;
         p.groundPlatform = platform;
         p.jumpsLeft = 1 + p.stats.extraJumps;
+        p.floatLeft = p.stats.floatTime;
       } else if (overlap.side === "bottom") {
         p.y += overlap.amount;
         p.vy = Math.max(0, p.vy) * 0.24;
@@ -2533,6 +2582,13 @@
       b.y += b.vy * dt;
       b.life -= dt;
       if (b.life <= 0 && tryBoomerang(b)) continue;
+      if (b.meteor) {
+        if (Math.random() < dt * 60) flames(b.x, b.y, 1, 5, 1.1);
+        if (Math.random() < dt * 24) smoke(b.x, b.y, 1, 6, 0.8);
+      } else if (b.burn && Math.random() < dt * 40) {
+        // an incendiary round is visibly alight in flight
+        flames(b.x, b.y, 1, 3, 0.7);
+      }
       particles.push({
         x: b.x, y: b.y, vx: rand(-16, 16), vy: rand(-16, 16),
         life: 0.16, maxLife: 0.16, r: b.golden ? 3 : 2,
@@ -2760,6 +2816,8 @@
         }
       }
       world.shake = Math.max(world.shake, 9 + b.explosive * 2);
+      flames(b.x, b.y, 10 + Math.round(b.explosive * 6), 16 + b.explosive * 6, 1 + b.explosive * 0.25);
+      smoke(b.x, b.y, 4 + Math.round(b.explosive * 2), 14, 1 + b.explosive * 0.2);
       sfx("boom");
       // splash also batters nearby crates and cracked platforms
       const radius = 105 + b.explosive * 12;
@@ -3026,7 +3084,24 @@
     sfx("hit");
     pulse(p, 0.4, 150);
     world.shake = Math.max(world.shake, 7);
-    burst(p.x, p.y + p.stats.radius, currentLevel().palette.hazard || "#ff6a3d", 18, 420);
+    const hazCol = currentLevel().palette.hazard || "#ff6a3d";
+    burst(p.x, p.y + p.stats.radius, hazCol, 18, 420);
+    // Lava spits fire and smoke; ice spikes and blades must not, so this keys
+    // off the arena's own hazard colour being a hot one.
+    if (isHot(hazCol)) {
+      flames(p.x, p.y + p.stats.radius * 0.6, 8, 12, 1);
+      smoke(p.x, p.y + p.stats.radius * 0.4, 3, 10, 1);
+    }
+  }
+
+  // "hot" = fire colours only: bright red through orange to yellow. Requiring
+  // green to beat blue keeps the neon magenta hazards (Neon Skyline, Voidfall)
+  // out of it — those glow, they don't burn.
+  function isHot(hex) {
+    const h = String(hex).replace("#", "");
+    if (h.length < 6) return false;
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    return r > 150 && r > b + 60 && g < r && g >= b;
   }
 
   // The bottom of the world is a trampoline with a temper: it hurts, flings you
@@ -5307,7 +5382,10 @@
       p.life -= dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vy += 360 * dt;
+      // sparks and debris fall; fire and smoke are buoyant and rise instead
+      if (p.smoke) { p.vy -= 60 * dt; p.vx *= Math.pow(0.9, dt * 60); }
+      else if (p.flame) p.vy -= 130 * dt;
+      else p.vy += 360 * dt;
     }
     particles = particles.filter(p => p.life > 0);
   }
@@ -5315,13 +5393,60 @@
   function drawParticles() {
     for (const p of particles) {
       const a = clamp(p.life / p.maxLife, 0, 1);
+      if (p.smoke) {
+        // smoke thins and swells as it climbs
+        ctx.globalAlpha = a * 0.55;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * (1.6 - a * 0.6), 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
       ctx.globalAlpha = a;
+      if (p.flame) {
+        // a flame is a hot core in a softer glow, shrinking as it burns out
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * a * 1.15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = a * 0.4;
+        ctx.fillStyle = "#ffe9a8";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * a * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
       ctx.fillStyle = p.color;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r * (0.6 + a), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+
+  // Fire and smoke, used by everything that should look genuinely alight:
+  // burning fighters, explosions, meteors, lava. Flames rise and shrink, smoke
+  // rises and swells (see updateParticles/drawParticles).
+  function flames(x, y, count = 6, spread = 14, power = 1) {
+    for (let i = 0; i < count; i += 1) {
+      particles.push({
+        x: x + rand(-spread, spread), y: y + rand(-spread, spread),
+        vx: rand(-40, 40) * power, vy: rand(-170, -70) * power,
+        life: rand(0.3, 0.5), maxLife: 0.5, r: rand(2.5, 6) * power,
+        color: Math.random() < 0.55 ? "#ffcf4d" : "#ff7a26", flame: true
+      });
+    }
+  }
+
+  function smoke(x, y, count = 3, spread = 12, power = 1) {
+    for (let i = 0; i < count; i += 1) {
+      particles.push({
+        x: x + rand(-spread, spread), y: y + rand(-spread, spread),
+        vx: rand(-22, 22), vy: rand(-70, -30),
+        life: rand(0.9, 1.4), maxLife: 1.4, r: rand(5, 10) * power,
+        color: "rgba(70,66,72,0.55)", smoke: true
+      });
+    }
   }
 
   function burst(x, y, color, count, speed) {
@@ -5843,6 +5968,11 @@
     holes: () => activePlatforms(currentLevel(), world.time)
       .filter(pl => pl.holes && pl.holes.length)
       .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, holes: pl.holes.map(h => ({ ...h })) })),
+    particles: () => ({
+      total: particles.length,
+      flame: particles.filter(x => x.flame).length,
+      smoke: particles.filter(x => x.smoke).length
+    }),
     probe: (px, py, rad = 27) => activePlatforms(currentLevel(), world.time)
       .filter(pl => pl.holes && pl.holes.length)
       .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, hasHoles: pl.holes.length, inHole: inHole(pl, px, py, rad) })),

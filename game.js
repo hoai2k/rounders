@@ -113,6 +113,7 @@
   let particles = [];
   let fields = [];
   let bolts = []; // lightning polylines {points, life, color}
+  let decoys = []; // Body Double stand-ins {x, y, hp, owner, character, color, life}
   // Destructible / dynamic arena props, rebuilt every round from level data:
   //   breaks — Map(level platform → {hp,max,dead}) for platforms with `breakable`
   //   hungs  — platforms suspended on shootable chains; cut every chain and they drop
@@ -164,7 +165,17 @@
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
       guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0,
       goldenShot: false, killHeal: false,
-      active: null, activeCooldown: 10
+      active: null, activeCooldown: 10,
+      // gap-audit wave (CARD-GAP-AUDIT.md): offense & bullets
+      kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0,
+      steer: 0, helium: 0, boomerang: 0, encore: 0, burstFire: 0,
+      bloodMoney: 0, underdog: 0,
+      // block toolkit
+      blockReload: 0, healField: 0, frostBlock: 0, sawBlock: 0,
+      empowerBlock: 0, autoBlock: 0, brickBlock: 0, decoy: 0, blockRefresh: 0,
+      // reload / sustain / triggered
+      scavenge: 0, reloadPulse: 0, sugarRush: 0, hotStreak: 0, overflow: 0,
+      decay: 0, freshCoat: 0, chillAura: 0, stomp: 0, jumpBlast: 0, repel: 0
     };
   }
 
@@ -188,6 +199,10 @@
       chillTimer: 0,
       teleCooldown: 0,
       guardianCharges: 0, roundRevives: 0,
+      sugarTimer: 0, stunTimer: 0, silenceTimer: 0, dazzleImmune: 0,
+      sawGrace: 0, stompGrace: 0, refreshLock: 0, pulseClock: 0,
+      decayPool: 0, decayAttacker: null, freshPool: 0, hotShield: 0, overShield: 0,
+      empowerShot: 0, steeredBullet: null, burstQueue: [], encoreQueue: [],
       trail: [],
       cards: [],
       stats: defaultStats(),
@@ -606,8 +621,16 @@
       p.shieldDelay = 0;
       p.shieldFlash = 0;
       p.trail = [];
+      p.sugarTimer = 0; p.stunTimer = 0; p.silenceTimer = 0; p.dazzleImmune = 0;
+      p.sawGrace = 0; p.stompGrace = 0; p.refreshLock = 0; p.pulseClock = 0;
+      p.decayPool = 0; p.decayAttacker = null;
+      p.freshPool = p.stats.maxHp * p.stats.freshCoat; // shatters on first hit
+      p.hotShield = 0; p.overShield = 0;
+      p.empowerShot = 0; p.steeredBullet = null;
+      p.burstQueue = []; p.encoreQueue = [];
       p.spawnGrace = 1.6;
     });
+    decoys = [];
     world.roundFreeze = 1.1;
     arenaName.textContent = level.name;
     arenaTag.textContent = level.tagline;
@@ -1187,6 +1210,7 @@
     updatePlayers(step);
     updateBullets(step);
     updateFields(step);
+    updateDecoys(step);
     updateParticles(step);
     updateBolts(step);
     updateHud();
@@ -1638,6 +1662,51 @@
       p.wallTimer = Math.max(0, p.wallTimer - dt);
       p.wallCooldown = Math.max(0, p.wallCooldown - dt);
       p.blinkClock += dt;
+      p.sugarTimer = Math.max(0, p.sugarTimer - dt);
+      p.stunTimer = Math.max(0, p.stunTimer - dt);
+      p.silenceTimer = Math.max(0, p.silenceTimer - dt);
+      p.dazzleImmune = Math.max(0, p.dazzleImmune - dt);
+      p.sawGrace = Math.max(0, p.sawGrace - dt);
+      p.stompGrace = Math.max(0, p.stompGrace - dt);
+      p.refreshLock = Math.max(0, p.refreshLock - dt);
+      // Hot Streak armor bleeds away fast; Overflow shield sticks around
+      if (p.hotShield > 0) p.hotShield = Math.max(0, p.hotShield - 10 * dt);
+      // Payment Plan: the pool of deferred damage drips into your health bar
+      if (p.decayPool > 0) {
+        const bite = Math.min(p.decayPool, Math.max(p.decayPool / 3, 3) * dt);
+        p.decayPool -= bite;
+        applyDamage(p, bite, p.decayAttacker, true);
+        if (Math.random() < dt * 10) puffOne(p.x + rand(-12, 12), p.y + rand(-12, 12), "#c88fff");
+      }
+      // Triple Tap echoes and Encore ghosts fire themselves on their timers
+      if (p.burstQueue.length) {
+        for (const q of p.burstQueue) q.t -= dt;
+        while (p.burstQueue.length && p.burstQueue[0].t <= 0) {
+          const q = p.burstQueue.shift();
+          if (p.alive) { fireVolley(p, { mul: q.mul }); sfx("shoot"); }
+        }
+      }
+      if (p.encoreQueue.length) {
+        for (const q of p.encoreQueue) q.t -= dt;
+        while (p.encoreQueue.length && p.encoreQueue[0].t <= 0) {
+          const q = p.encoreQueue.shift();
+          if (p.alive) {
+            fireVolley(p, { mul: q.mul, angle: q.angle, ghost: true });
+            puff(p.x, p.y, "#b8c4ff", 6);
+            sfx("shoot");
+          }
+        }
+      }
+      // Cold Shoulder: standing near the wearer is its own punishment
+      if (p.stats.chillAura) {
+        for (const q of players) {
+          if (!q.alive || q === p || q.spawnGrace > 0) continue;
+          if (Math.hypot(q.x - p.x, q.y - p.y) < 200) {
+            q.chillTimer = Math.max(q.chillTimer, 0.3);
+            if (Math.random() < dt * 6) puffOne(q.x + rand(-12, 12), q.y + rand(-12, 12), "#8fd8ff");
+          }
+        }
+      }
 
       if (p.echoTimer > 0) {
         p.echoTimer -= dt;
@@ -1677,6 +1746,21 @@
 
       if (p.reloadTimer > 0) {
         p.reloadTimer -= dt;
+        // Coffee Break: the reload itself is dangerous to stand next to
+        if (p.stats.reloadPulse) {
+          p.pulseClock += dt;
+          if (p.pulseClock >= 0.45) {
+            p.pulseClock = 0;
+            fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 130, life: 0.14, force: 520 });
+            for (const q of players) {
+              if (!q.alive || q === p || q.spawnGrace > 0) continue;
+              if (Math.hypot(q.x - p.x, q.y - p.y) < 130) {
+                hurtRaw(q, 8 * p.stats.reloadPulse, p);
+              }
+            }
+            sfx("block");
+          }
+        } else p.pulseClock = 0;
         if (p.reloadTimer <= 0) {
           p.ammo = p.stats.maxAmmo;
           puff(p.x, p.y, "#ffffff", 8);
@@ -1685,13 +1769,19 @@
 
       const chillMul = p.chillTimer > 0 ? 0.55 : 1;
       const adrenalineMul = p.stats.adrenaline > 0 && p.hp / p.stats.maxHp < 0.35 ? 1 + p.stats.adrenaline : 1;
-      let speed = p.stats.speed * chillMul * adrenalineMul;
+      const sugarMul = p.sugarTimer > 0 ? 1 + p.stats.sugarRush : 1;
+      let speed = p.stats.speed * chillMul * adrenalineMul * sugarMul * underdogMul(p);
       // syrup zones
       for (const z of level.zones || []) {
         if (circleRect(p, z)) { speed *= 0.45; break; }
       }
 
-      const move = clamp(p.input.move, -1, 1);
+      // Camera Flash: stunned players stand there, seeing spots
+      const stunned = p.stunTimer > 0;
+      if (stunned && Math.random() < dt * 10) {
+        puffOne(p.x + rand(-14, 14), p.y - p.stats.radius - rand(4, 16), "#ffffff");
+      }
+      const move = stunned ? 0 : clamp(p.input.move, -1, 1);
       const onIce = p.groundPlatform && p.groundPlatform.ice;
       const targetVx = move * speed;
       let accel = p.grounded ? p.stats.accel : p.stats.airAccel;
@@ -1714,7 +1804,7 @@
       p.aimX /= aimMag; p.aimY /= aimMag;
 
       const chillJump = p.chillTimer > 0 ? 0.75 : 1;
-      if (p.input.jumpPressed) {
+      if (p.input.jumpPressed && !stunned) {
         const canWallJump = !p.grounded && p.wallTimer > 0 && p.wallCooldown <= 0;
         if (canWallJump) {
           // Kick up and away from the wall. It costs no air jump, so a wall can
@@ -1730,6 +1820,19 @@
           sfx("jump");
           burst(p.x - p.wallDir * p.stats.radius, p.y, "#ffffff", 9, 190);
         } else if (p.jumpsLeft > 0) {
+          // Firecracker Heels: an air jump goes off like a mortar under you
+          if (!p.grounded && p.stats.jumpBlast) {
+            const dmg = 15 * p.stats.jumpBlast;
+            fields.push({ type: "push", owner: p, x: p.x, y: p.y + 20, r: 110, life: 0.14, force: 640 });
+            for (const q of players) {
+              if (!q.alive || q === p || q.spawnGrace > 0) continue;
+              const d = Math.hypot(q.x - p.x, q.y - (p.y + 20));
+              if (d < 110) hurt(q, (1 - d / 110) * dmg + 4, p, q.x - p.x, q.y - p.y);
+            }
+            burst(p.x, p.y + 16, "#ff9e3d", 18, 320);
+            world.shake = Math.max(world.shake, 5);
+            sfx("boom");
+          }
           p.vy = -p.stats.jump * chillJump;
           p.jumpsLeft -= 1;
           p.grounded = false;
@@ -1740,8 +1843,8 @@
         }
       }
 
-      if (p.input.blockPressed && !tryActive(p)) tryBlock(p);
-      if (p.input.shoot) tryShoot(p);
+      if (p.input.blockPressed && !stunned && !tryActive(p)) tryBlock(p);
+      if (p.input.shoot && !stunned) tryShoot(p);
 
       p.vy += levelGravity() * dt;
       // hugging a wall slows the fall, giving you time to line up the next kick
@@ -1769,6 +1872,25 @@
 
       collidePlayer(p, plats);
       collidePlayerSlabs(p, dt);
+
+      // Springload: landing on a head is an attack and a launchpad
+      if (p.stats.stomp && p.vy > 160 && p.stompGrace <= 0) {
+        for (const q of players) {
+          if (!q.alive || q === p || q.spawnGrace > 0) continue;
+          const dx = q.x - p.x, dy = q.y - p.y;
+          if (Math.abs(dx) < q.stats.radius + p.stats.radius * 0.7 &&
+              dy > 0 && dy < q.stats.radius + p.stats.radius + 10) {
+            hurt(q, 25 * p.stats.stomp, p, dx * 0.4, 120);
+            p.vy = -p.stats.jump * 1.05;
+            p.jumpsLeft = Math.max(p.jumpsLeft, 1);
+            p.stompGrace = 0.5;
+            burst(q.x, q.y - q.stats.radius, "#ffe169", 14, 280);
+            pulse(p, 0.25, 80);
+            sfx("bounce");
+            break;
+          }
+        }
+      }
 
       // bounce pads
       for (const pad of level.bouncePads || []) {
@@ -1899,13 +2021,59 @@
   }
 
   // ----------------------------------------------------------------- combat
+  // The block effects that happen *at a place* — normally where the blocker
+  // stands, but Return to Sender fires them again wherever the empowered
+  // bullet lands. Movement effects (dash, warp) stay on the body and are not
+  // part of this set.
+  function blockEffectsAt(p, x, y) {
+    if (p.stats.blockPush) fields.push({ type: "push", owner: p, x, y, r: 190, life: 0.18, force: 1000 });
+    if (p.stats.stormBlock) {
+      for (const q of players) {
+        if (!q.alive || q === p || q.spawnGrace > 0) continue;
+        const d = Math.hypot(q.x - x, q.y - y);
+        if (d < 260) {
+          boltVisual(x, y, q.x, q.y, "#ffe95e", 0.25);
+          hurt(q, 30, p, q.x - x, q.y - y - 120);
+        }
+      }
+      world.shake = Math.max(world.shake, 8);
+      sfx("chain");
+    }
+    if (p.stats.frostBlock) {
+      for (const q of players) {
+        if (!q.alive || q === p || q.spawnGrace > 0) continue;
+        if (Math.hypot(q.x - x, q.y - y) < 260) {
+          q.chillTimer = Math.max(q.chillTimer, 2.5 * p.stats.frostBlock);
+          burst(q.x, q.y, "#8fd8ff", 12, 220);
+        }
+      }
+      burst(x, y, "#8fd8ff", 18, 280);
+    }
+    if (p.stats.healField) {
+      fields.push({
+        type: "heal", owner: p, x, y,
+        r: 130 + (p.stats.healField - 1) * 40, life: 3,
+        hps: 10 * p.stats.healField
+      });
+      sfx("card");
+    }
+  }
+
   function tryBlock(p) {
-    if (p.blockCooldown > 0) return;
+    if (p.blockCooldown > 0 || p.silenceTimer > 0) return;
     p.blockTimer = p.stats.blockDuration;
     p.blockCooldown = p.stats.blockCooldown;
     pulse(p, 0.32, 95);
     sfx("block");
     burst(p.x, p.y, "#ffffff", 14, 240);
+    // Body Double: the decoy stands where you blocked — before a warp moves you
+    if (p.stats.decoy) {
+      decoys.push({
+        x: p.x, y: p.y, hp: 20 * p.stats.decoy, maxHp: 20 * p.stats.decoy,
+        owner: p, character: p.character, color: p.color, life: 6, wobble: Math.random() * 6,
+        isDecoy: true
+      });
+    }
     if (p.stats.warpBlock) {
       burst(p.x, p.y, p.color, 18, 300);
       p.x = clamp(p.x + p.aimX * 260, p.stats.radius, world.width - p.stats.radius);
@@ -1917,24 +2085,47 @@
       p.vx += p.aimX * 720;
       p.vy += p.aimY * 520;
     }
-    if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 190, life: 0.18, force: 1000 });
-    if (p.stats.stormBlock) {
-      for (const q of players) {
-        if (!q.alive || q === p || q.spawnGrace > 0) continue;
-        const d = Math.hypot(q.x - p.x, q.y - p.y);
-        if (d < 260) {
-          boltVisual(p.x, p.y, q.x, q.y, "#ffe95e", 0.25);
-          hurt(q, 30, p, q.x - p.x, q.y - p.y - 120);
-        }
-      }
-      world.shake = Math.max(world.shake, 8);
-      sfx("chain");
+    if (p.stats.blockReload) {
+      p.ammo = p.stats.maxAmmo;
+      p.reloadTimer = 0;
+      puff(p.x, p.y, "#ffe169", 10);
     }
+    if (p.stats.sawBlock) {
+      fields.push({
+        type: "saw", owner: p, x: p.x, y: p.y,
+        r: 64 + p.stats.sawBlock * 8, life: 2, angle: Math.random() * 6.3,
+        dmg: 9 + p.stats.sawBlock * 3
+      });
+    }
+    // Bricklayer: conjure a loose slab in front of you; it drops into the
+    // arena's rigid-body pool and lives by the same physics as a cut platform
+    if (p.stats.brickBlock) {
+      const mine = props.slabs.filter(s => !s.dead && s.brickOwner === p).length;
+      if (mine < 1 + p.stats.brickBlock) {
+        const bx = clamp(p.x + p.aimX * 150, 90, world.width - 90);
+        const by = clamp(p.y + p.aimY * 110 - 30, 60, world.height - 80);
+        const w = 140, h = 22;
+        props.slabs.push({
+          x: bx, y: by, w, h, ice: false,
+          angle: clamp(Math.atan2(p.aimY, p.aimX) * 0.25, -0.5, 0.5),
+          vx: 0, vy: -40, va: 0,
+          I: (w * w + h * h) / 12,
+          rest: 0, thudCd: 0, dead: false, brickOwner: p
+        });
+        burst(bx, by, "#d8c8a8", 16, 240);
+        sfx("bounce");
+      }
+    }
+    if (p.stats.empowerBlock) {
+      p.empowerShot = p.stats.empowerBlock;
+      puff(p.x, p.y - p.stats.radius, "#ffd700", 8);
+    }
+    blockEffectsAt(p, p.x, p.y);
     if (p.stats.echoBlock) p.echoTimer = 0.19;
   }
 
   function tryActive(p) {
-    if (!p.stats.active || p.activeCooldown > 0) return false;
+    if (!p.stats.active || p.activeCooldown > 0 || p.silenceTimer > 0) return false;
     p.activeCooldown = p.stats.activeCooldown;
     pulse(p, 0.75, 170);
     sfx("mythic");
@@ -1978,25 +2169,34 @@
     return true;
   }
 
-  function tryShoot(p) {
-    if (p.fireTimer > 0 || p.reloadTimer > 0 || p.ammo <= 0) return;
-    p.fireTimer = p.stats.fireDelay;
-    const golden = p.stats.goldenShot && p.ammo === p.stats.maxAmmo;
-    p.ammo -= 1;
-    sfx(golden ? "golden" : "shoot");
+  // Underdog: every round you trail the current leader makes you scrappier
+  function underdogMul(p) {
+    if (!p.stats.underdog) return 1;
+    const lead = Math.max(0, ...players.filter(q => q !== p).map(q => q.score)) - p.score;
+    return 1 + p.stats.underdog * Math.max(0, lead);
+  }
+
+  // One trigger pull's worth of pellets. Triple Tap echoes and Encore ghosts
+  // re-fire this with a damage multiplier (and, for Encore, the recorded aim),
+  // so every card a bullet carries rides along on the repeats too.
+  function fireVolley(p, opts = {}) {
+    const golden = opts.golden || false;
+    const mul = (opts.mul ?? 1) * underdogMul(p);
+    const baseAngle = opts.angle ?? Math.atan2(p.aimY, p.aimX);
+    const empower = opts.empower || 0;
     const rageMul = p.stats.rage > 0 ? 1 + p.stats.rage * (1 - clamp(p.hp / p.stats.maxHp, 0, 1)) : 1;
-    const baseAngle = Math.atan2(p.aimY, p.aimX);
     const pellets = p.stats.pellets;
     // Rigged characters fire from the actual barrel tip; everyone else keeps
     // the old fixed offset along the aim.
     const muz = window.ROUNDERS.rig
       ? window.ROUNDERS.rig.muzzle(p.character, p.stats.radius, p.aimX, p.aimY, 0, p.facing || 0)
       : null;
+    let newest = null;
     for (let i = 0; i < pellets; i += 1) {
       const spread = (i - (pellets - 1) / 2) * p.stats.spread + rand(-0.018, 0.018);
       const a = baseAngle + spread;
       const speed = p.stats.bulletSpeed * rand(0.94, 1.05);
-      bullets.push({
+      const b = {
         owner: p,
         x: p.x + (muz ? muz.x : Math.cos(a) * 34),
         y: p.y + (muz ? muz.y : Math.sin(a) * 34),
@@ -2004,10 +2204,14 @@
         vx: Math.cos(a) * speed + p.vx * 0.18,
         vy: Math.sin(a) * speed + p.vy * 0.08,
         r: (5.5 + Math.min(9, p.stats.damage / 22)) * p.stats.bulletSize,
-        damage: p.stats.damage * rageMul * (golden ? (pellets > 1 ? 2 : 3) : 1),
+        damage: p.stats.damage * rageMul * mul
+          * (golden ? (pellets > 1 ? 2 : 3) : 1)
+          * (empower ? 1 + 0.75 * empower : 1),
         life: 3.2,
         // seekers fly true: homing shots shrug off most of their drop
-        gravity: p.stats.bulletGravity * (p.stats.homing > 0 ? 0.4 : 1),
+        gravity: p.stats.helium
+          ? -p.stats.bulletGravity * (0.35 + 0.15 * (p.stats.helium - 1))
+          : p.stats.bulletGravity * (p.stats.homing > 0 ? 0.4 : 1),
         drag: p.stats.bulletDrag,
         restitution: p.stats.bulletRestitution,
         bounces: p.stats.bounces + (currentLevel().bulletBounceBonus || 0),
@@ -2022,16 +2226,60 @@
         grow: p.stats.grow,
         groundHug: p.stats.groundHug,
         voidPull: p.stats.voidPull,
+        bankShot: p.stats.bankShot,
+        stink: p.stats.stink,
+        dazzle: p.stats.dazzle,
+        silence: p.stats.silence,
+        boomerang: p.stats.boomerang,
+        steer: p.stats.steer,
+        empowered: empower,
         golden,
         isShard: false,
+        ghost: opts.ghost || false,
         hitIds: new Set(),
-        color: golden ? "#ffd700" : p.color
-      });
+        color: golden ? "#ffd700" : empower ? "#ffd700" : p.color
+      };
+      bullets.push(b);
+      newest = b;
     }
-    p.vx -= Math.cos(baseAngle) * 70;
-    p.vy -= Math.sin(baseAngle) * 20;
+    // Puppet Strings drives only the newest bullet — the one you just fired
+    if (p.stats.steer && newest) p.steeredBullet = newest;
+    p.vx -= Math.cos(baseAngle) * 70 * mul;
+    p.vy -= Math.sin(baseAngle) * 20 * mul;
     pulse(p, 0.18, 45);
-    if (p.ammo <= 0) p.reloadTimer = p.stats.reload;
+  }
+
+  function tryShoot(p) {
+    if (p.fireTimer > 0 || p.reloadTimer > 0 || p.ammo <= 0) return;
+    p.fireTimer = p.stats.fireDelay;
+    const golden = p.stats.goldenShot && p.ammo === p.stats.maxAmmo;
+    p.ammo -= 1;
+    if (p.stats.bloodMoney) {
+      // the pact never finishes you off, but it always collects
+      p.hp = Math.max(1, p.hp - 5 * p.stats.bloodMoney);
+      p.hitFlash = Math.max(p.hitFlash || 0, 0.12);
+      puffOne(p.x + rand(-10, 10), p.y + rand(-10, 10), "#ff4d5f");
+    }
+    sfx(golden ? "golden" : "shoot");
+    const empower = p.empowerShot;
+    p.empowerShot = 0;
+    const angle = Math.atan2(p.aimY, p.aimX);
+    fireVolley(p, { golden, empower, angle });
+    // Triple Tap: the echoes follow on their own, aimed wherever you are then
+    if (p.stats.burstFire) {
+      for (let i = 1; i <= p.stats.burstFire; i += 1) {
+        p.burstQueue.push({ t: i * 0.09, mul: 0.45 });
+      }
+    }
+    // Encore: one ghost of this shot per stack, a beat apart
+    for (let i = 1; i <= p.stats.encore; i += 1) {
+      p.encoreQueue.push({ t: 0.8 * i, angle, mul: 0.5 });
+    }
+    if (p.ammo <= 0) {
+      p.reloadTimer = p.stats.reload;
+      // Panic Button: the empty click doubles as the block button
+      if (p.stats.autoBlock) tryBlock(p);
+    }
   }
 
   function updateBullets(dt) {
@@ -2039,7 +2287,60 @@
     const plats = activePlatforms(level, world.time);
     const wind = windForce();
     for (const b of bullets) {
-      if (b.homing) {
+      // Boomerang, coming home: fly to the owner's hand, through everything
+      if (b.returning) {
+        const o = b.owner;
+        if (!o || !o.alive) { b.life = -1; continue; }
+        const cur = Math.atan2(b.vy, b.vx);
+        const want = Math.atan2(o.y - b.y, o.x - b.x);
+        let diff = want - cur;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const a = cur + clamp(diff, -9 * dt, 9 * dt);
+        const sp = Math.max(700, Math.hypot(b.vx, b.vy));
+        b.vx = Math.cos(a) * sp;
+        b.vy = Math.sin(a) * sp;
+        b.prevX = b.x; b.prevY = b.y;
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.life -= dt;
+        if (Math.random() < dt * 30) puffOne(b.x, b.y, b.color);
+        if (Math.hypot(o.x - b.x, o.y - b.y) < o.stats.radius + b.r + 6) {
+          o.ammo = Math.min(o.stats.maxAmmo, o.ammo + 1);
+          if (o.reloadTimer > 0 && o.ammo > 0) o.reloadTimer = 0;
+          puff(o.x, o.y, "#ffe169", 8);
+          sfx("card");
+          b.life = -1;
+          continue;
+        }
+        // it can still clip an enemy on the way back
+        for (const p of players) {
+          if (!p.alive || p === b.owner || p.spawnGrace > 0 || b.hitIds.has(p.id)) continue;
+          if (Math.hypot(p.x - b.x, p.y - b.y) < p.stats.radius + b.r) {
+            hurt(p, b.damage * 0.8, b.owner, b.vx, b.vy);
+            b.hitIds.add(p.id);
+            b.life = -1;
+            break;
+          }
+        }
+        continue;
+      }
+      // Puppet Strings: the newest bullet chases the owner's aim ray, so the
+      // shooter walks it around cover by moving the stick
+      if (b.steer && b.owner && b.owner.alive && b.owner.steeredBullet === b) {
+        const o = b.owner;
+        const cur = Math.atan2(b.vy, b.vx);
+        const want = Math.atan2(o.aimY, o.aimX);
+        let diff = want - cur;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const maxTurn = Math.min(b.steer * 3.4, 7.5) * dt;
+        const a = cur + clamp(diff, -maxTurn, maxTurn);
+        const sp = Math.hypot(b.vx, b.vy);
+        b.vx = Math.cos(a) * sp;
+        b.vy = Math.sin(a) * sp;
+        if (Math.random() < dt * 24) puffOne(b.x, b.y, "#ffffff");
+      } else if (b.homing) {
         // Steering, not a nudge: rotate the whole velocity toward the target
         // at a turn rate set by the homing stat, keeping speed — so one card
         // visibly curves shots and two make heat-seekers. (The old version
@@ -2052,6 +2353,24 @@
           while (diff > Math.PI) diff -= Math.PI * 2;
           while (diff < -Math.PI) diff += Math.PI * 2;
           const maxTurn = Math.min(b.homing * 2.7, 6.5) * dt;
+          const a = cur + clamp(diff, -maxTurn, maxTurn);
+          const sp = Math.hypot(b.vx, b.vy);
+          b.vx = Math.cos(a) * sp;
+          b.vy = Math.sin(a) * sp;
+        }
+      }
+      // Magnet Suit: wearers gently bend incoming bullets off course
+      for (const q of players) {
+        if (!q.alive || q === b.owner || !q.stats.repel) continue;
+        const dx = b.x - q.x, dy = b.y - q.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 1 && d < 280) {
+          const cur = Math.atan2(b.vy, b.vx);
+          const away = Math.atan2(dy, dx);
+          let diff = away - cur;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          const maxTurn = Math.min(q.stats.repel * 1.1, 2.6) * (1 - d / 280) * dt;
           const a = cur + clamp(diff, -maxTurn, maxTurn);
           const sp = Math.hypot(b.vx, b.vy);
           b.vx = Math.cos(a) * sp;
@@ -2097,6 +2416,7 @@
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.life -= dt;
+      if (b.life <= 0 && tryBoomerang(b)) continue;
       particles.push({
         x: b.x, y: b.y, vx: rand(-16, 16), vy: rand(-16, 16),
         life: 0.16, maxLife: 0.16, r: b.golden ? 3 : 2,
@@ -2124,7 +2444,7 @@
               bounceBullet(b, platform);
               b.bounces -= 1;
               sfx("block");
-            } else {
+            } else if (!tryBoomerang(b)) {
               b.life = -1;
               explodeBullet(b);
             }
@@ -2132,10 +2452,21 @@
             bounceBullet(b, platform);
             b.bounces -= 1;
             sfx("block");
-          } else {
+          } else if (!tryBoomerang(b)) {
             b.life = -1;
             explodeBullet(b);
           }
+        }
+      }
+
+      // Body Doubles soak bullets like a body would
+      for (const dcy of decoys) {
+        if (b.life <= 0 || dcy.hp <= 0 || dcy.owner === b.owner) continue;
+        if (Math.hypot(dcy.x - b.x, dcy.y - b.y) < 26 + b.r) {
+          dcy.hp -= b.damage;
+          puff(dcy.x, dcy.y, dcy.color, 8);
+          if (b.pierce > 0) b.pierce -= 1;
+          else { b.life = -1; explodeBullet(b); }
         }
       }
 
@@ -2161,7 +2492,38 @@
             const damage = b.damage * growBonus;
             hurt(p, damage, b.owner, b.vx, b.vy);
             if (b.owner && b.owner.alive && b.owner.stats.lifesteal) {
-              b.owner.hp = Math.min(b.owner.stats.maxHp, b.owner.hp + damage * b.owner.stats.lifesteal);
+              healPlayer(b.owner, damage * b.owner.stats.lifesteal);
+            }
+            if (b.owner && b.owner.alive) {
+              const o = b.owner;
+              // Waste Not: the hit hands the bullet back
+              if (o.stats.scavenge) {
+                if (o.reloadTimer > 0) o.reloadTimer = Math.max(0, o.reloadTimer - 0.4 * o.stats.scavenge);
+                else o.ammo = Math.min(o.stats.maxAmmo, o.ammo + 1);
+              }
+              // Sugar Rush / Hot Streak / Second Serve: landing a hit pays out
+              if (o.stats.sugarRush) o.sugarTimer = 2.5;
+              if (o.stats.hotStreak) o.hotShield = 25 * o.stats.hotStreak;
+              if (o.stats.blockRefresh && o.refreshLock <= 0) {
+                o.blockCooldown = 0;
+                o.refreshLock = 1;
+                puffOne(o.x, o.y - o.stats.radius - 8, "#ffffff");
+              }
+            }
+            if (b.dazzle && p.dazzleImmune <= 0) {
+              p.stunTimer = Math.max(p.stunTimer, Math.min(0.7, 0.4 * b.dazzle));
+              p.dazzleImmune = 2;
+              burst(p.x, p.y - p.stats.radius - 6, "#ffffff", 10, 160);
+            }
+            if (b.silence) {
+              p.silenceTimer = Math.max(p.silenceTimer, 1.5 * b.silence);
+              puff(p.x, p.y - p.stats.radius - 6, "#b8b8c8", 6);
+            }
+            // Return to Sender: the empowered shot carries its owner's block
+            // effects to wherever it lands
+            if (b.empowered && b.owner && b.owner.alive) {
+              blockEffectsAt(b.owner, p.x, p.y);
+              b.empowered = 0;
             }
             if (b.poison) {
               p.poisonTimer = Math.max(p.poisonTimer, 3);
@@ -2199,7 +2561,17 @@
       const d = Math.hypot(q.x - victim.x, q.y - victim.y);
       if (d < bestD && d < 520) { bestD = d; best = q; }
     }
-    if (best) {
+    for (const dcy of decoys) {
+      if (dcy.hp <= 0 || dcy.owner === b.owner) continue;
+      const d = Math.hypot(dcy.x - victim.x, dcy.y - victim.y);
+      if (d < bestD && d < 520) { bestD = d; best = dcy; }
+    }
+    if (best && best.isDecoy) {
+      boltVisual(victim.x, victim.y, best.x, best.y, "#ffe95e", 0.22);
+      best.hp -= damage * 0.55 * b.chain;
+      puff(best.x, best.y, best.color, 8);
+      sfx("chain");
+    } else if (best) {
       boltVisual(victim.x, victim.y, best.x, best.y, "#ffe95e", 0.22);
       hurt(best, damage * 0.55 * b.chain, b.owner, best.x - victim.x, best.y - victim.y);
       sfx("chain");
@@ -2212,6 +2584,19 @@
   }
 
   function explodeBullet(b) {
+    // Stink Bomb: the impact lingers as a poisonous, slowing cloud
+    if (b.stink) {
+      fields.push({
+        type: "stink", owner: b.owner, x: b.x, y: b.y,
+        r: 110 + b.stink * 30, life: 2.5, stink: b.stink
+      });
+    }
+    // Return to Sender: an empowered shot that breaks on terrain still
+    // delivers the block payload where it lands
+    if (b.empowered && b.owner && b.owner.alive) {
+      blockEffectsAt(b.owner, b.x, b.y);
+      b.empowered = 0;
+    }
     if (b.voidPull) {
       // a pocket vortex: brief, hungry, and very visible
       fields.push({
@@ -2304,6 +2689,24 @@
     b.hitIds = new Set(); // a fresh bounce can hit the same target again
     b.vx += rand(-18, 18);
     b.vy += rand(-18, 18);
+    // Bank Shot: every cushion makes the ball smarter and meaner
+    if (b.bankShot) {
+      b.homing = Math.max(b.homing, 0.9 * b.bankShot);
+      b.damage *= 1 + 0.3 * b.bankShot;
+      puff(b.x, b.y, "#ffe169", 5);
+    }
+  }
+
+  // Boomerang: a shot that dies without touching anyone turns for home instead
+  function tryBoomerang(b) {
+    if (!b.boomerang || b.returning || b.isShard || b.meteor || b.hitIds.size > 0) return false;
+    if (!b.owner || !b.owner.alive) return false;
+    b.returning = true;
+    b.life = 2.4;
+    b.gravity = 0;
+    b.hugging = false;
+    sfx("bounce");
+    return true;
   }
 
   function updateFields(dt) {
@@ -2311,6 +2714,50 @@
       f.life -= dt;
       if (f.type === "lightning-warn") {
         if (f.life <= 0) resolveLightningStrike(f.x);
+        continue;
+      }
+      // Lemonade Stand: a stationary fizz that heals anyone inside, owner too
+      if (f.type === "heal") {
+        for (const p of players) {
+          if (!p.alive) continue;
+          if (Math.hypot(p.x - f.x, p.y - f.y) < f.r) {
+            healPlayer(p, f.hps * dt);
+            if (Math.random() < dt * 8) puffOne(p.x + rand(-12, 12), p.y - rand(0, 20), "#c8ff6e");
+          }
+        }
+        continue;
+      }
+      // Stink Bomb: a cloud that keeps poisoning and slowing whoever stands in it
+      if (f.type === "stink") {
+        for (const p of players) {
+          if (!p.alive || p === f.owner || p.spawnGrace > 0) continue;
+          if (Math.hypot(p.x - f.x, p.y - f.y) < f.r) {
+            p.poisonTimer = Math.max(p.poisonTimer, 0.8);
+            p.poisonDps = Math.max(p.poisonDps, 8 * f.stink);
+            p.poisonAttacker = f.owner;
+            p.chillTimer = Math.max(p.chillTimer, 0.5);
+          }
+        }
+        continue;
+      }
+      // Mosh Pit: the blade rides an orbit around its owner
+      if (f.type === "saw") {
+        const o = f.owner;
+        if (!o || !o.alive) { f.life = -1; continue; }
+        f.angle += dt * 7;
+        f.x = o.x + Math.cos(f.angle) * f.r;
+        f.y = o.y + Math.sin(f.angle) * f.r;
+        for (const p of players) {
+          if (!p.alive || p === o || p.spawnGrace > 0 || p.sawGrace > 0) continue;
+          if (Math.hypot(p.x - f.x, p.y - f.y) < p.stats.radius + 18) {
+            hurt(p, f.dmg, o, p.x - o.x, p.y - o.y - 60);
+            p.sawGrace = 0.35;
+          }
+        }
+        for (const dcy of decoys) {
+          if (dcy.hp <= 0 || dcy.owner === o) continue;
+          if (Math.hypot(dcy.x - f.x, dcy.y - f.y) < 26 + 18) dcy.hp -= f.dmg * dt * 8;
+        }
         continue;
       }
       for (const p of players) {
@@ -2337,6 +2784,21 @@
 
   // -------------------------------------------------------------- water
   // Is this point under water — the level's tide, or inside a water hazard?
+  // Body Doubles: they just stand there, convincingly, until they pop
+  function updateDecoys(dt) {
+    for (const dcy of decoys) {
+      dcy.life -= dt;
+      dcy.wobble += dt;
+      if ((dcy.hp <= 0 || dcy.life <= 0) && !dcy.popped) {
+        dcy.popped = true;
+        burst(dcy.x, dcy.y, dcy.color, 26, 380);
+        puff(dcy.x, dcy.y, "#ffffff", 10);
+        sfx("hit");
+      }
+    }
+    decoys = decoys.filter(dcy => !dcy.popped);
+  }
+
   function inWater(x, y, level = currentLevel()) {
     if (level.tide && y > world.tideLevel + 10) return true;
     if (!settings.hazards) return false;
@@ -2416,10 +2878,25 @@
     burst(p.x, world.height + 10, currentLevel().palette.accent || "#ffffff", 22, 460);
   }
 
+  // Healing funnels through here so Overflow can bank the excess as shield
+  function healPlayer(p, amount) {
+    if (!p.alive || amount <= 0) return;
+    const toHp = Math.min(p.stats.maxHp - p.hp, amount);
+    p.hp += toHp;
+    const extra = amount - toHp;
+    if (extra > 0 && p.stats.overflow) {
+      const was = p.overShield;
+      p.overShield = Math.min(p.stats.overflow, p.overShield + extra);
+      if (p.overShield > was && Math.random() < 0.3) puffOne(p.x, p.y - p.stats.radius, "#7fd8ff");
+    }
+  }
+
   function hurt(p, amount, attacker, kx, ky) {
     if (!p.alive || p.blockTimer > 0 || p.spawnGrace > 0) return;
     const mag = Math.hypot(kx, ky) || 1;
-    const kb = 1 - clamp(p.stats.kbResist, 0, 0.9);
+    const kb = (1 - clamp(p.stats.kbResist, 0, 0.9))
+      // Boxing Glove: the attacker's gloves add shove on top of the damage
+      * (attacker && attacker.stats ? 1 + attacker.stats.kbDeal : 1);
     p.vx += (kx / mag) * Math.min(620, amount * 16) * kb;
     p.vy += ((ky / mag) * Math.min(320, amount * 8) - Math.min(220, amount * 2)) * kb;
     if (amount > 4) {
@@ -2441,7 +2918,7 @@
     applyDamage(p, amount, attacker);
   }
 
-  function applyDamage(p, amount, attacker) {
+  function applyDamage(p, amount, attacker, fromDecay = false) {
     p.hitFlash = Math.max(p.hitFlash || 0, amount >= 8 ? 0.2 : 0.16);
     // a regenerating shield soaks damage before health (world-kill bypasses)
     if (p.stats.shield > 0 && amount < 500) {
@@ -2457,6 +2934,36 @@
         }
         if (amount <= 0) return;
       }
+    }
+    // Hot Streak / Overflow temp shields soak next (world-kill bypasses)
+    if (amount < 500 && p.hotShield > 0) {
+      const soaked = Math.min(p.hotShield, amount);
+      p.hotShield -= soaked;
+      amount -= soaked;
+      p.shieldFlash = 0.25;
+      if (amount <= 0) return;
+    }
+    if (amount < 500 && p.overShield > 0) {
+      const soaked = Math.min(p.overShield, amount);
+      p.overShield -= soaked;
+      amount -= soaked;
+      p.shieldFlash = 0.25;
+      if (amount <= 0) return;
+    }
+    // Fresh Coat: the overcoat eats the first hit, then the rest shatters
+    if (amount < 500 && p.freshPool > 0) {
+      const soaked = Math.min(p.freshPool, amount);
+      amount -= soaked;
+      p.freshPool = 0;
+      burst(p.x, p.y, "#ffffff", 22, 320);
+      sfx("block");
+      if (amount <= 0) return;
+    }
+    // Payment Plan: real damage is banked and paid off over the next seconds
+    if (!fromDecay && p.stats.decay && amount < 500 && amount > 0) {
+      p.decayPool += amount;
+      p.decayAttacker = attacker || p.decayAttacker;
+      return;
     }
     const lethal = p.hp - amount <= 0;
     if (lethal && p.guardianCharges > 0 && amount < 500) {
@@ -2510,6 +3017,12 @@
       if (!p.alive || p === b.owner || b.hitIds.has(p.id)) continue;
       const d = Math.hypot(p.x - b.x, p.y - b.y);
       if (d < bestD && d < 900) { bestD = d; best = p; }
+    }
+    // Body Doubles read as bodies to anything that seeks — that's their job
+    for (const dcy of decoys) {
+      if (dcy.hp <= 0 || dcy.owner === b.owner) continue;
+      const d = Math.hypot(dcy.x - b.x, dcy.y - b.y);
+      if (d < bestD && d < 900) { bestD = d; best = dcy; }
     }
     return best;
   }
@@ -2937,6 +3450,7 @@
       drawArenaFeatures(level);
       drawPlatforms(level);
       drawFields();
+      drawDecoys();
       drawBullets();
       drawPlayersAll();
       drawTide(level);
@@ -3691,6 +4205,15 @@
       ctx.roundRect(x + 2.5, y + 2, Math.max(1, (w - 5) * frac), 1.6, 1);
       ctx.fill();
     }
+    // temp armor (Hot Streak, Overflow, Fresh Coat) rides as a gold sliver
+    const temp = (p.hotShield || 0) + (p.overShield || 0) + (p.freshPool || 0);
+    if (temp > 0) {
+      const tf = clamp(temp / p.stats.maxHp, 0, 1);
+      ctx.fillStyle = "#ffd76e";
+      ctx.beginPath();
+      ctx.roundRect(x + 1, y - (p.stats.shield > 0 ? 9.5 : 5) + 0.6, Math.max(2, (w - 2) * tf), 2.4, 1.4);
+      ctx.fill();
+    }
     // shield charge rides as a thin cyan sliver above the health bar
     if (p.stats.shield > 0) {
       const sf = clamp(p.shield / p.stats.shield, 0, 1);
@@ -3749,8 +4272,14 @@
     const t = world.time;
     for (const b of bullets) {
       ctx.save();
-      if (b.golden) { ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 16; }
+      if (b.golden || b.empowered) { ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 16; }
       if (b.meteor) { ctx.shadowColor = "#ff9e3d"; ctx.shadowBlur = 20; }
+      // helium shots trail tiny rising bubbles; a returning boomerang glints
+      if (b.gravity < 0 && Math.random() < 0.25) {
+        particles.push({ x: b.x + rand(-4, 4), y: b.y + 4, vx: rand(-8, 8), vy: rand(-60, -30),
+          life: 0.35, maxLife: 0.35, r: rand(1.2, 2.4), color: "#cfe8ff" });
+      }
+      if (b.returning) { ctx.shadowColor = b.color; ctx.shadowBlur = 12; }
       if (b.explosive) { ctx.shadowColor = "#ff7a3d"; ctx.shadowBlur = 10 + Math.sin(t * 18) * 5; }
       // grown bullets read bigger the farther they've flown
       const growF = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 1300) : 1;
@@ -3859,6 +4388,73 @@
           ctx.stroke();
         }
         ctx.restore();
+      } else if (f.type === "heal") {
+        const a = clamp(f.life / 3, 0.15, 1);
+        ctx.save();
+        const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+        g.addColorStop(0, `rgba(200,255,110,${0.16 * a})`);
+        g.addColorStop(1, "rgba(200,255,110,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(200,255,110,${0.5 * a})`;
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([10, 8]);
+        ctx.lineDashOffset = -world.time * 40;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+        ctx.stroke();
+        // little rising pluses
+        for (let i = 0; i < 3; i += 1) {
+          const t = (world.time * 0.7 + i / 3) % 1;
+          const px = f.x + Math.sin(i * 7.3 + world.time) * f.r * 0.5;
+          const py = f.y + f.r * 0.4 - t * f.r * 0.9;
+          ctx.globalAlpha = (1 - t) * 0.8 * a;
+          ctx.fillStyle = "#c8ff6e";
+          ctx.fillRect(px - 1.5, py - 5, 3, 10);
+          ctx.fillRect(px - 5, py - 1.5, 10, 3);
+        }
+        ctx.restore();
+      } else if (f.type === "stink") {
+        const a = clamp(f.life / 2.5, 0.1, 1);
+        ctx.save();
+        for (let i = 0; i < 5; i += 1) {
+          const wob = Math.sin(world.time * 1.8 + i * 2.4);
+          const px = f.x + Math.cos(i * 1.26 + world.time * 0.4) * f.r * 0.45;
+          const py = f.y + Math.sin(i * 2.1) * f.r * 0.3 - wob * 8;
+          const rr = f.r * (0.34 + 0.1 * wob);
+          const g = ctx.createRadialGradient(px, py, 0, px, py, rr);
+          g.addColorStop(0, `rgba(110,190,60,${0.22 * a})`);
+          g.addColorStop(1, "rgba(80,150,40,0)");
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(px, py, rr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      } else if (f.type === "saw") {
+        ctx.save();
+        ctx.translate(f.x, f.y);
+        ctx.rotate(world.time * 18);
+        ctx.fillStyle = "#c8ccd8";
+        ctx.strokeStyle = "#3a3f4d";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < 10; i += 1) {
+          const a1 = (i / 10) * Math.PI * 2;
+          const a2 = ((i + 0.5) / 10) * Math.PI * 2;
+          ctx.lineTo(Math.cos(a1) * 18, Math.sin(a1) * 18);
+          ctx.lineTo(Math.cos(a2) * 11, Math.sin(a2) * 11);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#3a3f4d";
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       } else {
         const alpha = clamp(f.life / 0.18, 0, 1);
         ctx.strokeStyle = `rgba(255,255,255,${0.3 * alpha})`;
@@ -3867,6 +4463,25 @@
         ctx.arc(f.x, f.y, f.r * (1 - alpha * 0.45), 0, Math.PI * 2);
         ctx.stroke();
       }
+    }
+  }
+
+  // Body Doubles: drawn like the player they copy, with a faint shimmer that
+  // an attentive human can clock but seekers can't
+  function drawDecoys() {
+    for (const dcy of decoys) {
+      ctx.save();
+      ctx.translate(dcy.x, dcy.y + Math.sin(dcy.wobble * 2.2) * 2);
+      ctx.globalAlpha = 0.88;
+      drawCharacter(ctx, dcy.character, 27, { t: world.time + dcy.wobble, aimX: 1, aimY: 0 });
+      // hp pips
+      const frac = clamp(dcy.hp / dcy.maxHp, 0, 1);
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = "rgba(10,8,18,0.7)";
+      ctx.fillRect(-16, -40, 32, 4);
+      ctx.fillStyle = dcy.color;
+      ctx.fillRect(-15, -39, 30 * frac, 2);
+      ctx.restore();
     }
   }
 
@@ -4552,6 +5167,19 @@
       return this;
     };
   }
+
+  // Tiny dev/test hooks: grant a card by id mid-match, peek at the fighters.
+  // Used by the headless smoke tests; harmless in normal play.
+  window.ROUNDERS.debug = {
+    players: () => players,
+    world,
+    grant(index, cardId) {
+      const p = players[index];
+      const c = CARDS.find(x => x.id === cardId);
+      if (p && c) grantCard(p, c);
+      return Boolean(p && c);
+    }
+  };
 
   applyStrings();
   bindUi();

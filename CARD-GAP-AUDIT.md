@@ -308,7 +308,9 @@ and it's the single most build-crafty addition available to us.
 
 ---
 
-*Next steps if approved: implement §4's 12 cards (new stats: `kbDeal`, zone
-entities, empower/steered-bullet flags), add their emblem + scene prompts to
-`image-requests.md`, and run a balance pass against the AUDIT.md baseline math
-(80.5 sustained DPS, 100 HP pool).*
+*Status: **implemented in full** — the 12 §4 cards, the ten second-wave cards,
+and the ten §5 originals all shipped (55 → 87 cards in `js/cards.js`, engine
+mechanics in `game.js`). Art prompts for all 32 are in `image-requests.md` §2;
+the set can be browsed at `/workbench?edit=cards`. Remaining: a balance pass
+against the AUDIT.md baseline math (80.5 sustained DPS, 100 HP pool) once the
+new cards have seen real play.*

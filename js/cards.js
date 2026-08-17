@@ -1,8 +1,13 @@
-// Rounders — card set (55 cards, designed from scratch).
+// Rounders — card set (87 cards, designed from scratch).
 // Cards mutate player.stats via apply(). The engine implements every mechanic
 // referenced here (burn, chill, pierce, chain, shards, thorns, regen, rage,
 // adrenaline, guardian, goldenShot, killHeal, stormBlock, warpBlock, shield,
-// groundHug, voidPull, actives).
+// groundHug, voidPull, actives — and the gap-audit wave: scavenge, blockReload,
+// healField, frostBlock, sawBlock, empowerBlock, autoBlock, steer, bankShot,
+// stink, sugarRush, kbDeal, decay, freshCoat, hotStreak, bloodMoney, dazzle,
+// silence, reloadPulse, burstFire, chillAura, blockRefresh, brickBlock,
+// overflow, helium, boomerang, decoy, stomp, encore, underdog, jumpBlast,
+// repel; see CARD-GAP-AUDIT.md).
 //
 // STACKING RULE: every numeric effect uses += or *= so drafting a card twice
 // compounds it (two Big Bores = fatter still; two Magnet Fingers = a true
@@ -26,7 +31,7 @@
   }
 
   const CARDS = [
-    // ------------------------------------------------------------- COMMON (14)
+    // ------------------------------------------------------------- COMMON (16)
     card("bubblegum-rounds", "Bubblegum Rounds", "common",
       "Chews through magazines.",
       "Carry 2 extra bullets per magazine, but each one hits a little softer.",
@@ -111,7 +116,19 @@
       ["+18% damage", "+25% bullet size", "−12% bullet speed"], ["damage"],
       p => { p.stats.damage *= 1.18; p.stats.bulletSize *= 1.25; p.stats.bulletSpeed *= 0.88; }),
 
-    // ---------------------------------------------------------- UNCOMMON (13)
+    card("boxing-glove", "Boxing Glove", "common",
+      "Float like a truck.",
+      "Your shots hit like a haymaker — massively more knockback, slightly bigger, slightly softer.",
+      ["+120% knockback dealt", "+10% bullet size", "−10% damage"], ["control"],
+      p => { p.stats.kbDeal += 1.2; p.stats.bulletSize *= 1.1; p.stats.damage *= 0.9; }),
+
+    card("sugar-rush", "Sugar Rush", "common",
+      "Hits taste like candy.",
+      "Landing a hit makes you giddy: +35% move speed for 2.5 seconds.",
+      ["+35% speed for 2.5s after a hit"], ["movement"],
+      p => { p.stats.sugarRush += 0.35; }),
+
+    // ---------------------------------------------------------- UNCOMMON (24)
     card("ricochet-romance", "Ricochet Romance", "uncommon",
       "Every wall is a matchmaker.",
       "Your bullets bounce off walls and floors up to 2 times before breaking.",
@@ -190,7 +207,73 @@
       ["+40% speed when under 35% HP"], ["movement", "clutch"],
       p => { p.stats.adrenaline += 0.4; }),
 
-    // -------------------------------------------------------------- RARE (11)
+    card("waste-not", "Waste Not", "uncommon",
+      "Every bullet comes home.",
+      "Bullets that hit a player are refunded to your magazine. Shots come a touch slower.",
+      ["hits refund ammo", "+0.15s fire delay"], ["ammo"],
+      p => { if (p.stats.scavenge) p.stats.reload *= 0.8; p.stats.scavenge += 1; p.stats.fireDelay += 0.15; }),
+
+    card("pit-stop", "Pit Stop", "uncommon",
+      "Four seconds flat.",
+      "Blocking instantly refills your magazine.",
+      ["block = full reload", "+0.25s block cooldown"], ["block", "ammo"],
+      p => { p.stats.blockReload += 1; p.stats.blockCooldown += 0.25; }),
+
+    card("cold-snap", "Cold Snap", "uncommon",
+      "Everyone out of the pool.",
+      "Blocking flash-freezes the air, chilling everyone nearby for 2.5 seconds.",
+      ["block chills nearby (2.5s)", "+10% health"], ["block", "control"],
+      p => { p.stats.frostBlock += 1; p.stats.maxHp *= 1.1; }),
+
+    card("panic-button", "Panic Button", "uncommon",
+      "Insurance you fire.",
+      "Firing the last bullet in your magazine automatically triggers your block — and everything attached to it.",
+      ["last bullet auto-blocks", "+0.3s reload"], ["block", "clutch"],
+      p => { p.stats.autoBlock += 1; p.stats.reload += 0.3; }),
+
+    card("coffee-break", "Coffee Break", "uncommon",
+      "Do not talk to me yet.",
+      "While reloading you emit scalding pulses that damage and push nearby enemies.",
+      ["damaging pulses while reloading"], ["aoe"],
+      p => { p.stats.reloadPulse += 1; }),
+
+    card("triple-tap", "Triple Tap", "uncommon",
+      "Once more, with feeling. Twice.",
+      "Every trigger pull is followed by two lighter echo shots in a tight burst.",
+      ["+2 burst echoes (45% damage)", "+0.1s fire delay"], ["firerate"],
+      p => { p.stats.burstFire += 2; p.stats.fireDelay += 0.1; }),
+
+    card("hot-streak", "Hot Streak", "uncommon",
+      "Ride the wave.",
+      "Dealing bullet damage armors you with a 25-point shield that fades fast.",
+      ["hits grant a decaying 25 shield"], ["defense"],
+      p => { p.stats.hotStreak += 1; }),
+
+    card("helium-rounds", "Helium Rounds", "uncommon",
+      "Gravity is a social construct.",
+      "Your bullets fall up — gently. Lob shots under ledges and up through gaps.",
+      ["bullets arc upward"], ["projectile"],
+      p => { p.stats.helium += 1; }),
+
+    card("springload", "Springload", "uncommon",
+      "The classic.",
+      "Landing on an opponent's head deals 25 damage and bounces you high.",
+      ["head stomp: 25 damage + bounce"], ["movement"],
+      p => { p.stats.stomp += 1; }),
+
+    card("underdog", "Underdog", "uncommon",
+      "Nothing left to lose.",
+      "For every round you trail the leader, hit 8% harder and move 8% faster.",
+      ["+8% damage & speed per round behind"], ["clutch"],
+      p => { p.stats.underdog += 0.08; }),
+
+    card("firecracker-heels", "Firecracker Heels", "uncommon",
+      "Ignition on the second hop.",
+      "Your mid-air jumps detonate a small blast beneath you that damages and shoves enemies.",
+      ["air jumps explode (15 dmg)"], ["movement", "aoe"],
+      p => { p.stats.jumpBlast += 1; }),
+
+    // -------------------------------------------------------------- RARE (26)
     card("drill-rounds", "Drill Rounds", "rare",
       "Through, not around.",
       "Bullets punch straight through the first player they hit and keep flying.",
@@ -257,7 +340,97 @@
       ["−40% fire delay", "+2 ammo", "+10% speed", "−20% damage"], ["firerate"],
       p => { p.stats.fireDelay *= 0.6; p.stats.maxAmmo += 2; p.stats.speed *= 1.1; p.stats.damage *= 0.8; }),
 
-    // -------------------------------------------------------------- EPIC (9)
+    card("lemonade-stand", "Lemonade Stand", "rare",
+      "Fresh squeezed. Slightly radioactive.",
+      "Blocking plants a fizzy zone that heals anyone inside 10 HP a second for 3 seconds — stand in your own.",
+      ["block plants a heal zone (10 HP/s)"], ["block", "sustain"],
+      p => { p.stats.healField += 1; }),
+
+    card("mosh-pit", "Mosh Pit", "rare",
+      "Mind the blade.",
+      "Blocking spins a sawblade around you for 2 seconds, shredding anyone it touches.",
+      ["block = orbiting saw (2s)"], ["block", "aoe"],
+      p => { p.stats.sawBlock += 1; }),
+
+    card("bank-shot", "Bank Shot", "rare",
+      "Called it. Off two cushions.",
+      "One extra bounce, and after each bounce your bullet veers toward the nearest opponent and hits 30% harder.",
+      ["+1 bounce", "bounces seek & gain +30% damage"], ["projectile"],
+      p => { p.stats.bankShot += 1; p.stats.bounces += 1; }),
+
+    card("stink-bomb", "Stink Bomb", "rare",
+      "You'll clear the room.",
+      "When a bullet breaks it bursts into a lingering cloud that poisons and slows anyone inside.",
+      ["impacts leave a toxic cloud (2.5s)", "−10% damage"], ["aoe", "dot"],
+      p => { p.stats.stink += 1; p.stats.damage *= 0.9; }),
+
+    card("payment-plan", "Payment Plan", "rare",
+      "Suffer now, later.",
+      "Damage you take is paid off over 3 seconds instead of all at once — time enough to turn the fight.",
+      ["damage taken drips over 3s", "+10% health"], ["defense"],
+      p => { p.stats.decay += 1; p.stats.maxHp *= 1.1; }),
+
+    card("fresh-coat", "Fresh Coat", "rare",
+      "Still has the sticker on.",
+      "Start each round with a +50% health overcoat. It shatters the first time you're hit.",
+      ["+50% HP shell until first hit"], ["defense"],
+      p => { p.stats.freshCoat += 0.5; }),
+
+    card("blood-money", "Blood Money", "rare",
+      "Everything costs something.",
+      "Fire wildly fast, but every shot costs 5 health. It can't finish you off.",
+      ["−70% fire delay", "shots cost 5 HP (never lethal)"], ["damage", "firerate"],
+      p => { p.stats.bloodMoney += 1; p.stats.fireDelay *= 0.3; }),
+
+    card("camera-flash", "Camera Flash", "rare",
+      "Say cheese.",
+      "Hits briefly stun your victim. Each target shrugs off further flashes for 2 seconds.",
+      ["hits stun 0.4s (then 2s immunity)", "−10% damage"], ["control"],
+      p => { p.stats.dazzle += 1; p.stats.damage *= 0.9; }),
+
+    card("gag-order", "Gag Order", "rare",
+      "Talk to my lawyer.",
+      "Hits mute the victim: no blocking, no abilities for 1.5 seconds.",
+      ["hits disable block & actives (1.5s)", "−8% damage"], ["control"],
+      p => { p.stats.silence += 1; p.stats.damage *= 0.92; }),
+
+    card("cold-shoulder", "Cold Shoulder", "rare",
+      "You bring the weather with you.",
+      "Enemies near you are permanently chilled — slower feet, weaker jumps.",
+      ["chill aura around you"], ["control"],
+      p => { p.stats.chillAura += 1; }),
+
+    card("second-serve", "Second Serve", "rare",
+      "Advantage: you.",
+      "Dealing bullet damage instantly returns your block. Deep breaths between rallies.",
+      ["hits refresh your block (1s lockout)"], ["block"],
+      p => { p.stats.blockRefresh += 1; }),
+
+    card("overflow", "Overflow", "rare",
+      "Waste not a drop.",
+      "Healing past full health becomes a shield instead, up to 40 points.",
+      ["overheal → shield (max 40)"], ["sustain", "defense"],
+      p => { p.stats.overflow += 40; }),
+
+    card("boomerang", "Boomerang", "rare",
+      "It misses you too.",
+      "Bullets that miss fly back to your hand — catching one refunds it. They can still hit on the way back.",
+      ["missed shots return & refund ammo"], ["projectile", "ammo"],
+      p => { p.stats.boomerang += 1; }),
+
+    card("body-double", "Body Double", "rare",
+      "You, but expendable.",
+      "Blocking leaves a decoy of you behind. Seeking shots and lightning chase it until it pops.",
+      ["block leaves a 20 HP decoy"], ["block", "defense"],
+      p => { p.stats.decoy += 1; }),
+
+    card("magnet-suit", "Magnet Suit", "rare",
+      "Opposites repulse.",
+      "Enemy bullets curve gently away from you. Flat, fast shots still find you.",
+      ["enemy bullets veer away from you"], ["defense"],
+      p => { p.stats.repel += 1; }),
+
+    // -------------------------------------------------------------- EPIC (13)
     card("cluster-bomb", "Party Favor", "epic",
       "One explosion is never enough.",
       "Bullets explode on impact AND split into bomblets. Reloads take longer.",
@@ -311,6 +484,30 @@
       "Fire 3 extra pellets in an elegant, tight formation. Each pellet is much weaker.",
       ["+3 pellets", "tight spread", "−45% damage per pellet"], ["multishot"],
       p => { p.stats.pellets += 3; p.stats.spread += 0.06; p.stats.damage *= 0.55; }),
+
+    card("return-to-sender", "Return to Sender", "epic",
+      "Postage due.",
+      "Blocking supercharges your next shot: +75% damage, and your block effects detonate where it lands.",
+      ["block empowers next shot (+75%)", "block effects fire at impact"], ["block", "damage"],
+      p => { p.stats.empowerBlock += 1; }),
+
+    card("puppet-strings", "Puppet Strings", "epic",
+      "The bullet does what you're thinking.",
+      "After firing, your newest bullet steers toward wherever you aim — walk it around cover.",
+      ["steer your latest bullet", "−30% bullet speed", "−10% damage"], ["projectile", "accuracy"],
+      p => { p.stats.steer += 1; p.stats.bulletSpeed *= 0.7; p.stats.damage *= 0.9; }),
+
+    card("bricklayer", "Bricklayer", "epic",
+      "Permits pending.",
+      "Blocking conjures a stone slab in front of you — real, heavy, standable, and very droppable.",
+      ["block conjures a physics slab", "+0.3s block cooldown"], ["block", "control"],
+      p => { p.stats.brickBlock += 1; p.stats.blockCooldown += 0.3; }),
+
+    card("encore", "Encore", "epic",
+      "The crowd demands it.",
+      "Every shot is followed one beat later by a ghost of itself, fired from where you are now at half damage.",
+      ["shots repeat after 0.8s (50% dmg)", "+0.1s fire delay"], ["firerate"],
+      p => { p.stats.encore += 1; p.stats.fireDelay += 0.1; }),
 
     // ---------------------------------------------------------- LEGENDARY (5)
     card("supernova", "Supernova", "legendary",

@@ -4,6 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Rounders — Sprite Workbench</title>
+    <!-- /workbench?edit=cards is the card browser's address -->
+    <script>
+      if (new URLSearchParams(location.search).get("edit") === "cards") {
+        const dir = location.pathname.replace(/index\.html$/, "").replace(/\/?$/, "/");
+        location.replace(dir + "cards.html");
+      }
+    </script>
     <link rel="stylesheet" href="workbench.css" />
   </head>
   <body>
@@ -24,6 +31,7 @@
       <button id="resetChar" class="ghost">Reset to auto</button>
       <label class="ghost file">Import JSON<input id="importFile" type="file" accept="application/json" hidden /></label>
       <button id="exportJson" class="primary">Export rigs.json</button>
+      <a class="ghost" href="cards.html">Cards →</a>
       <a class="ghost" href="intake.html">Art intake →</a>
     </header>
 

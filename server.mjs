@@ -28,12 +28,21 @@ createServer(async (request, response) => {
     const pathname = decodeURIComponent(url.pathname);
     // "/" and "/workbench/" both serve the directory's index.html
     const rel = pathname === "/" || pathname.endsWith("/") ? `${pathname}index.html` : pathname;
-    const file = resolve(join(root, rel));
+    let file = resolve(join(root, rel));
     if (!file.startsWith(root)) {
       response.writeHead(403);
       response.end("Forbidden");
       return;
     }
+    // a bare directory path ("/workbench?edit=cards") redirects to the slash
+    // form, like GitHub Pages, so the page's relative URLs resolve correctly
+    try {
+      if ((await stat(file)).isDirectory()) {
+        response.writeHead(301, { location: `${pathname}/${url.search}` });
+        response.end();
+        return;
+      }
+    } catch { /* fall through to the 404 below */ }
     const type = types[extname(file)] || "application/octet-stream";
     const media = type.startsWith("audio/") || type.startsWith("video/");
 

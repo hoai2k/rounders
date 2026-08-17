@@ -40,10 +40,10 @@ Pillars:
 - [x] `CLAUDE.md` — repo policy (merge to main when a task is done)
 - [x] This state document
 
-### 2. Card system — 55 cards, designed from scratch
+### 2. Card system — 87 cards, designed from scratch
 - [x] New card schema: id, name, rarity, tagline (flavor), description (plain-English
       explanation), effect list, tags, apply()
-- [x] 14 Common / 13 Uncommon / 11 Rare / 9 Epic / 5 Legendary / 3 Mythic = **55 cards**
+- [x] 16 Common / 24 Uncommon / 26 Rare / 13 Epic / 5 Legendary / 3 Mythic = **87 cards**
 - [x] **Power-card audit** (AUDIT.md §6): homing reworked from a feeble nudge to
       real steering (visible curves, heat-seekers when stacked); three ROUNDS
       gaps filled — Aegis Bubble (regenerating shield with bubble/absorb/break
@@ -60,11 +60,24 @@ Pillars:
 - [x] **Card gap audit vs ROUNDS** (`CARD-GAP-AUDIT.md`): all 67 vanilla ROUNDS
       cards mapped against our 55 — ~40 covered, structural gaps identified
       (block depth, reload economy, triggered buffs, area denial, steered
-      bullets, knockback offense); 12 gap-closing cards proposed (55 → 67) plus
-      10 original beyond-ROUNDS ideas. Implementation not started
-- [ ] Implement the 12 proposed cards from `CARD-GAP-AUDIT.md` §4 (needs new
-      stats: `kbDeal`, zone entities, empower/steered-bullet flags) + art
-      prompts in `image-requests.md` + balance pass
+      bullets, knockback offense); 12 gap-closing cards proposed plus the
+      second wave and 10 original beyond-ROUNDS ideas
+- [x] **Gap-audit wave implemented — all 32 cards** (55 → 87): the §4 twelve,
+      the §4 second wave of ten, and the §5 ten originals. New engine systems:
+      temp-shield soak chain (Hot Streak / Overflow / Fresh Coat), deferred
+      damage pool (Payment Plan), stun + silence control, heal/stink/saw
+      fields, block toolkit (reload, frost, saw, decoy, brick-slab conjuring,
+      empowered shots that carry block effects to impact), steered and
+      boomerang and helium bullets, bounce-seeking Bank Shot, burst echoes and
+      Encore ghosts, kbDeal knockback offense, head stomps, air-jump blasts,
+      chill/repel auras, underdog comeback scaling. Art prompts for all 32 in
+      `image-requests.md` §2 (procedural fallbacks until delivered).
+      Headless smoke-tested: full bot/human match with all 32 granted, clean
+- [x] **Card workbench** (`/workbench?edit=cards` → `workbench/cards.html`):
+      every card rendered with the game's own card-face markup and stylesheet —
+      featured card with ←/→ flipping, rarity filter chips, full-set grid;
+      `server.mjs` now redirects bare directory paths so the query URL works
+- [ ] Balance pass on the 32 new cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality
 - [x] Level schema: name, theme blurb, full palette (sky gradient, platform colors,

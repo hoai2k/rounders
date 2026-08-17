@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rounders — Card Workbench</title>
+    <!-- The game's own stylesheet, so a card here IS the card in the game -->
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      /* Layout for the browser page itself; card faces come from styles.css */
+      html, body { height: auto; min-height: 100%; overflow: auto; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(ellipse at 50% -10%, #2a2f42, transparent 60%),
+          linear-gradient(180deg, #171a24, #0d0f16);
+        color: #f5f2ff;
+        font-family: system-ui, sans-serif;
+      }
+      .cw-bar {
+        position: sticky; top: 0; z-index: 10;
+        display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        padding: 12px 18px;
+        background: rgba(13, 15, 22, 0.92);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(6px);
+      }
+      .cw-bar h1 { margin: 0 8px 0 0; font-size: 17px; letter-spacing: 0.04em; }
+      .cw-count { opacity: 0.6; font-size: 13px; }
+      .cw-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+      .cw-chip {
+        border: 1px solid color-mix(in srgb, var(--c, #b8c4d0) 55%, transparent);
+        color: var(--c, #b8c4d0);
+        background: color-mix(in srgb, var(--c, #b8c4d0) 10%, transparent);
+        border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 700;
+        cursor: pointer;
+      }
+      .cw-chip.off { opacity: 0.32; filter: saturate(0.4); }
+      .cw-back { color: #8fb8ff; font-size: 13px; text-decoration: none; }
+
+      /* featured card: one card, big, exactly as the draft hand shows it */
+      .cw-stage {
+        display: flex; align-items: center; justify-content: center; gap: 26px;
+        padding: 34px 16px 10px;
+        --cardw: clamp(240px, 34vh, 340px);
+      }
+      .cw-stage .card { cursor: default; margin: 0; animation: none; }
+      .cw-stage .card:hover { transform: none; }
+      .cw-arrow {
+        width: 52px; height: 52px; border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff; font-size: 22px; cursor: pointer; flex: none;
+      }
+      .cw-arrow:hover { background: rgba(255, 255, 255, 0.14); }
+      .cw-meta { text-align: center; padding: 10px 16px 4px; font-size: 13px; opacity: 0.75; }
+      .cw-meta b { letter-spacing: 0.03em; }
+      .cw-hint { text-align: center; font-size: 12px; opacity: 0.45; padding-bottom: 14px; }
+
+      /* the full set, fanned flat as a grid of real (small) card faces */
+      .cw-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 14px 10px;
+        padding: 10px 22px 60px;
+        --cardw: 100%;
+      }
+      .cw-grid .card { margin: 0; animation: none; width: 100%; }
+      .cw-grid .card:hover { transform: translateY(-6px); }
+      .cw-grid .card.current {
+        border-color: #fff;
+        box-shadow: 0 0 0 2px #fff, 0 0 30px var(--rglow), 0 12px 26px rgba(0, 0, 0, 0.5);
+      }
+      .cw-grid .card.hidden-rarity { display: none; }
+      .cw-rarity-head {
+        grid-column: 1 / -1;
+        margin: 16px 0 0;
+        font-size: 12px; font-weight: 800; letter-spacing: 0.24em; text-transform: uppercase;
+        color: var(--c); opacity: 0.9;
+      }
+      .cw-rarity-head.hidden-rarity { display: none; }
+    </style>
+  </head>
+  <body>
+    <header class="cw-bar">
+      <h1>Card Workbench</h1>
+      <span class="cw-count" id="count"></span>
+      <span class="cw-filters" id="filters"></span>
+      <a class="cw-back" href="index.html">Sprite workbench →</a>
+    </header>
+
+    <section class="cw-stage">
+      <button class="cw-arrow" id="prev" title="Previous card (←)">←</button>
+      <div id="featured"></div>
+      <button class="cw-arrow" id="next" title="Next card (→)">→</button>
+    </section>
+    <p class="cw-meta" id="meta"></p>
+    <p class="cw-hint">← / → or click a card below to flip through the set. Number keys toggle rarities.</p>
+
+    <main class="cw-grid" id="grid"></main>
+
+    <script>window.ROUNDERS_ASSET_BASE = "../";</script>
+    <script src="../js/cards.js"></script>
+    <script>
+      (() => {
+        "use strict";
+        const { CARDS, RARITIES, RARITY_ORDER, cardArtUrl, cardSceneUrl } = window.ROUNDERS;
+        const grid = document.getElementById("grid");
+        const featured = document.getElementById("featured");
+        const meta = document.getElementById("meta");
+        const countEl = document.getElementById("count");
+        const filtersEl = document.getElementById("filters");
+
+        // ordered by rarity ladder, then as authored inside each rarity
+        const ordered = RARITY_ORDER.flatMap(r => CARDS.filter(c => c.rarity === r));
+        const shown = new Set(RARITY_ORDER);
+        let index = Math.max(0, ordered.findIndex(c => c.id === new URLSearchParams(location.search).get("card")));
+
+        // exactly the markup renderDraftPanel() builds in game.js, so the page
+        // shows the card the way the draft hand does
+        function cardHtml(c, big) {
+          const rar = RARITIES[c.rarity];
+          return `
+            <article class="card r-${c.rarity}${big ? " selected" : ""}" data-id="${c.id}"
+                     style="--rcol:${rar.color};--rglow:${rar.glow};--tilt:0deg">
+              <span class="card-pip">${rar.name[0]}</span>
+              <span class="rarity">${rar.name}</span>
+              <span class="card-art" style="--scene:url('${cardSceneUrl(c.id)}');--emblem:url('${cardArtUrl(c.id)}')"></span>
+              <strong class="card-name">${c.name}</strong>
+              <em class="card-tagline">${c.tagline}</em>
+              <p class="card-desc">${c.description}</p>
+              <div class="stat-list">${c.effects.map(s => `<span>${s}</span>`).join("")}</div>
+              <span class="card-pip flip">${rar.name[0]}</span>
+            </article>`;
+        }
+
+        function visible() { return ordered.filter(c => shown.has(c.rarity)); }
+
+        function renderFeatured() {
+          const list = visible();
+          if (!list.length) { featured.innerHTML = ""; meta.textContent = "No rarities selected."; return; }
+          index = ((index % list.length) + list.length) % list.length;
+          const c = list[index];
+          // the big face keeps the draft hand's "selected" pop, minus the tilt
+          featured.innerHTML = cardHtml(c, true);
+          featured.querySelector(".card").style.transform = "none";
+          meta.innerHTML = `<b>${c.name}</b> — ${RARITIES[c.rarity].name} · ${index + 1} / ${list.length}` +
+            ` · tags: ${(c.tags || []).join(", ") || "—"}`;
+          for (const el of grid.querySelectorAll(".card")) {
+            el.classList.toggle("current", el.dataset.id === c.id);
+          }
+          const url = new URL(location);
+          url.searchParams.set("card", c.id);
+          history.replaceState(null, "", url);
+        }
+
+        function renderGrid() {
+          let html = "";
+          for (const r of RARITY_ORDER) {
+            const set = CARDS.filter(c => c.rarity === r);
+            html += `<h2 class="cw-rarity-head" data-rarity="${r}" style="--c:${RARITIES[r].color}">` +
+              `${RARITIES[r].name} — ${set.length}</h2>`;
+            html += set.map(c => cardHtml(c, false)).join("");
+          }
+          grid.innerHTML = html;
+          grid.addEventListener("click", e => {
+            const el = e.target.closest(".card");
+            if (!el) return;
+            const list = visible();
+            const i = list.findIndex(c => c.id === el.dataset.id);
+            if (i >= 0) { index = i; renderFeatured(); scrollTo({ top: 0, behavior: "smooth" }); }
+          });
+        }
+
+        function applyFilter() {
+          for (const el of grid.querySelectorAll(".card")) {
+            el.classList.toggle("hidden-rarity", !shown.has(el.className.match(/r-(\w+)/)[1]));
+          }
+          for (const el of grid.querySelectorAll(".cw-rarity-head")) {
+            el.classList.toggle("hidden-rarity", !shown.has(el.dataset.rarity));
+          }
+          for (const el of filtersEl.querySelectorAll(".cw-chip")) {
+            el.classList.toggle("off", !shown.has(el.dataset.rarity));
+          }
+          const total = visible().length;
+          countEl.textContent = `${total} / ${CARDS.length} cards`;
+          index = 0;
+          renderFeatured();
+        }
+
+        filtersEl.innerHTML = RARITY_ORDER.map(r =>
+          `<button class="cw-chip" data-rarity="${r}" style="--c:${RARITIES[r].color}">` +
+          `${RARITIES[r].name} ${CARDS.filter(c => c.rarity === r).length}</button>`).join("");
+        filtersEl.addEventListener("click", e => {
+          const chip = e.target.closest(".cw-chip");
+          if (!chip) return;
+          const r = chip.dataset.rarity;
+          if (shown.has(r) && shown.size === 1) RARITY_ORDER.forEach(x => shown.add(x)); // lone chip re-opens all
+          else if (shown.has(r)) shown.delete(r);
+          else shown.add(r);
+          applyFilter();
+        });
+
+        document.getElementById("prev").addEventListener("click", () => { index -= 1; renderFeatured(); });
+        document.getElementById("next").addEventListener("click", () => { index += 1; renderFeatured(); });
+        addEventListener("keydown", e => {
+          if (e.key === "ArrowLeft") { index -= 1; renderFeatured(); }
+          else if (e.key === "ArrowRight") { index += 1; renderFeatured(); }
+          else if (/^[1-6]$/.test(e.key)) {
+            const r = RARITY_ORDER[Number(e.key) - 1];
+            if (shown.has(r)) shown.delete(r); else shown.add(r);
+            applyFilter();
+          }
+        });
+
+        renderGrid();
+        countEl.textContent = `${CARDS.length} / ${CARDS.length} cards`;
+        renderFeatured();
+      })();
+    </script>
+  </body>
+</html>

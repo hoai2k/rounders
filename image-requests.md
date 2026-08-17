@@ -28,13 +28,20 @@ goes looking.
 > a tennis serve and a blade on an orbital track, neither of which the card does
 > any more — so all four files were re-requested and have now been replaced.
 >
-> **Not everything delivered is wired up yet.** Five of the 20 effect sheets are
-> drawn by the engine (`angel`, `black-hole`, `lemonade`, `poison-cloud`,
-> `sawblade`); the other 15 — `armor-plates`, `bore-hole`, `chill-aura`,
-> `dust-puff`, `explosion`, `explosion-big`, `frost-burst`, `heal-field`,
-> `lightning-arc`, `muzzle-flash`, `shield-break`, `shield-bubble`,
-> `shockwave-ring`, `storm-nova`, `stun-stars` — are on disk with no call site,
-> waiting on engine work rather than on art. That is a code gap, not an art one.
+> **16 of the 20 effect sheets are drawn by the engine.** `angel`, `black-hole`,
+> `lemonade`, `poison-cloud` and `sawblade` were already in; `explosion`,
+> `explosion-big`, `shockwave-ring`, `lightning-arc`, `storm-nova`,
+> `shield-bubble`, `shield-break`, `stun-stars`, `muzzle-flash`, `chill-aura`
+> and `frost-burst` were wired in on 2026-08-17.
+>
+> **Four are deliberately unused, and should stay that way** unless the design
+> they lose to is revisited: `armor-plates` (Juggernaut wears rolled steel by
+> decision, not golden hex scales), `bore-hole` (a Breakthrough gap is drawn as
+> nothing at all — flying chunks sell it), `heal-field` (the only heal zone left
+> is Lemonade Stand, deliberately lemon-yellow with a glass rather than generic
+> green), and `dust-puff` (arena dust is tinted with each arena's own wall
+> colour, which a fixed pale puff would flatten). Requesting replacements for
+> these would be requesting art the game has decided against.
 
 The game ships with procedural fallbacks, so art can be dropped in
 incrementally: any missing file is fine and simply falls back.
@@ -73,4 +80,4 @@ incrementally: any missing file is fine and simply falls back.
 | Card emblems | the HUD card chips, and a stand-in wherever a scene is missing |
 | Card art panels | the panel across the top of a full card face — the draft hand, the card workbench, and the card a bot is shown taking |
 | Bullets | the round a fighter fires, picked from the newest card they hold that changes the bullet; also shown at true size in the workbench's bullet pane |
-| Effects | explosions, black holes, poison clouds, sawblades and the rest, with the procedural drawing as fallback |
+| Effects | explosions, shockwave rings, muzzle flashes, lightning, shields, stun stars, frost and the rest — sprite strips play frame by frame, single images animate by scaling and fading, and every one keeps its procedural drawing as fallback |

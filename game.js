@@ -752,6 +752,7 @@
     particles = [];
     fields = [];
     bolts = [];
+    fxShots = [];
     floats = [];
     world.weather = [];
     world.lightningTimer = level.lightning ? level.lightning.period : 0;
@@ -1980,7 +1981,7 @@
         p.echoTimer -= dt;
         if (p.echoTimer <= 0) {
           p.blockTimer = Math.max(p.blockTimer, p.stats.blockDuration * 0.8);
-          if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 200, life: 0.18, force: 840, scatter: true });
+          if (p.stats.blockPush) fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 200, life: 0.18, maxLife: 0.18, force: 840, scatter: true });
           burst(p.x, p.y, "#ffffff", 12, 200);
         }
       }
@@ -2046,7 +2047,7 @@
           p.pulseClock += dt;
           if (p.pulseClock >= 0.45) {
             p.pulseClock = 0;
-            fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 130, life: 0.14, force: 520 });
+            fields.push({ type: "push", owner: p, x: p.x, y: p.y, r: 130, life: 0.14, maxLife: 0.14, force: 520 });
             for (const q of players) {
               if (!q.alive || q === p || q.spawnGrace > 0) continue;
               if (Math.hypot(q.x - p.x, q.y - p.y) < 130) {
@@ -2139,7 +2140,7 @@
           // Firecracker Heels: an air jump goes off like a mortar under you
           if (!p.grounded && p.stats.jumpBlast) {
             const dmg = 15 * p.stats.jumpBlast;
-            fields.push({ type: "push", owner: p, x: p.x, y: p.y + 20, r: 110, life: 0.14, force: 640 });
+            fields.push({ type: "push", owner: p, x: p.x, y: p.y + 20, r: 110, life: 0.14, maxLife: 0.14, force: 640 });
             for (const q of players) {
               if (!q.alive || q === p || q.spawnGrace > 0) continue;
               const d = Math.hypot(q.x - p.x, q.y - (p.y + 20));
@@ -2381,7 +2382,7 @@
   // bullet lands. Movement effects (dash, warp) stay on the body and are not
   // part of this set.
   function blockEffectsAt(p, x, y) {
-    if (p.stats.blockPush) fields.push({ type: "push", owner: p, x, y, r: 190, life: 0.18, force: 1000, scatter: true });
+    if (p.stats.blockPush) fields.push({ type: "push", owner: p, x, y, r: 190, life: 0.18, maxLife: 0.18, force: 1000, scatter: true });
     if (p.stats.stormBlock) {
       for (const q of players) {
         if (!q.alive || q === p || q.spawnGrace > 0) continue;
@@ -2391,6 +2392,8 @@
           hurt(q, 30, p, q.x - x, q.y - y - 120);
         }
       }
+      // the crown itself: a burst of lightning thrown outward from the block
+      fxShot("storm-nova", x, y, 300, 0.4, { grow: 0.8 });
       world.shake = Math.max(world.shake, 8);
       sfx("chain");
     }
@@ -2565,6 +2568,22 @@
     const muz = window.ROUNDERS.rig
       ? window.ROUNDERS.rig.muzzle(p.character, p.stats.radius, p.aimX, p.aimY, 0, p.facing || 0)
       : null;
+    // A flash off the barrel tip, pointing where the shot went. The art is
+    // drawn pointing right, so it rotates onto the aim; it rides the fighter
+    // for its one frame of life so it does not lag behind a moving shooter.
+    {
+      const mx = muz ? muz.x : Math.cos(baseAngle) * 34;
+      const my = muz ? muz.y : Math.sin(baseAngle) * 34;
+      const from = opts.from || null;
+      // the art's hot core sits back from its cone, so the flash is nudged
+      // forward along the aim to put the core on the barrel tip itself
+      const lead = 12;
+      fxShot("muzzle-flash",
+        (from ? from.x : p.x) + mx + Math.cos(baseAngle) * lead,
+        (from ? from.y : p.y) + my + Math.sin(baseAngle) * lead,
+        54 + p.stats.bulletSize * 8, 0.07,
+        { rot: baseAngle, follow: from ? null : { p, dx: mx + Math.cos(baseAngle) * lead, dy: my + Math.sin(baseAngle) * lead } });
+    }
     let newest = null;
     for (let i = 0; i < pellets; i += 1) {
       const spread = (i - (pellets - 1) / 2) * spreadStep + rand(-0.018, 0.018);
@@ -3006,7 +3025,9 @@
               p.burnAttacker = b.owner;
             }
             if (b.chill) {
+              const fresh = p.chillTimer <= 0;   // only the moment it takes hold
               p.chillTimer = Math.max(p.chillTimer, 2);
+              if (fresh) fxShot("frost-burst", p.x, p.y, p.stats.radius * 4, 0.35, { grow: 0.5 });
               burst(p.x, p.y, "#8fd8ff", 10, 200);
             }
             if (b.chain) chainLightning(b, p, damage);
@@ -3148,7 +3169,7 @@
       sfx("teleport");
     }
     if (b.explosive) {
-      fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: 95 + b.explosive * 20, life: 0.14, force: 760 });
+      fields.push({ type: "push", owner: b.owner, x: b.x, y: b.y, r: 95 + b.explosive * 20, life: 0.14, maxLife: 0.14, force: 760 });
       // the visible detonation: a white core that flashes out into expanding
       // shockwave spheres, scaled by the size of the charge
       fields.push({
@@ -3645,6 +3666,9 @@
         amount -= soaked;
         p.shieldFlash = 0.25;
         if (p.shield <= 0) {
+          // the bubble going: five frames of it coming apart into glassy shards,
+          // thrown wider than the bubble it was
+          fxShot("shield-break", p.x, p.y, (p.stats.radius + 19) * 2.7, 0.32);
           burst(p.x, p.y, "#7fd8ff", 20, 340);
           sfx("block");
         }
@@ -4479,6 +4503,7 @@
     bullets = [];
     fields = [];
     particles = [];
+    fxShots = [];
     hud.innerHTML = "";
     hudRefs = [];
     duckMusic(DUCK.none);
@@ -4631,6 +4656,7 @@
       drawTide(level);
       drawParticles();
       drawBoltsAll();
+      drawFxShots();
       drawFloats();
       if (world.lightningFlash > 0) {
         ctx.fillStyle = `rgba(255,244,200,${world.lightningFlash * 1.4})`;
@@ -5342,6 +5368,11 @@
       if (p.chillTimer > 0) {
         ctx.fillStyle = "rgba(140,220,255,0.3)";
         ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+        // A wreath of cold vapour around the frozen fighter, over the flat tint.
+        // The art is a ring with a hollow middle and it is drawn wide enough for
+        // that hollow to clear the body — a chilled fighter you cannot see is a
+        // fighter you cannot shoot at.
+        drawFxSheet("chill-aura", 0, 0, r * 4, 0, { rot: world.time * 0.5, alpha: 0.4 });
       }
       if (p.burnTimer > 0) {
         ctx.fillStyle = "rgba(255,120,40,0.22)";
@@ -5370,15 +5401,31 @@
       if (p.stats.shield > 0 && p.shield > 0) {
         const frac = p.shield / p.stats.shield;
         const flash = p.shieldFlash > 0 ? p.shieldFlash / 0.25 : 0;
-        ctx.strokeStyle = `rgba(127,216,255,${0.25 + frac * 0.35 + flash * 0.4})`;
-        ctx.lineWidth = 2.5 + flash * 3;
-        ctx.beginPath();
-        ctx.arc(0, 0, r + 9 + Math.sin(world.time * 5) * 1.5, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillStyle = `rgba(127,216,255,${0.05 + flash * 0.18})`;
-        ctx.beginPath();
-        ctx.arc(0, 0, r + 9, 0, Math.PI * 2);
-        ctx.fill();
+        // The painted bubble carries its own hex facets and rim; how full the
+        // shield is still reads through its opacity, and a hit still flares it.
+        // Its hex band rides the outer third of the image, so it is drawn wide
+        // enough for that band to sit clear of the body rather than on it.
+        const painted = drawFxSheet("shield-bubble", 0, 0,
+          (r + 19) * 2 + Math.sin(world.time * 5) * 3, 0,
+          { alpha: 0.5 + frac * 0.35 + flash * 0.4 });
+        if (!painted) {
+          ctx.strokeStyle = `rgba(127,216,255,${0.25 + frac * 0.35 + flash * 0.4})`;
+          ctx.lineWidth = 2.5 + flash * 3;
+          ctx.beginPath();
+          ctx.arc(0, 0, r + 9 + Math.sin(world.time * 5) * 1.5, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = `rgba(127,216,255,${0.05 + flash * 0.18})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, r + 9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      // Camera Flash leaves its victim seeing stars — before this the only tell
+      // a stun had was that they stopped moving. They ride above the health bar
+      // and the name tag, which both sit just over the head, and rock as they go.
+      if (p.stunTimer > 0) {
+        drawFxSheet("stun-stars", 0, -r - 64, 74, 0,
+          { rot: Math.sin(world.time * 7) * 0.2, alpha: clamp(p.stunTimer / 0.25, 0, 1) });
       }
       // active ability ready
       if (p.stats.active && p.activeCooldown <= 0) {
@@ -5714,6 +5761,16 @@
   function drawFields() {
     for (const f of fields) {
       if (f.type === "lightning-warn") continue;
+      // The knockback pulse used to be pure physics with nothing on screen —
+      // fighters simply flew apart. The painted pressure ring gives it a cause.
+      if (f.type === "push") {
+        // strong the instant it goes off, gone by the end — the ring is a thin
+        // feathered thing and a linear fade leaves it invisible for most of its
+        // life against a bright arena
+        const k = 1 - clamp(f.life / (f.maxLife || 0.18), 0, 1);
+        drawFxSheet("shockwave-ring", f.x, f.y, f.r * 2 * (0.25 + k * 1.05), 0, { alpha: 0.95 * (1 - k * k) });
+        continue;
+      }
       if (f.type === "blackhole") {
         const a = clamp(f.life / 3, 0, 1);
         const hole = fxImage("black-hole");
@@ -5817,6 +5874,11 @@
         // two expanding shockwave spheres, all sized by the charge.
         const k = 1 - Math.max(0, f.life) / 0.5;         // 0 at the flash, 1 at the end
         const R = f.r * (0.25 + k * 0.95);
+        // The painted fireball plays its own six frames at a fixed size — the
+        // art does the blooming, so it is not scaled by k the way the drawn
+        // one is. Supernova-scale charges get the bigger sheet.
+        if (drawFxSheet(f.power >= 1.5 ? "explosion-big" : "explosion", f.x, f.y, f.r * 2.5, k,
+          { alpha: 1 - clamp((k - 0.8) / 0.2, 0, 1) })) continue;
         ctx.save();
         const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
         g.addColorStop(0, `rgba(255,255,255,${(1 - k) * 0.95})`);
@@ -5980,11 +6042,41 @@
   // The strike itself is instantaneous, but it CLEARS in the direction it
   // travelled: the tail lets go first and the vanishing edge chases the head
   // down the path, so you can read which way a bolt went after the flash.
+  // The painted bolt is one horizontal jagged arc meant to stretch between two
+  // points, so it replaces the whole polyline rather than a segment of it — the
+  // art supplies the jaggedness the jitter used to, and the wipe survives as a
+  // clip on the tail. The colour check picks WHICH bolts get the painted look:
+  // storm lightning does, and a bolt deliberately tinted something else (Thorn
+  // Jacket's pink retaliation) keeps the drawn version, since recolouring a PNG
+  // per frame is not worth it here.
+  const BOLT_ART_COLOR = "#ffe95e";
+  function drawBoltArt(b, a, edge) {
+    if (b.color !== BOLT_ART_COLOR || !fxImage("lightning-arc")) return false;
+    const p0 = b.points[0], p1 = b.points[b.points.length - 1];
+    const dx = p1.x - p0.x, dy = p1.y - p0.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) return false;
+    const img = fxImage("lightning-arc");
+    const h = len * (img.height / img.width) * 1.6;
+    const from = clamp(edge, 0, 1);          // the wiped-away tail
+    ctx.save();
+    ctx.globalAlpha = 0.35 + a * 0.65;
+    ctx.translate(p0.x, p0.y);
+    ctx.rotate(Math.atan2(dy, dx));
+    ctx.beginPath();
+    ctx.rect(len * from, -h, len * (1 - from), h * 2);
+    ctx.clip();
+    ctx.drawImage(img, 0, -h / 2, len, h);
+    ctx.restore();
+    return true;
+  }
+
   function drawBoltsAll() {
     for (const b of bolts) {
       if (!b.points.length) continue;
       const a = clamp(b.life / b.maxLife, 0, 1);
       const edge = (1 - a) * 1.35 - 0.35;   // the path is gone up to here
+      if (drawBoltArt(b, a, edge)) continue;
       const n = b.points.length - 1;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
@@ -6233,6 +6325,7 @@
 
   // -------- particles
   function updateParticles(dt) {
+    updateFxShots(dt);
     for (const p of particles) {
       p.life -= dt;
       p.x += p.vx * dt;
@@ -6881,6 +6974,74 @@
   const fxImage = name => loadArt("fx", name);
   window.ROUNDERS.fxImage = fxImage;
 
+  // Sheets are one strip of equal left-to-right frames; everything else is a
+  // single image, which is just a one-frame sheet.
+  const FX_FRAMES = { explosion: 6, "explosion-big": 6, "shield-break": 5 };
+
+  // Effect art is lazy-loaded on first use, which would mean the first
+  // explosion of a match is the procedural one and the second is painted. A
+  // touch at boot costs nothing and makes the art show from the first shot.
+  const FX_WARM = [
+    "explosion", "explosion-big", "shockwave-ring", "lightning-arc", "storm-nova",
+    "shield-bubble", "shield-break", "stun-stars", "muzzle-flash", "chill-aura",
+    "frost-burst", "black-hole", "poison-cloud", "sawblade", "angel", "lemonade"
+  ];
+  function warmFxArt() { for (const n of FX_WARM) fxImage(n); }
+
+  // Draws one frame of a sheet centred on (x, y), `u` running 0→1 across the
+  // strip. Returns false when the file is missing, which is every caller's cue
+  // to draw the procedural version instead.
+  function drawFxSheet(name, x, y, size, u = 0, opts = {}) {
+    const img = fxImage(name);
+    if (!img) return false;
+    const frames = FX_FRAMES[name] || 1;
+    const fw = img.width / frames;
+    const frame = clamp(Math.floor(u * frames), 0, frames - 1);
+    const h = size * (img.height / fw);
+    ctx.save();
+    ctx.globalAlpha = clamp(opts.alpha === undefined ? 1 : opts.alpha, 0, 1);
+    ctx.translate(x, y);
+    if (opts.rot) ctx.rotate(opts.rot);
+    ctx.drawImage(img, frame * fw, 0, fw, img.height, -size / 2, -h / 2, size, h);
+    ctx.restore();
+    return true;
+  }
+
+  // Painted one-shots: art for moments the engine has no lasting field to hang
+  // a drawing on — a shield shattering, a nova going off, a muzzle flash. They
+  // age like particles and are drawn over the top of everything else.
+  let fxShots = [];
+  function fxShot(name, x, y, size, life = 0.35, opts = {}) {
+    if (!fxImage(name)) return false;   // no art: the caller keeps its own
+    fxShots.push({
+      name, x, y, size, life, maxLife: life,
+      rot: opts.rot || 0, spin: opts.spin || 0, grow: opts.grow || 0,
+      alpha: opts.alpha === undefined ? 1 : opts.alpha,
+      follow: opts.follow || null       // rides a fighter, e.g. a muzzle flash
+    });
+    return true;
+  }
+
+  function updateFxShots(dt) {
+    for (const s of fxShots) {
+      s.life -= dt;
+      s.rot += s.spin * dt;
+      if (s.follow) { s.x = s.follow.p.x + s.follow.dx; s.y = s.follow.p.y + s.follow.dy; }
+    }
+    fxShots = fxShots.filter(s => s.life > 0);
+  }
+
+  function drawFxShots() {
+    for (const s of fxShots) {
+      const k = 1 - clamp(s.life / s.maxLife, 0, 1);       // 0 at the flash, 1 at the end
+      const size = s.size * (1 + s.grow * k);
+      // a single image fades out; a sheet plays its frames and holds its alpha,
+      // because the art itself is what dissipates
+      const alpha = (FX_FRAMES[s.name] || 1) > 1 ? s.alpha : s.alpha * (1 - k);
+      drawFxSheet(s.name, s.x, s.y, size, k, { rot: s.rot, alpha });
+    }
+  }
+
   // The round a player fires is the painted one from the newest card they hold
   // that changes how the bullet looks; everything else keeps the procedural
   // tells layered on top.
@@ -6902,6 +7063,14 @@
     // what a draft is allowed to offer, and a real hand rolled from it
     cardPool,
     drawCards,
+    // Effect hooks, so a delivered fx sheet can be posed and eyeballed without
+    // waiting for the card that fires it to turn up in a draft. `fields` below
+    // is a read-only summary — this one is the live array, to push onto.
+    liveFields: () => fields,
+    fxShots: () => fxShots,
+    fxShot,
+    boltVisual,
+    fire: p => tryShoot(p),
     // bored terrain, reported at LIVE positions (a mover's base x is not where
     // it currently is, and the hole rides with it)
     holes: () => activePlatforms(currentLevel(), world.time)
@@ -6943,6 +7112,7 @@
   };
 
   applyStrings();
+  warmFxArt();
   bindUi();
   renderLobby();
   syncMusicButtons();

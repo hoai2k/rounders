@@ -133,12 +133,35 @@ Pillars:
       `fx/lemonade.png` and re-arts for Second Defence and Sawblade — landed
       already transparent, so `npm run intake-art` filed them with nothing to
       key; prompts moved to `image-requests-history.md` §11
-- [ ] **15 effect sheets are on disk with no call site**: `armor-plates`,
-      `bore-hole`, `chill-aura`, `dust-puff`, `explosion`, `explosion-big`,
-      `frost-burst`, `heal-field`, `lightning-arc`, `muzzle-flash`,
-      `shield-break`, `shield-bubble`, `shockwave-ring`, `storm-nova`,
-      `stun-stars`. Only `angel`, `black-hole`, `lemonade`, `poison-cloud` and
-      `sawblade` are drawn today — the rest are waiting on engine work, not art
+- [x] **Effect sheets wired in 2026-08-17**: 11 of the 15 that were sitting on
+      disk unused now draw, on a small shared rig — `FX_FRAMES` describes the
+      sprite strips, `drawFxSheet` plays a frame, and `fxShot` carries painted
+      one-shots for moments with no lasting field to hang art on. Every caller
+      keeps its procedural drawing for when a file is missing, and the art is
+      warmed at boot so the first explosion of a match is already the painted
+      one. What each replaced:
+      **explosion** / **explosion-big** (6-frame) → the `boom` field, big sheet
+      for Supernova-scale charges · **shockwave-ring** → the `push` field, which
+      was pure physics with *nothing on screen* · **muzzle-flash** → every shot,
+      at the rig's real barrel tip, rotated onto the aim · **stun-stars** →
+      Camera Flash's stun, which also had no tell at all · **lightning-arc** →
+      the storm bolts, stretched between the endpoints with the tail-wipe kept
+      as a clip · **storm-nova** → Crown of Storms' block · **shield-bubble** /
+      **shield-break** (5-frame) → Aegis Bubble holding and shattering ·
+      **chill-aura** / **frost-burst** → chilled fighters and the moment a chill
+      lands (Permafrost, Storm Caller)
+- [ ] **4 effect sheets deliberately left unused.** Not oversights — each would
+      undo a later decision, and all four are recorded here so nobody re-opens
+      them by accident:
+      **armor-plates** (golden hex scales) loses to `drawIronHull`, which is
+      deliberately rolled steel, concentric and fixed — "a rotating ring reads as
+      a gadget, not as plate" · **bore-hole** (scorched hole decal) contradicts
+      Breakthrough's "the gap is drawn as nothing at all", where the break is
+      sold by flying chunks instead · **heal-field** (citrus-green dome, plus
+      signs) is superseded: the only `healField` card left is Lemonade Stand,
+      restyled lemon-yellow with a glass in it · **dust-puff** (pale rubble
+      puff) would flatten dust that is currently tinted with each arena's own
+      wall colour
 - [x] **Play-feel pass 2026-08-17**: Big Bore cut (a strictly worse
       Cannonball); Boxing Glove +300% knockback; Sugar Rush +100% speed;
       Longshot +100% bullet speed; Grasshopper is a hard launch (+38% jump

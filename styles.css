@@ -1312,13 +1312,34 @@ h1.title-logo .logo-img {
 
 .lobby-actions button { min-width: 240px; }
 
+/* Start Match — "crystal glass": frosted slab with a neon-gradient edge,
+   echoing the crystal arch of the logo */
 .lobby-actions .start-big {
   min-width: min(460px, 80%);
-  padding: 20px 30px;
-  font-size: 22px;
-  letter-spacing: 0.06em;
-  border-radius: 18px;
+  padding: 22px 40px;
+  font-size: 23px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  border-radius: 22px;
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(16, 15, 26, 0.92), rgba(26, 20, 44, 0.92)) padding-box,
+    linear-gradient(100deg, var(--coral), #b45cff 45%, var(--sky)) border-box;
+  border: 3px solid transparent;
+  text-shadow: 0 0 14px rgba(255, 61, 132, 0.9), 0 0 34px rgba(180, 92, 255, 0.5);
+  box-shadow: 0 0 24px rgba(255, 61, 132, 0.32), 0 0 60px rgba(69, 208, 255, 0.16),
+              inset 0 0 30px rgba(180, 92, 255, 0.16);
   animation: start-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.lobby-actions .start-big:hover, .lobby-actions .start-big.controller-focus {
+  background:
+    linear-gradient(180deg, rgba(20, 18, 32, 0.94), rgba(32, 24, 54, 0.94)) padding-box,
+    linear-gradient(100deg, #ff5c99, #c988ff 45%, #6fdcff) border-box;
+  box-shadow: 0 0 34px rgba(255, 61, 132, 0.55), 0 0 80px rgba(69, 208, 255, 0.3),
+              inset 0 0 34px rgba(180, 92, 255, 0.28);
+  transform: translateY(-2px) scale(1.02);
 }
 
 @keyframes start-pop {
@@ -1376,16 +1397,69 @@ h1.title-logo .logo-img {
   .icon-btn svg { width: 22px; height: 22px; }
 }
 
-/* pause panel is a compact stack, not a wide grid */
+/* pause panel — compact "crystal glass" stack: see-through frosted backing
+   with a neon-gradient edge, so the frozen match stays visible behind it */
 .pause-panel {
   width: min(360px, calc(100vw - 32px));
   padding: 26px 26px 24px;
   text-align: center;
+  background:
+    linear-gradient(180deg, rgba(13, 13, 20, 0.55), rgba(19, 15, 32, 0.55)) padding-box,
+    linear-gradient(140deg, rgba(255, 61, 132, 0.85), rgba(180, 92, 255, 0.85) 50%, rgba(69, 208, 255, 0.85)) border-box;
+  border: 2px solid transparent;
+  border-radius: 24px;
+  -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  backdrop-filter: blur(14px) saturate(1.25);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6), 0 0 44px rgba(180, 92, 255, 0.18);
 }
 
-.pause-panel h2 { font-size: 27px; margin-bottom: 16px; }
+.pause-panel h2 {
+  font-size: 24px;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: linear-gradient(100deg, var(--coral), #c88dff 55%, var(--sky));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 14px rgba(180, 92, 255, 0.45));
+}
+
 .pause-grid { grid-template-columns: 1fr; margin-top: 0; }
-.pause-grid button { padding: 12px 16px; font-size: 15px; }
+
+.pause-panel .pause-grid button {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(196, 206, 224, 0.22);
+  border-radius: 14px;
+  padding: 13px 16px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  box-shadow: none;
+}
+
+.pause-panel .pause-grid button:hover, .pause-panel .pause-grid button.controller-focus {
+  border-color: rgba(69, 208, 255, 0.75);
+  background: rgba(69, 208, 255, 0.08);
+  box-shadow: 0 0 20px rgba(69, 208, 255, 0.28);
+  transform: none;
+}
+
+.pause-panel .pause-grid button.primary,
+.pause-panel .pause-grid button.primary:hover,
+.pause-panel .pause-grid button.primary.controller-focus {
+  background:
+    linear-gradient(180deg, rgba(20, 16, 32, 0.82), rgba(30, 20, 50, 0.82)) padding-box,
+    linear-gradient(100deg, var(--coral), #b45cff 55%, var(--sky)) border-box;
+  border: 2px solid transparent;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 61, 132, 0.8);
+  box-shadow: 0 0 18px rgba(255, 61, 132, 0.3);
+}
+
+.pause-panel .pause-grid button.primary:hover,
+.pause-panel .pause-grid button.primary.controller-focus {
+  box-shadow: 0 0 26px rgba(255, 61, 132, 0.55), 0 0 40px rgba(69, 208, 255, 0.25);
+}
 
 
 /* ------------------------------------------------- lobby slot interaction */

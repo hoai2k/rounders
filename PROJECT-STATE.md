@@ -575,6 +575,11 @@ Pillars:
       buttons, crystal magenta/purple accents)
 - [x] Arcade title screen (flashing PRESS START, any input begins, keyboard/mouse
       start also enters fullscreen)
+- [x] **Crystal Glass restyle for Start Match + pause menu** (user picked from
+      3 mocked options): frosted glass slabs with a coral→purple→sky gradient
+      edge and glowing spaced type. The pause backing is deliberately
+      semi-transparent (0.55 alpha + 14px blur) so the frozen match shows
+      through; "Game Paused" is gradient-clipped text
 - [x] Full controller menu navigation (D-pad move, A/Menu confirm, B/View back)
 - [x] Every menu control reachable on a pad: dropdowns cycle with ◀ ▶ / step with A
       (Arena gets on-screen ◀ ▶ arrows), D-pad scrolls long panels when the cursor

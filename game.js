@@ -1807,7 +1807,7 @@
         while (p.encoreQueue.length && p.encoreQueue[0].t <= 0) {
           const q = p.encoreQueue.shift();
           if (p.alive) {
-            fireVolley(p, { mul: q.mul, angle: q.angle, ghost: true });
+            fireVolley(p, { mul: q.mul, angle: q.angle, ghost: true, pellets: q.pellets, from: q.from });
             puff(p.x, p.y, "#b8c4ff", 6);
             sfx("shoot");
           }
@@ -2266,10 +2266,11 @@
       if (mine < 1 + p.stats.brickBlock) {
         const bx = clamp(p.x + p.aimX * 150, 90, world.width - 90);
         const by = clamp(p.y + p.aimY * 110 - 30, 60, world.height - 80);
-        const w = 140, h = 22;
+        // stood on end: a wall you can hide behind, not a shelf
+        const w = 24, h = 150;
         props.slabs.push({
           x: bx, y: by, w, h, ice: false,
-          angle: clamp(Math.atan2(p.aimY, p.aimX) * 0.25, -0.5, 0.5),
+          angle: 0,
           vx: 0, vy: -40, va: 0,
           I: (w * w + h * h) / 12,
           rest: 0, thudCd: 0, dead: false, brickOwner: p
@@ -2312,7 +2313,7 @@
         type: "blackhole", owner: p,
         x: clamp(p.x + p.aimX * 320, 150, world.width - 150),
         y: clamp(p.y + p.aimY * 260, 150, world.height - 150),
-        r: 300, life: 3, force: -950, dps: 16
+        r: 380, life: 3.4, force: -1500, dps: 16
       });
       showToast(str("toast.eventHorizon", { name: p.name }));
     } else if (p.stats.active === "chronoshift") {
@@ -2347,7 +2348,9 @@
     const baseAngle = opts.angle ?? Math.atan2(p.aimY, p.aimX);
     const empower = opts.empower || 0;
     const rageMul = p.stats.rage > 0 ? 1 + p.stats.rage * (1 - clamp(p.hp / p.stats.maxHp, 0, 1)) : 1;
-    const pellets = p.stats.pellets;
+    const pellets = opts.pellets || p.stats.pellets;
+    const from = opts.from || null;
+    const spreadStep = opts.pellets ? Math.max(p.stats.spread, 0.09) : p.stats.spread;
     // Rigged characters fire from the actual barrel tip; everyone else keeps
     // the old fixed offset along the aim.
     const muz = window.ROUNDERS.rig
@@ -2355,14 +2358,15 @@
       : null;
     let newest = null;
     for (let i = 0; i < pellets; i += 1) {
-      const spread = (i - (pellets - 1) / 2) * p.stats.spread + rand(-0.018, 0.018);
+      const spread = (i - (pellets - 1) / 2) * spreadStep + rand(-0.018, 0.018);
       const a = baseAngle + spread;
       const speed = p.stats.bulletSpeed * rand(0.94, 1.05);
       const b = {
         owner: p,
-        x: p.x + (muz ? muz.x : Math.cos(a) * 34),
-        y: p.y + (muz ? muz.y : Math.sin(a) * 34),
-        prevX: p.x, prevY: p.y, ox: p.x, oy: p.y,
+        x: (from ? from.x : p.x) + (muz && !from ? muz.x : Math.cos(a) * 34),
+        y: (from ? from.y : p.y) + (muz && !from ? muz.y : Math.sin(a) * 34),
+        prevX: from ? from.x : p.x, prevY: from ? from.y : p.y,
+        ox: from ? from.x : p.x, oy: from ? from.y : p.y,
         vx: Math.cos(a) * speed + p.vx * 0.18,
         vy: Math.sin(a) * speed + p.vy * 0.08,
         r: (5.5 + Math.min(9, p.stats.damage / 22)) * p.stats.bulletSize,
@@ -2409,8 +2413,10 @@
     }
     // Puppet Strings drives only the newest bullet — the one you just fired
     if (p.stats.steer && newest) p.steeredBullet = newest;
-    p.vx -= Math.cos(baseAngle) * 70 * mul;
-    p.vy -= Math.sin(baseAngle) * 20 * mul;
+    if (!from) {
+      p.vx -= Math.cos(baseAngle) * 70 * mul;
+      p.vy -= Math.sin(baseAngle) * 20 * mul;
+    }
     pulse(p, 0.18, 45);
   }
 
@@ -2438,7 +2444,10 @@
     }
     // Encore: one ghost of this shot per stack, a beat apart
     for (let i = 1; i <= p.stats.encore; i += 1) {
-      p.encoreQueue.push({ t: 0.8 * i, angle, mul: 0.5 });
+      // the ghost fires a full second later, as a twin shot, from the spot the
+      // original was fired from — so stepping aside after shooting leaves the
+      // encore covering the ground you just left
+      p.encoreQueue.push({ t: 1 * i, angle, mul: 0.5, pellets: 2, from: { x: p.x, y: p.y } });
     }
     if (p.ammo <= 0) {
       p.reloadTimer = p.stats.reload;
@@ -3011,7 +3020,24 @@
           if (f.type === "blackhole") {
             p.vx += (dx / d) * f.force * t * dt;
             p.vy += (dy / d) * f.force * t * dt;
-            hurtRaw(p, f.dps * t * dt, f.owner);
+            // Reaching the middle is like touching a hazard: a solid bite and
+            // a launch clear of it. The vortex then hauls them back in, so a
+            // careless player is chewed several times over.
+            if (d < f.r * 0.3 && p.hazardGrace <= 0) {
+              p.hazardGrace = HAZARD_GRACE * 0.55;
+              hurtRaw(p, HAZARD_DAMAGE, f.owner);
+              if (p.alive) {
+                const away = Math.hypot(dx, dy) || 1;
+                p.vx = -(dx / away) * 520;
+                p.vy = -(dy / away) * 380 - 260;
+                pulse(p, 0.4, 150);
+                world.shake = Math.max(world.shake, 8);
+                burst(p.x, p.y, "#c88fff", 24, 420);
+                sfx("hit");
+              }
+            } else {
+              hurtRaw(p, f.dps * t * dt, f.owner);
+            }
             if (Math.random() < dt * 20) puffOne(p.x + rand(-10, 10), p.y + rand(-10, 10), "#b45cff");
           } else {
             p.vx += (dx / d) * f.force * t * dt;
@@ -4965,6 +4991,20 @@
           });
         }
       }
+      if (b.empowered) {
+        // it is carrying a block: draw the parry bubble around the round
+        const rr = b.r * 2.6 + 4;
+        ctx.save();
+        ctx.strokeStyle = `rgba(255,255,255,${0.75 + 0.25 * Math.sin(t * 16)})`;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(b.x, b.y, rr, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,0.14)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,215,0,0.55)";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(b.x, b.y, rr - 4, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
       // a big charge flies as a white-hot core with a corona (Supernova)
       if (b.explosive >= 2) {
         ctx.shadowColor = "#fff0c0";
@@ -5087,11 +5127,30 @@
       if (f.type === "lightning-warn") continue;
       if (f.type === "blackhole") {
         const a = clamp(f.life / 3, 0, 1);
+        // debris spiralling inward, so the pull is visible even in empty air
+        if (Math.random() < 0.6) {
+          const ang = rand(0, Math.PI * 2), rr = f.r * rand(0.45, 0.95);
+          particles.push({
+            x: f.x + Math.cos(ang) * rr, y: f.y + Math.sin(ang) * rr,
+            vx: -Math.cos(ang) * 260 - Math.sin(ang) * 200,
+            vy: -Math.sin(ang) * 260 + Math.cos(ang) * 200,
+            life: 0.45, maxLife: 0.45, r: rand(1.5, 3.5), color: "#d8a8ff", spark: true
+          });
+        }
         ctx.save();
         ctx.translate(f.x, f.y);
-        ctx.rotate(world.time * 3);
+        // a wide, slow maw with fast arms inside it
+        ctx.rotate(world.time * 1.6);
+        ctx.strokeStyle = `rgba(190,120,255,${0.4 * a})`;
+        for (let i = 0; i < 5; i += 1) {
+          ctx.lineWidth = 7 - i;
+          ctx.beginPath();
+          ctx.arc(0, 0, f.r * (0.24 + i * 0.15), i * 1.3, i * 1.3 + Math.PI * 1.35);
+          ctx.stroke();
+        }
+        ctx.rotate(world.time * 1.4);
         const g = ctx.createRadialGradient(0, 0, 0, 0, 0, f.r * 0.6);
-        g.addColorStop(0, "rgba(10,5,20,0.95)");
+        g.addColorStop(0, "rgba(4,2,10,1)");
         g.addColorStop(0.5, `rgba(120,40,200,${0.5 * a})`);
         g.addColorStop(1, "rgba(120,40,200,0)");
         ctx.fillStyle = g;
@@ -6058,6 +6117,14 @@
     holes: () => activePlatforms(currentLevel(), world.time)
       .filter(pl => pl.holes && pl.holes.length)
       .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, holes: pl.holes.map(h => ({ ...h })) })),
+    bullets: () => bullets.map(b => ({
+      x: Math.round(b.x), y: Math.round(b.y), ghost: Boolean(b.ghost),
+      damage: Math.round(b.damage), empowered: b.empowered || 0, explosive: b.explosive
+    })),
+    slabs: () => props.slabs.filter(s => !s.dead).map(s => ({
+      x: Math.round(s.x), y: Math.round(s.y), w: s.w, h: s.h, brick: Boolean(s.brickOwner)
+    })),
+    fields: () => fields.map(f => ({ type: f.type, x: Math.round(f.x), y: Math.round(f.y), r: Math.round(f.r || 0) })),
     particles: () => ({
       total: particles.length,
       flame: particles.filter(x => x.flame).length,

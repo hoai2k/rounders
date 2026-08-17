@@ -475,8 +475,8 @@
 
     card("pocket-void", "Pocket Void", "epic",
       "Litter, but cosmic.",
-      "Wherever a bullet breaks, it tears open a brief vortex that drags nearby players toward it. Stacks make it bigger and hungrier.",
-      ["impacts open a small black hole", "−10% damage"], ["control", "aoe"],
+      "Wherever a bullet breaks it tears open a vortex that drags players in — and its heart mauls them like an arena hazard, over and over if they cannot get clear.",
+      ["impacts open a black hole", "core deals hazard damage", "−10% damage"], ["control", "aoe"],
       p => { p.stats.voidPull += 1; p.stats.damage *= 0.9; }),
 
     card("bullet-ballet", "Bullet Ballet", "epic",
@@ -499,14 +499,14 @@
 
     card("bricklayer", "Bricklayer", "epic",
       "Permits pending.",
-      "Blocking conjures a stone slab in front of you — real, heavy, standable, and very droppable.",
-      ["block conjures a physics slab", "+0.3s block cooldown"], ["block", "control"],
+      "Blocking stands a stone slab on end in front of you — real cover that stops bullets, and heavy enough to topple onto someone.",
+      ["block raises a slab of cover", "+0.3s block cooldown"], ["block", "control"],
       p => { p.stats.brickBlock += 1; p.stats.blockCooldown += 0.3; }),
 
     card("encore", "Encore", "epic",
       "The crowd demands it.",
-      "Every shot is followed one beat later by a ghost of itself, fired from where you are now at half damage.",
-      ["shots repeat after 0.8s (50% dmg)", "+0.1s fire delay"], ["firerate"],
+      "A second after every shot, a ghostly twin volley fires from the spot you shot from — two rounds, half damage each.",
+      ["twin ghost shot 1s later (50% dmg each)", "fires from where you stood", "+0.1s fire delay"], ["firerate"],
       p => { p.stats.encore += 1; p.stats.fireDelay += 0.1; }),
 
     // ---------------------------------------------------------- LEGENDARY (5)
@@ -551,8 +551,8 @@
 
     card("event-horizon", "Event Horizon", "mythic",
       "Everything falls. Eventually.",
-      "ACTIVE (Y / LB): open a black hole at your aim point that drags enemies in and crushes them for 3s. 14s cooldown. Passive: +10% health.",
-      ["ACTIVE: black hole (3s)", "14s cooldown", "+10% health"], ["active", "control"],
+      "ACTIVE (Y / LB): tear open a vast black hole at your aim point. It hauls enemies in for 3.4s and mauls them like a hazard every time they reach its heart. 14s cooldown. Passive: +10% health.",
+      ["ACTIVE: huge black hole (3.4s)", "hazard damage at its core", "14s cooldown", "+10% health"], ["active", "control"],
       p => { p.stats.active = "eventHorizon"; p.stats.activeCooldown = 14; p.stats.maxHp *= 1.1; }),
 
     card("chronoshift", "Chronoshift", "mythic",

@@ -181,7 +181,7 @@
     if (on("scavenge") || on("blockReload")) watch.push("watch the ammo pips refill");
     if (on("reloadPulse")) watch.push("pulses go off while reloading");
     if (on("decoy")) watch.push("a stand-in of them is left behind and takes the shots");
-    if (on("brickBlock")) watch.push("blocking conjures a real slab of cover");
+    if (on("brickBlock")) watch.push("blocking stands a slab on end — watch it soak the incoming shots");
     if (on("healField")) watch.push("blocking plants a zone that heals them");
     if (on("sawBlock")) watch.push("a sawblade orbits them after the block");
     if (on("stormBlock")) watch.push("blocking throws lightning at whoever is near");
@@ -208,7 +208,7 @@
     // Only cards that are actually about blocking make the receiver block. A
     // shield card must be shown soaking the hit, not parrying it away, and a
     // silence card needs the receiver to TRY to block so you see it fail.
-    plan.blockDemo = blocky || on("silence");
+    plan.blockDemo = (blocky && !on("empowerBlock")) || on("silence");
     return plan;
   }
 
@@ -344,8 +344,10 @@
       return dir > 0 ? -theta : Math.PI + theta;
     }
 
-    function fire(who, mul = 1, angleOverride = null, ghost = false) {
+    function fire(who, mul = 1, angleOverride = null, ghost = false, opts = {}) {
       const st = who.stats;
+      const nPellets = opts.pellets || st.pellets;
+      const from = opts.from || null;
       const golden = st.goldenShot && who.ammo === st.maxAmmo;
       who.ammo = Math.max(0, who.ammo - 1);
       const target = enemies(who)[0];
@@ -371,13 +373,15 @@
         if (plan.aimUp) ang += plan.aimUp * (who.facing > 0 ? 1 : -1);
       }
       const empower = who.empower; who.empower = 0;
-      for (let i = 0; i < st.pellets; i += 1) {
-        const sp = (i - (st.pellets - 1) / 2) * st.spread;
+      for (let i = 0; i < nPellets; i += 1) {
+        const sp = (i - (nPellets - 1) / 2) * (opts.pellets ? Math.max(st.spread, 0.09) : st.spread);
         const angle = ang + sp;
         const speed = st.bulletSpeed * SCALE;
         bullets.push({
-          owner: who, x: who.x + Math.cos(angle) * 26, y: who.y + Math.sin(angle) * 26,
-          ox: who.x, oy: who.y,
+          owner: who,
+          x: (from ? from.x : who.x) + Math.cos(angle) * 26,
+          y: (from ? from.y : who.y) + Math.sin(angle) * 26,
+          ox: from ? from.x : who.x, oy: from ? from.y : who.y,
           vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
           r: bulletRadius(st),
           damage: st.damage * mul * (golden ? (st.pellets > 1 ? 2 : 3) : 1) * (empower ? 1 + 0.75 * empower : 1),
@@ -397,7 +401,9 @@
       // would feed back forever
       if (!ghost) {
         for (let i = 1; i <= st.burstFire; i += 1) who.queue.push({ t: i * 0.09, mul: 0.45 });
-        for (let i = 1; i <= st.encore; i += 1) who.queue.push({ t: 0.8 * i, mul: 0.5, angle: ang });
+        for (let i = 1; i <= st.encore; i += 1) {
+          who.queue.push({ t: 1 * i, mul: 0.5, angle: ang, pellets: 2, from: { x: who.x, y: who.y } });
+        }
       }
       if (who.ammo <= 0) { who.reloadT = st.reload; if (st.autoBlock) doBlock(who); }
     }
@@ -438,7 +444,8 @@
       if (st.blockDash) who.vx += who.facing * 320;
       if (st.blockReload) { who.ammo = st.maxAmmo; who.reloadT = 0; float(who.x, who.y - 56, "RELOADED", "#ffe169"); }
       if (st.sawBlock) fields.push({ type: "saw", owner: who, angle: 0, r: 58, life: 2, dmg: 9 });
-      if (st.brickBlock && slabs.length < 2) slabs.push({ x: who.x + who.facing * 78, y: GROUND - 60, w: 96, h: 18, vy: 0 });
+      // stood on end, so it is cover you can hide behind
+      if (st.brickBlock && slabs.length < 2) slabs.push({ x: who.x + who.facing * 84, y: GROUND - 62, w: 20, h: 118, vy: 0 });
       if (st.empowerBlock) { who.empower = st.empowerBlock; float(who.x, who.y - 56, "EMPOWERED", "#ffd700"); }
       blockEffects(who, who.x, who.y);
       if (st.echoBlock) who.echoT = 0.35;
@@ -503,7 +510,7 @@
         let guard = 0;
         while (who.queue.length && who.queue[0].t <= 0 && guard++ < 8) {
           const q = who.queue.shift();
-          fire(who, q.mul, q.angle ?? null, true);
+          fire(who, q.mul, q.angle ?? null, true, q);
         }
         // physics
         who.vy += 1500 * SCALE * dt;
@@ -536,7 +543,13 @@
         h.vx += (Math.sin(t * 1.6) > 0 ? 1 : -1) * h.stats.speed * SCALE * dt * 6;
         if (h.grounded && Math.sin(t * 3.1) > 0.985) { h.vy = -h.stats.jump * SCALE; h.grounded = false; }
       }
-      if (shooter.fireT <= 0 && shooter.reloadT <= 0 && shooter.ammo > 0 && shooter.stunT <= 0 && t > 0.7) {
+      // Return to Sender only means anything on an EMPOWERED shot, so the
+      // shooter blocks to charge one before pulling the trigger
+      if (shooter.stats.empowerBlock && !shooter.empower && shooter.blockCd <= 0 && t > 0.7) {
+        doBlock(shooter);
+      }
+      if (shooter.fireT <= 0 && shooter.reloadT <= 0 && shooter.ammo > 0 && shooter.stunT <= 0 && t > 0.7 &&
+          (!shooter.stats.empowerBlock || shooter.empower > 0)) {
         fire(shooter);
         shooter.fireT = Math.max(0.55, shooter.stats.fireDelay);
       }
@@ -748,8 +761,17 @@
               // hard enough to actually drag them off their feet
               who.vx += (dx / d) * 2600 * SCALE * dt;
               who.vy += (dy / d) * 1500 * SCALE * dt - 260 * SCALE * dt;
-              who.hp = Math.max(1, who.hp - 16 * dt);
-              if (Math.random() < dt * 8) float(who.x, who.y - 40, "-" + Math.round(16 * 0.5), "#c88fff");
+              // the middle bites like an arena hazard and throws them clear,
+              // then drags them straight back in
+              if (d < f.r * 0.3 && (who.voidGrace || 0) <= 0) {
+                who.voidGrace = 0.55;
+                damage(who, 30, f.owner, 0, 0, false);
+                who.vx = -(dx / d) * 520 * SCALE;
+                who.vy = -(dy / d) * 380 * SCALE - 200 * SCALE;
+                puff(who.x, who.y, "#c88fff", 18, 320);
+              } else {
+                who.hp = Math.max(1, who.hp - 16 * dt);
+              }
             }
           }
           // debris spiralling in, so the pull is legible even with nobody near
@@ -1065,6 +1087,13 @@
           }
         }
         if (b.explosive >= 2) { ctx.shadowColor = "#fff0c0"; ctx.shadowBlur = 26; }
+        if (b.empowered) {
+          const rr = b.r * 2.6 + 3;
+          ctx.strokeStyle = `rgba(255,255,255,${0.75 + 0.25 * Math.sin(t * 16)})`;
+          ctx.lineWidth = 2.2;
+          ctx.beginPath(); ctx.arc(b.x, b.y, rr, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fill();
+        }
         ctx.fillStyle = b.color; ctx.strokeStyle = "#15121c"; ctx.lineWidth = 2;
         const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 600) : 1;
         const r = b.r * gr * tScale;

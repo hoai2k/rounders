@@ -166,6 +166,15 @@ Pillars:
       particle kind (drifts rather than falling). All mirrored in the preview
       sim and the bullet viewer; painted rounds for both are already requested
       in `image-requests.md` §2
+- [x] **Card feel pass 2026-08-17 (2)**: Encore's follow-up is now a twin shot
+      a full second later, fired **from the spot you shot from** (step aside
+      and the ghost covers the ground you left); Bricklayer stands its slab on
+      end (24×150) so it is cover that stops bullets; Return to Sender's
+      charged round flies inside a visible block bubble; a vortex core —
+      Pocket Void's and Event Horizon's alike — now mauls like an arena hazard
+      (30 damage + a launch clear of it, on a short grace, so a careless
+      player is chewed repeatedly); Event Horizon is wider (380px), hungrier
+      (−1500 pull) and swirls with layered arms and debris spiralling in
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

@@ -46,9 +46,10 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 
 ## What's inside
 
-- **52 hand-designed power cards** across six color-coded rarities — Common,
-  Uncommon, Rare, Epic, Legendary, and **Mythic** (active abilities on your block
-  button). Every card states exactly what it does.
+- **77 hand-designed power cards** across six color-coded rarities — Common,
+  Uncommon, Rare, Epic, Legendary, and **Mythic** (active abilities on their own
+  button). Every card states exactly what it does, and every one is painted:
+  a 256×256 emblem for the HUD chip and a full-bleed scene for the card face.
 - **25 themed arenas**, each with its own palette, weather, and signature mechanic:
   ice, conveyors, wind gusts, low gravity, bounce pads, moving platforms,
   teleporters, crumbling floors, rising tides, timed lightning, syrup pools,
@@ -98,7 +99,7 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 |---|---|
 | `game.js` | Engine: physics, combat, arena features, draft flow, rendering, menus |
 | `js/strings.js` | **All UI wording** — every menu and in-game string in one editable file |
-| `js/cards.js` | The 52-card set + rarity metadata |
+| `js/cards.js` | The 77-card set + rarity metadata |
 | `js/levels.js` | The 25 arenas |
 | `js/characters.js` | The 24 characters + procedural renderer |
 | `js/music.js` | Soundtrack manifest: the 28 tracks, their themes and pairs |

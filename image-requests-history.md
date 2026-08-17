@@ -410,3 +410,89 @@ cells) — otherwise a single image the engine animates by scaling/fading.
 | `muzzle-flash.png` | 128×128 | A short bright star-burst flash, drawn pointing right |
 | `angel.png` | 256×256 (52×60 drawn) | A tiny cartoon guardian angel seen head-on — round head, simple robe, two spread feathered wings, its own little halo above. Warm cream-gold on transparent; it rises and fades when Guardian Halo saves you, so keep it a clean readable silhouette |
 
+
+
+## 11. Effect finishers and two re-arts (delivered 2026-08-17)
+
+The six files that closed the list. Two of them completed the effect sheets —
+Guardian Halo's rising angel and Lemonade Stand's glass had been drawing
+procedurally since those cards shipped. The other four **replaced** art that had
+gone stale under a rename: the card formerly called Second Serve was still a
+tennis serve, and the one formerly called Mosh Pit still showed a small blade on
+an orbital track after the blade stopped orbiting.
+
+All six arrived already transparent (scenes excepted, which are meant to be
+opaque), so `npm run intake-art` filed them with nothing to key and nothing to
+archive.
+
+The prompts these were made from:
+
+### The last two effect sheets
+
+- **Path:** `assets/images/fx/<name>.png`
+
+| File | Size | Subject |
+|---|---|---|
+| `angel.png` | 256×256 (drawn ~52×60) | A tiny cartoon guardian angel seen head-on — round head, simple robe, two spread feathered wings, its own little halo above. Warm cream-gold on transparent; it rises and fades when Guardian Halo saves you, so keep it a clean readable silhouette |
+| `lemonade.png` | 256×256 (drawn ~106×106) | A tall glass of cloudy lemonade seen head-on — ice cubes, a pink-and-white striped straw, a lemon wedge on the rim, a couple of bubbles. Bright lemon yellow on transparent. It sits faded into the middle of Lemonade Stand's heal zone, so it must read at low opacity: strong shapes, dark outline, no fine detail |
+
+---
+
+### Second Defence — re-art after the rename
+
+The card used to be **Second Serve** and both files are a tennis player mid
+serve. It is now **Second Defence**: *"Dealing bullet damage instantly returns
+your block."* Land a hit, your shield is back — nothing to do with tennis. Both
+files below **replace** what is already at those paths.
+
+**Card:** Second Defence · Rare · *"Advantage: you."*
+**Effect:** hits refresh your block (1s lockout)
+
+- **Emblem** — `assets/images/cards/second-defence.png`, 256×256, transparent
+  background, drawn small in the HUD so it needs a clean silhouette:
+
+  > A round cartoon brawler mid-punch, and the instant their fist lands a
+  > hexagonal energy shield snaps back into place around them — the shield
+  > re-forming in a burst of cyan-white hex panels flying together. Motion
+  > lines from the punch, a bright impact spark at the fist. Cyan and white
+  > over deep blue. Confident, not defensive.
+
+- **Scene** — `assets/images/cards/art/second-defence.png`, 512×384, opaque
+  full-bleed painting:
+
+  > A round cartoon brawler in an arena, fist buried in an enemy, and in the
+  > same instant a hexagonal energy barrier is snapping shut around the
+  > attacker — shield panels rushing inward and locking together, cyan-white,
+  > with the impact flash still bright at the point of contact. The enemy is
+  > recoiling. Read: hitting them is what put your guard back up.
+
+---
+
+### Sawblade — re-art after the rename
+
+The card used to be **Mosh Pit** and both files show a small blade riding a
+visible circular *track* around the fighter. The blade no longer orbits: it is
+now one huge disc centred on you, spinning on its own axis and filling the
+whole area it damages. Both files below **replace** what is already at those
+paths (already renamed `mosh-pit.png` → `sawblade.png`).
+
+**Card:** Sawblade · Rare · *"Mind the blade."*
+**Effect:** block = spinning saw (2s)
+
+- **Emblem** — `assets/images/cards/sawblade.png`, 256×256, transparent
+  background:
+
+  > A round cartoon brawler at the centre of one enormous circular sawblade
+  > that is much wider than they are — the blade behind them, teeth all round
+  > the outside, motion-blurred as it spins. Bright steel with a heavy dark
+  > outline so it reads against any background. Sparks where the teeth bite.
+  > The fighter looks delighted about it. No orbit, no track, no second blade.
+
+- **Scene** — `assets/images/cards/art/sawblade.png`, 512×384, opaque
+  full-bleed painting:
+
+  > A round cartoon brawler standing inside a colossal spinning sawblade — the
+  > disc is centred on them and several times their width, filling the frame
+  > behind them, teeth throwing sparks off the arena floor. An enemy is
+  > flinching back from the edge of it. Steel and hazard orange against a
+  > darker arena. Read: they ARE the blade, it is not circling them.

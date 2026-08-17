@@ -861,6 +861,10 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 /* The triggers are not pills. A real Xbox trigger is a paddle: a generously
    rounded top that your finger sits in, tapering to a squarer heel. Drawing
    them that way is what tells LT/RT apart from LB/RB at badge size. */
+/* The triggers are not pills. A real trigger is a paddle with ONE swept
+   corner — the outer bottom edge your finger curls around — so RT rounds only
+   at bottom-right and LT only at bottom-left. Mirroring them that way is what
+   makes left and right readable at badge size without reading the letters. */
 .card-btns b[data-b="LT"], .card-btns b[data-b="RT"],
 .cw-btnbadge[data-b="LT"], .cw-btnbadge[data-b="RT"] {
   --btn-face: #e6ebf3;
@@ -868,9 +872,8 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   min-width: 25px;
   height: 21px;
   font-size: 9.5px;
-  padding: 2px 5px 0;
-  border-radius: 11px 11px 4px 4px;
-  align-content: end;
+  padding: 0 4px;
+  place-items: center;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 46%),
     var(--btn-face);
@@ -879,7 +882,9 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
     inset 0 2px 2px rgba(255, 255, 255, 0.65),
     0 2px 6px rgba(0, 0, 0, 0.5);
 }
-.cw-btnbadge[data-b="LT"], .cw-btnbadge[data-b="RT"] { height: 22px; vertical-align: -5px; }
+.card-btns b[data-b="RT"], .cw-btnbadge[data-b="RT"] { border-radius: 0 0 10px 0; }
+.card-btns b[data-b="LT"], .cw-btnbadge[data-b="LT"] { border-radius: 0 0 0 10px; }
+.cw-btnbadge[data-b="LT"], .cw-btnbadge[data-b="RT"] { height: 22px; vertical-align: -6px; }
 
 /* the workbench's inline badges sit in a line of text, so they need a hair
    more room and a baseline nudge */

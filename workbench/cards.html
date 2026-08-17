@@ -203,6 +203,12 @@
 
     <script>window.ROUNDERS_ASSET_BASE = "../";</script>
     <script src="../js/chroma.js"></script>
+    <!-- rig.js MUST come before characters.js: characters.js preloads the rig
+         parts and pulls in rigs.json on load, and skips both silently if the
+         rig module is not there yet. Without it the preview drew fighters from
+         the fallback art, so a weapon here did not match the one configured in
+         the sprite workbench or used in the game. -->
+    <script src="../js/rig.js"></script>
     <script src="../js/characters.js"></script>
     <script src="../js/cards.js"></script>
     <script src="../js/gameplay.js"></script>

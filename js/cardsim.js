@@ -507,6 +507,19 @@
       return dir > 0 ? -theta : Math.PI + theta;
     }
 
+    // Where the round actually leaves the gun. The game takes this from the
+    // composed rig (game.js: rig.muzzle), so the preview does too — otherwise a
+    // fighter's barrel and their shots disagree. Falls back to a plain offset
+    // if the rig has not resolved.
+    function muzzleOf(who, ang) {
+      const rig = window.ROUNDERS.rig;
+      const m = rig && rig.muzzle
+        ? rig.muzzle(who.character, who.stats.radius, Math.cos(ang), Math.sin(ang), 0, who.facing || 0)
+        : null;
+      return m ? { x: who.x + m.x, y: who.y + m.y }
+               : { x: who.x + Math.cos(ang) * 26, y: who.y + Math.sin(ang) * 26 };
+    }
+
     function fire(who, mul = 1, angleOverride = null, ghost = false, opts = {}) {
       const st = who.stats;
       const nPellets = opts.pellets || st.pellets;
@@ -529,7 +542,7 @@
           // actually is at that angle — the 26px of barrel is enough to make
           // a long shot sail over the target's head.
           ang = aimAngle(who, target, speed, grav);
-          const muz = { x: who.x + Math.cos(ang) * 26, y: who.y + Math.sin(ang) * 26 };
+          const muz = muzzleOf(who, ang);
           ang = aimAngle(muz, target, speed, grav);
         }
         // deliberate miss for the cards whose whole point is recovering from one
@@ -552,8 +565,8 @@
         const speed = st.bulletSpeed * SCALE;
         bullets.push({
           owner: who,
-          x: (from ? from.x : who.x) + Math.cos(angle) * 26,
-          y: (from ? from.y : who.y) + Math.sin(angle) * 26,
+          x: from ? from.x : muzzleOf(who, angle).x,
+          y: from ? from.y : muzzleOf(who, angle).y,
           ox: from ? from.x : who.x, oy: from ? from.y : who.y,
           vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
           r: bulletRadius(st) * (1 + rageMul * 0.55),

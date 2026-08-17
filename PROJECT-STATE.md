@@ -385,6 +385,17 @@ Pillars:
       Chromium paints no scrollbar thumb at all, so the appearance could not be
       confirmed by screenshot — what is verified is that the stylesheet loads
       and the values resolve on every page
+- [x] **The card workbench never loaded `js/rig.js`**, so its fighters were
+      drawn from fallback art instead of the composed rig — which is why a
+      weapon there did not match the sprite workbench or the game. `rig.js` now
+      loads *before* `characters.js` (which preloads the rig parts and pulls in
+      `rigs.json` on load, and silently skips both if the module is absent).
+      All three pages now resolve the same rig and the same muzzle at
+      (55.4, 0). The preview also takes its firing position from `rig.muzzle`
+      rather than a hardcoded 26px offset, so barrel and bullet agree
+- [x] **Trigger badges mirror**: RT rounds only at bottom-right, LT only at
+      bottom-left — one swept corner each, so left and right read apart at
+      badge size without reading the letters. Text centred in the shape
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

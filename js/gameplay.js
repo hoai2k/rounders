@@ -1,0 +1,78 @@
+// ===========================================================================
+// Rounders — GAMEPLAY TUNING CONFIG
+// ===========================================================================
+// The base numbers a match starts from, in one editable place — the gameplay
+// counterpart to js/strings.js. Change a value and reload; the engine and the
+// card workbench both read from here.
+//
+// Cards MODIFY these baselines (multiply, add), so a change here shifts the
+// whole game while card trade-offs keep their proportions.
+// ===========================================================================
+(() => {
+  "use strict";
+  window.ROUNDERS = window.ROUNDERS || {};
+
+  window.ROUNDERS.GAMEPLAY = {
+
+    // -------------------------------------------------------- FIGHTER BASELINE
+    // What every fighter is before any cards.
+    fighter: {
+      maxHp: 100,
+      radius: 27,     // body size (px)
+
+      // movement
+      speed: 560,     // top ground speed (px/s)
+      accel: 12,      // how sharply you reach top speed
+      airAccel: 5.2,  // steering strength while airborne
+      brake: 10,      // how sharply you stop
+      jump: 880       // jump launch speed (≈184px rise at normal gravity)
+    },
+
+    // ------------------------------------------------------------ THE GUN
+    // Baseline: 3 hits to kill (36 a hit), so one full clip is exactly lethal
+    // and a fight has room to turn around. Ballistics are tuned so lobbing is
+    // a real tactic: max ballistic range is v²/g ≈ 1330px, so a 45° arc clears
+    // mid-map cover, while flat shots still drop visibly at range.
+    gun: {
+      damage: 36,
+      maxAmmo: 3,
+      fireDelay: 0.22,        // seconds between shots (lower = faster follow-ups)
+      reload: 2.0,            // seconds to refill the whole clip once it's empty
+      bulletSpeed: 1180,      // px/s
+      bulletGravity: 1050,    // how much shots arc
+      bulletDrag: 0.997,
+      bulletRestitution: 0.72,// bounciness of ricochet shots
+      bulletSize: 1,          // visual + hitbox scale
+      pellets: 1,
+      spread: 0.04
+    },
+
+    // ------------------------------------------------------------- BLOCKING
+    block: {
+      cooldown: 1.55,   // seconds between blocks
+      duration: 0.25    // the parry window
+    },
+
+    // ---------------------------------------------------------------- WORLD
+    world: {
+      gravity: 2100,    // px/s² pulling fighters down
+      airDrag: 0.996,   // per-frame-at-60fps velocity keep while airborne
+      floorDrag: 0.86   // ...and while grounded (lower = stops faster)
+    },
+
+    // ------------------------------------------------------------ WALL MOVES
+    wall: {
+      coyote: 0.12,     // seconds a wall touch stays "jumpable" after leaving it
+      jumpPush: 300,    // sideways kick of a wall jump (small = same wall climbable)
+      slideMax: 250     // fall speed cap while hugging a wall
+    },
+
+    // -------------------------------------------------------------- HAZARDS
+    hazards: {
+      touchDamage: 30,  // spikes/lava per touch (~3 touches from full health)
+      touchGrace: 1.0,  // seconds of immunity to steer back to safety
+      pitBounces: 2,    // times the bottom of the world throws you back in
+      soakRate: 7       // HP per second while under water
+    }
+  };
+})();

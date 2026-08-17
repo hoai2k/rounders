@@ -22,8 +22,28 @@
   const SCALE = 0.42;
   const TIME = 0.8;
 
-  // Mirror of game.js defaultStats() — the baseline a card is applied on top of.
+  // The baseline a card is applied on top of. The literal below carries the
+  // full stat SHAPE; js/gameplay.js (when loaded) overrides just the numbers
+  // it owns, so the preview and the game always agree on the baseline.
   function baseStats() {
+    const st = literalStats();
+    const GP = window.ROUNDERS.GAMEPLAY;
+    if (GP) {
+      const F = GP.fighter, G = GP.gun, B = GP.block;
+      Object.assign(st, {
+        maxHp: F.maxHp, speed: F.speed, accel: F.accel, airAccel: F.airAccel, brake: F.brake, jump: F.jump,
+        radius: F.radius,
+        damage: G.damage, bulletSpeed: G.bulletSpeed, bulletGravity: G.bulletGravity, bulletDrag: G.bulletDrag,
+        bulletRestitution: G.bulletRestitution, bulletSize: G.bulletSize,
+        maxAmmo: G.maxAmmo, reload: G.reload, fireDelay: G.fireDelay,
+        pellets: G.pellets, spread: G.spread,
+        blockCooldown: B.cooldown, blockDuration: B.duration
+      });
+    }
+    return st;
+  }
+
+  function literalStats() {
     return {
       maxHp: 100, speed: 560, accel: 12, airAccel: 5.2, brake: 10, jump: 880,
       damage: 36, bulletSpeed: 1180, bulletGravity: 1050, bulletDrag: 0.997,

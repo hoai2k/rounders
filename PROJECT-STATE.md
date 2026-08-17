@@ -277,6 +277,9 @@ Pillars:
 - [x] How to Play is a full-width two-column layout that fits without scrolling
 - [x] Bots read hazards and ledges instead of walking into them
 - [x] Hazards damage + launch (~3 touches); the pit bounces you back twice
+- [x] `js/gameplay.js` — gameplay tuning config (fighter/gun/block/world/wall/
+      hazard baselines); engine and card workbench both read it; base fire
+      delay 0.3 → 0.22
 - [x] **Arch logo art**: `assets/images/logo-arch.png` (keyed from
       `rounders_logo_arch_v3.png`) replaces the text logo on the title screen
       and main menu; UI palette shifted to match (gunmetal panels, steel-bevel

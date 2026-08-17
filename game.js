@@ -5,6 +5,7 @@
   const { CARDS, RARITIES, CHARACTERS, LEVELS, drawCharacter, setProceduralCharacters, arenaImage } = window.ROUNDERS;
   const { cardArt, cardArtUrl, cardScene, cardSceneUrl } = window.ROUNDERS;
   const str = window.ROUNDERS.str;
+  const GP = window.ROUNDERS.GAMEPLAY;
 
   // Fills every [data-str] / [data-str-html] node from js/strings.js so all UI
   // wording can be edited in one file.
@@ -61,9 +62,9 @@
   const world = {
     width: 1600,
     height: 900,
-    gravity: 2100,
-    airDrag: 0.996,
-    floorDrag: 0.86,
+    gravity: GP.world.gravity,
+    airDrag: GP.world.airDrag,
+    floorDrag: GP.world.floorDrag,
     state: "title",
     panelReturn: "menu",
     musicDuck: 1,     // volume multiplier: 1 normal, DUCK.* while paused/drafting
@@ -145,28 +146,15 @@
 
   // ------------------------------------------------------------------ stats
   function defaultStats() {
+    // Baselines live in js/gameplay.js — edit numbers there, not here.
+    const F = GP.fighter, G = GP.gun, B = GP.block;
     return {
-      maxHp: 100, speed: 560, accel: 12, airAccel: 5.2, brake: 10, jump: 880,
-      // Baseline: 100 HP, no regen, 3 ammo with an automatic whole-clip reload
-      // when empty. The default gun takes *three* hits to kill (36 a hit), so
-      // one full clip is exactly lethal and a fight has room to turn around —
-      // two-shotting off spawn left no time to react.
-      //
-      // Damage is the number that moved, not health: every other source in the
-      // game (hazard contact 25, a meteor 34, an explosion 26, poison and burn
-      // ticks) is an absolute number weighed against a 100 HP pool, and
-      // inflating health would have quietly made all of them weaker.
-      //
-      // Ballistics are tuned so lobbing is a real tactic (ROUNDS-style): max
-      // ballistic range is v²/g ≈ 1330px, so a 45° arc clears mid-map cover
-      // and reaches most of a standard arena, while flat shots still drop
-      // visibly at range. The old 980/1300 pairing capped arcs at ~740px —
-      // half the arena — which made every fight close-range.
-      damage: 36, bulletSpeed: 1180, bulletGravity: 1050, bulletDrag: 0.997,
-      bulletRestitution: 0.72, bulletSize: 1,
-      maxAmmo: 3, reload: 2.0, fireDelay: 0.3,
-      blockCooldown: 1.55, blockDuration: 0.25,
-      radius: 27, pellets: 1, spread: 0.04,
+      maxHp: F.maxHp, speed: F.speed, accel: F.accel, airAccel: F.airAccel, brake: F.brake, jump: F.jump,
+      damage: G.damage, bulletSpeed: G.bulletSpeed, bulletGravity: G.bulletGravity, bulletDrag: G.bulletDrag,
+      bulletRestitution: G.bulletRestitution, bulletSize: G.bulletSize,
+      maxAmmo: G.maxAmmo, reload: G.reload, fireDelay: G.fireDelay,
+      blockCooldown: B.cooldown, blockDuration: B.duration,
+      radius: F.radius, pellets: G.pellets, spread: G.spread,
       bounces: 0, explosive: 0, homing: 0, grow: 0, pierce: 0,
       poison: 0, burn: 0, chill: 0, chain: 0, shards: 0,
       groundHug: 0, voidPull: 0,
@@ -2059,9 +2047,9 @@
 
   // Wall contact is remembered for a short window so a jump pressed a frame or
   // two after sliding off the edge of a wall still counts (coyote time).
-  const WALL_COYOTE = 0.12;
-  const WALL_JUMP_PUSH = 300;   // sideways kick; small so the same wall is climbable
-  const WALL_SLIDE_MAX = 250;   // fall speed cap while touching a wall
+  const WALL_COYOTE = GP.wall.coyote;
+  const WALL_JUMP_PUSH = GP.wall.jumpPush;
+  const WALL_SLIDE_MAX = GP.wall.slideMax;
   function touchWall(p, awayDir) {
     if (p.grounded) return;
     p.wallDir = awayDir;
@@ -2937,7 +2925,7 @@
     return false;
   }
 
-  const SOAK_RATE = 7;    // HP per second under water
+  const SOAK_RATE = GP.hazards.soakRate;
   const SOAK_BITE = 3.5;  // ...delivered in bites this size
 
   // Drowning is damage over time, but a health bar sliding down reads as a bug.
@@ -2962,9 +2950,9 @@
   // damage first (so guardian/revive rules still apply at low HP), then a hard
   // upward bounce away from the hazard, with a grace window so one dip into
   // lava reads as one hit.
-  const HAZARD_DAMAGE = 30;   // ~3 touches from full health
-  const HAZARD_GRACE = 1.0;   // long enough to steer back to a platform
-  const PIT_BOUNCES = 2;      // falls the floor of the world gives back
+  const HAZARD_DAMAGE = GP.hazards.touchDamage;
+  const HAZARD_GRACE = GP.hazards.touchGrace;
+  const PIT_BOUNCES = GP.hazards.pitBounces;
   function hazardHit(p, h) {
     if (!p.alive || p.hazardGrace > 0 || p.spawnGrace > 0) return;
     p.hazardGrace = HAZARD_GRACE;

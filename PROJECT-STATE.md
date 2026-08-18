@@ -585,6 +585,14 @@ Pillars:
       exists instead of waiting out a fixed lockout. The ready ring became an
       arc showing how much reel is left. Measured: a 2s hold spent 0.9s of tape
       and took 3.06s to refill
+- [x] **Bots use walls**: they knew how to jump AT a wall but never off one —
+      airborne, they never pressed jump at all, so a wall touch went unused
+      (measured: 0 wall jumps and 0 in-air wall contacts over a whole match).
+      A bot that wants height (target above, or nothing under its feet) now
+      kicks off a wall it is touching and steers straight back into it for the
+      next kick, chaining a climb; the same reflex recovers it from a fall
+      down the side of the arena. Measured after: 12 wall jumps in the same
+      test, and a bot dropped past the edge kicks back off the wall
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

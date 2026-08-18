@@ -12,6 +12,7 @@
     "fitrig": "node tools/fitrig.mjs",
     "audit-combos": "node tools/audit-combos.mjs",
     "audit-stats": "node tools/audit-stats.mjs",
+    "audit-ttk": "node tools/audit-ttk.mjs",
     "audit-arenas": "node tools/audit-arenas.mjs",
     "bullet-colors": "node tools/bullet-colors.mjs"
   }

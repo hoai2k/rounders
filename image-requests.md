@@ -1,16 +1,30 @@
 # Image Generation Requests — Rounders
 
-**Nothing outstanding.** Every image the game asks for has been generated and is
-in the repo. The prompts everything was made from live in
-`image-requests-history.md`, which is where a re-generation or a style question
-goes looking.
+**Six cards are waiting on art** — the health cards added in the anti-one-shot
+balance pass. Each needs an emblem (`cards/<id>.png`) and a scene
+(`cards/art/<id>.png`). The game already ships them and draws procedural
+fallbacks, so nothing is broken while these are outstanding.
+
+Prepend the global style guide below to every prompt.
+
+| id | emblem | scene |
+|---|---|---|
+| `second-wind` | a lungful of bright air, a green swirl curling up out of a fighter's chest | a battered round fighter straightening back up mid-fight, a fresh green gust spiralling around them, colour flooding back into their body |
+| `padded-vest` | a quilted flak vest, thick stitched panels, chunky buckles | a stout fighter in an overstuffed quilted vest shrugging off a hit, the round bouncing away in a puff of stuffing |
+| `iron-rations` | a dented tin of iron-grey field rations with a heavy ring pull | a fighter chewing through a slab of grey ration block, planted like a boulder while shots spark off them |
+| `sandbags` | three stacked sandbags, taut and heavy, sand trickling from a split seam | a fighter dug in behind a wall of sandbags they are visibly wearing, low and immovable, dust kicked up around their feet |
+| `bulwark` | a broad tower shield planted in the ground, riveted iron band across it | a fighter braced behind an enormous planted shield taking a volley head on, sparks fanning off the face of it |
+| `second-skin` | a sleek second layer peeling over an arm, plated and flexible, faint blue sheen | a fighter mid-stride wrapped in a glossy plated second skin, a hit sliding off it without moving them an inch |
+
+The prompts everything else was made from live in `image-requests-history.md`,
+which is where a re-generation or a style question goes looking.
 
 > Audited 2026-08-17, after the last six files landed (`fx/angel.png`,
 > `fx/lemonade.png` and re-arts for Second Defence and Sawblade):
 >
 > | | |
 > |---|---|
-> | Cards shipping | 77 — **0 missing art**, each with an emblem and a scene |
+> | Cards shipping | 83 — the six health cards above are the only ones missing art |
 > | Emblems / scenes on disk | 88 each: the extra 11 belong to cut cards, kept in case they come back |
 > | Painted bullets | 29 |
 > | Effect sheets | 20 |

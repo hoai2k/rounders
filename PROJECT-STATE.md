@@ -627,6 +627,27 @@ Pillars:
       slight pull Wasp Venom carries, and the card says "slight homing" rather
       than "strong". Its preview drops the off-target staging with it — below
       0.5 a round cannot recover from that launch angle
+- [x] **Anti-one-shot balance pass (2026-08-18)**: measured first —
+      `npm run audit-ttk` builds a random attacker and a random defender out of
+      the real cards and counts trigger pulls. It found **7.1% of matchups
+      ending in a single volley** and a 10th-percentile fight lasting 2 shots.
+      The cause was a supply asymmetry, not a bad number: health had only 9
+      sources in 77 cards and **none at uncommon**, while damage multipliers
+      compound and are reachable at every rarity.
+      **A — six health cards added** (Second Wind +25%, Padded Vest +20%/−4%
+      speed at common; Iron Rations +30%/+0.15s reload, Sandbags +25%/−6% jump
+      at uncommon; Bulwark +40%/+0.06s fire delay, Second Skin +30%/+20%
+      knockback resist at rare) — 83 cards now, 13/20/26/17/4/3.
+      **B — the five hottest hitters trimmed** while staying the biggest hits
+      in the game: Supernova x2.0 -> x1.7, Glass Cannon x1.75/−30% HP ->
+      x1.6/−25%, Cannonball x1.3 -> x1.25, Bullet Ballet x0.55 -> x0.47 a
+      pellet, Railgun x1.25 -> x1.18.
+      Re-measured: one-shots **7.1% -> 2.5%**, median fight 3 -> 4 shots, p90
+      6 -> 8, volley p99 174 -> 144 and worst 448 -> 289. The 99th-percentile
+      volley is still 4x the 36-damage baseline, so damage cards read as
+      strong as they did
+- [ ] Art for the six new health cards (`image-requests.md`) — they ship on
+      procedural fallbacks until it lands
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

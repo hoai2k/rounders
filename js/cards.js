@@ -31,7 +31,7 @@
   }
 
   const CARDS = [
-    // -------------------------------------------------------- COMMON (11)
+    // -------------------------------------------------------- COMMON (13)
 
     card("bubblegum-rounds", "Bubblegum Rounds", "common",
       "Chews through magazines.",
@@ -42,8 +42,8 @@
     card("cannonball", "Cannonball", "common",
       "Subtlety is for other people.",
       "Your shots hit much harder, but they fly slower and reloading takes longer.",
-      ["+30% damage", "slower shot & reload"], ["damage"],
-      p => { p.stats.damage *= 1.3; p.stats.bulletSpeed *= 0.9; p.stats.reload += 0.22; }),
+      ["+25% damage", "slower shot & reload"], ["damage"],
+      p => { p.stats.damage *= 1.25; p.stats.bulletSpeed *= 0.9; p.stats.reload += 0.22; }),
 
     card("featherweight", "Featherweight", "common",
       "Float like a… you know.",
@@ -99,7 +99,19 @@
       ["+50% acceleration", "+35% braking"], ["movement"],
       p => { p.stats.accel *= 1.5; p.stats.brake *= 1.35; }),
 
-    // ------------------------------------------------------ UNCOMMON (18)
+    card("second-wind", "Second Wind", "common",
+      "You are not done yet.",
+      "A deeper reserve of health, and nothing given up for it.",
+      ["+25% health"], ["defense"],
+      p => { p.stats.maxHp *= 1.25; }),
+
+    card("padded-vest", "Padded Vest", "common",
+      "Bulk has its uses.",
+      "Thick padding soaks up punishment; you move a shade slower wearing it.",
+      ["+20% health", "−4% speed"], ["defense"],
+      p => { p.stats.maxHp *= 1.2; p.stats.speed *= 0.96; }),
+
+    // ------------------------------------------------------ UNCOMMON (20)
 
     card("longshot", "Longshot", "uncommon",
       "Practically a laser.",
@@ -209,7 +221,19 @@
       ["+50% HP shell until first hit"], ["defense"],
       p => { p.stats.freshCoat += 0.5; }),
 
-    // ---------------------------------------------------------- RARE (24)
+    card("iron-rations", "Iron Rations", "uncommon",
+      "Heavy, dull, and it keeps you alive.",
+      "A much longer health bar, paid for with a slower reload.",
+      ["+30% health", "+0.15s reload"], ["defense"],
+      p => { p.stats.maxHp *= 1.3; p.stats.reload += 0.15; }),
+
+    card("sandbags", "Sandbags", "uncommon",
+      "Dig in.",
+      "Weighed down and hard to shift: much more health, a little less spring.",
+      ["+25% health", "−6% jump"], ["defense"],
+      p => { p.stats.maxHp *= 1.25; p.stats.jump *= 0.94; }),
+
+    // ---------------------------------------------------------- RARE (26)
 
     card("boxing-glove", "Boxing Glove", "rare",
       "Float like a truck.",
@@ -262,8 +286,8 @@
     card("glass-cannon", "Glass Cannon", "rare",
       "Handle with care. Or don't.",
       "Massive damage boost, but your health bar becomes alarmingly small.",
-      ["+75% damage", "−30% health", "rounds fly sheathed in glass"], ["damage"],
-      p => { p.stats.damage *= 1.75; p.stats.maxHp *= 0.7; p.stats.glass += 1; }),
+      ["+60% damage", "−25% health", "rounds fly in glass"], ["damage"],
+      p => { p.stats.damage *= 1.6; p.stats.maxHp *= 0.75; p.stats.glass += 1; }),
 
     card("comet-trail", "Comet Trail", "rare",
       "Give it room to breathe.",
@@ -355,6 +379,18 @@
       ["enemy bullets veer away from you"], ["defense"],
       p => { p.stats.repel += 1; }),
 
+    card("bulwark", "Bulwark", "rare",
+      "Hold the line.",
+      "A vast pool of health, at the cost of a slightly slower trigger finger.",
+      ["+40% health", "+0.06s fire delay"], ["defense"],
+      p => { p.stats.maxHp *= 1.4; p.stats.fireDelay += 0.06; }),
+
+    card("second-skin", "Second Skin", "rare",
+      "It moves when you do.",
+      "More health, and incoming shots shove you around far less.",
+      ["+30% health", "+20% knockback resist"], ["defense"],
+      p => { p.stats.maxHp *= 1.3; p.stats.kbResist += 0.2; }),
+
     // ---------------------------------------------------------- EPIC (17)
 
     card("breakthrough", "Breakthrough", "epic",
@@ -405,8 +441,8 @@
     card("railgun", "Railgun", "epic",
       "Physics called. It's impressed.",
       "Hyper-velocity slugs pierce 2 players and hit harder, but fire slowly.",
-      ["pierces 2 players", "+55% speed · +25% dmg", "slow fire · −1 ammo"], ["projectile", "damage"],
-      p => { p.stats.pierce += 2; p.stats.bulletSpeed *= 1.55; p.stats.damage *= 1.25; p.stats.fireDelay += 0.3; p.stats.maxAmmo = Math.max(1, p.stats.maxAmmo - 1); }),
+      ["pierces 2 players", "+55% speed · +18% dmg", "slow fire · −1 ammo"], ["projectile", "damage"],
+      p => { p.stats.pierce += 2; p.stats.bulletSpeed *= 1.55; p.stats.damage *= 1.18; p.stats.fireDelay += 0.3; p.stats.maxAmmo = Math.max(1, p.stats.maxAmmo - 1); }),
 
     card("storm-caller", "Storm Caller", "epic",
       "Weather forecast: you.",
@@ -429,8 +465,8 @@
     card("bullet-ballet", "Bullet Ballet", "epic",
       "Choreographed devastation.",
       "Fire 3 extra pellets in an elegant, tight formation. Each pellet is much weaker.",
-      ["+3 pellets", "tight spread", "−45% damage per pellet"], ["multishot"],
-      p => { p.stats.pellets += 3; p.stats.spread += 0.06; p.stats.damage *= 0.55; }),
+      ["+3 pellets, tight", "−53% dmg per pellet"], ["multishot"],
+      p => { p.stats.pellets += 3; p.stats.spread += 0.06; p.stats.damage *= 0.47; }),
 
     card("return-to-sender", "Return to Sender", "epic",
       "Postage due.",
@@ -466,11 +502,11 @@
 
     card("supernova", "Supernova", "legendary",
       "Astronomers hate this one trick.",
-      "Fat white-hot slugs that detonate in a colossal blast and hit twice as hard.",
-      ["colossal explosion", "+100% dmg · slow reload"], ["aoe", "damage"],
+      "Fat white-hot slugs that detonate in a colossal blast and hit far harder.",
+      ["colossal explosion", "+70% dmg · slow reload"], ["aoe", "damage"],
       // the biggest bang in the set: it must out-hit epic Party Favor, whose
       // point-blank shards otherwise stack past it
-      p => { p.stats.explosive += 2.8; p.stats.damage *= 2; p.stats.bulletSize *= 1.5; p.stats.reload += 0.3; }),
+      p => { p.stats.explosive += 2.8; p.stats.damage *= 1.7; p.stats.bulletSize *= 1.5; p.stats.reload += 0.3; }),
 
     card("golden-gun", "Golden Gun", "legendary",
       "The first word is the last word.",

@@ -774,16 +774,18 @@ Pillars:
 - [x] Soundtrack: 28 tracks in `assets/music/` — 14 themes × 2, including the 12
       uploaded 2026-08-17 (Bossa Nova, Calypso, Italian Accorion, Salsa, Spy,
       Waltz). Manifest in `js/music.js`, which also carries each track's theme and
-      its paired partner. "Rounders Jazz 1" is the title/selection theme. Streamed
+      which take of it this is. "Rounders Jazz 1" is the title/selection theme. Streamed
       via byte-range requests (`server.mjs` serves 206), with the next track warmed
       in the background so skips start instantly.
-- [x] Music is chosen per arena, not at random: `js/arena-music.js` is the config
-      table (arena id → song, one line each, with the reason). A board opens on
-      its song, then plays that song's partner ("Tango 2" → "Tango 1"), then
-      random non-repeating tracks. Every theme is used by at least one arena and
-      no two arenas open on the same song.
-- [x] Card draft ducks the music to 55% and keeps the board's song running; the
-      next board's song takes over when the round starts. Pause ducks to 22%.
+- [x] Music runs **per match**, not per round, and is not a blind shuffle:
+      `js/arena-music.js` is the config table (arena id → song, one line each,
+      with the reason) and a match opens on the song cast to the arena it starts
+      in. Every track after that is picked by THEME — all 14 themes play once
+      before any comes round again, and a returning theme plays the other song of
+      its pair ("Tango 2" → "Tango 1"). Every theme is used by at least one arena
+      and no two arenas open on the same song (checked at load, warns in console).
+- [x] Card draft ducks the music to 55% and leaves the match's song playing —
+      the next board does not change it. Pause ducks to 22%.
 - [x] Now-playing readout bottom-right with ◀ / ▶ skip buttons
 
 ### 8. Audit (agent pass)

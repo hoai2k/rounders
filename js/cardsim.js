@@ -61,6 +61,17 @@
   // The game's speeds would cross a 720px view instantly, so space and time are
   // scaled together (v and g both by SCALE, keeping trajectory shape).
   const SCALE = 0.42;
+  // Springload's squash: a quarter of their height on the compression, sprung
+  // back out, pivoting on the feet. Same curve as game.js.
+  const SQUISH_TIME = 0.22;
+  function squishScale(who) {
+    const left = who.squish || 0;
+    if (left <= 0) return null;
+    const k = 1 - left / SQUISH_TIME;
+    const bend = Math.sin(Math.PI * Math.min(1, k / 0.55));
+    const over = k > 0.55 ? Math.sin(Math.PI * (k - 0.55) / 0.45) * 0.1 : 0;
+    return { sy: 1 - 0.25 * bend + over, sx: 1 + 0.16 * bend - over * 0.6 };
+  }
   const TIME = 0.8;
 
   // The baseline a card is applied on top of. The literal below carries the
@@ -97,7 +108,7 @@
       groundHug: 0, voidPull: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
-      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0, hover: 0, hoard: 0,
+      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0, hover: 0, hoard: 0, glass: 0,
       goldenShot: 0, killHeal: false,
       active: null, activeCooldown: 10,
       kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0, wallPierce: 0, holePunch: 0,
@@ -136,6 +147,7 @@
       burn: on("burn"), poison: on("poison"), chill: on("chill"),
       chain: on("chain"), homing: on("homing") || on("steer"), grow: on("grow"),
       helium: on("helium"), boomerang: on("boomerang"), stink: on("stink"),
+      glass: st.glass > 0,
       voidPull: on("voidPull"), shards: st.shards > 0, bounces: st.bounces > 0,
       // not a bullet stat, but it changes what the round LOOKS like: an
       // empowered shot flies gold inside a block bubble, so the viewer has to
@@ -192,7 +204,10 @@
     // far better than a bank off a floating slab, which lands anywhere
     else if (on("bounces") || on("bankShot")) { plan.skip = true; watch.push("the shot skips off the floor instead of dying on it"); }
     if (on("chain")) { plan.wall = "perch"; watch.push("with nobody else to jump to, the bolt earths on the wall behind and comes back — hitting them twice"); }
-    if (on("homing") || on("steer")) { plan.aimUp = -0.6; watch.push("fired well off-target, the bullet curves back onto them"); }
+    // Only a shot that can genuinely correct is fired off-target: a slight
+    // drift (Wasp Venom) would sail past and the preview would land nothing.
+    if (s.homing >= 0.5 || on("steer")) { plan.aimUp = -0.6; watch.push("fired well off-target, the bullet curves back onto them"); }
+    else if (on("homing")) watch.push("the shot drifts after them as it flies");
     if (on("helium")) {
       // Fired FLAT, exactly as a normal round leaves the muzzle — the only
       // difference is what happens after launch. The target waits on a ledge
@@ -274,7 +289,11 @@
       plan.close = true;
       watch.push("landing on a head deals damage and bounces them off it");
     }
-    if (on("jumpBlast")) watch.push("their mid-air jump detonates underneath them");
+    if (on("jumpBlast")) {
+      plan.blastDemo = true;
+      plan.close = true;
+      watch.push("their mid-air jump detonates underneath them, and kicks lit crackers out of their heels");
+    }
     if (s.damage > b.damage * 1.02) watch.push("bigger bite out of the health bar");
     if (s.damage < b.damage * 0.98) watch.push("softer hits — the trade for the rest of the card");
     if (s.maxHp > b.maxHp * 1.02) watch.push("a longer health bar");
@@ -485,6 +504,15 @@
       }
     }
 
+    function simBubble(x, y, scale = 1) {
+      const life = rand(0.7, 1.2);
+      parts.push({
+        bubble: true, x, y, vx: rand(-12, 12), vy: rand(-42, -18) * scale,
+        life, max: life, r: rand(1.4, 3.2) * scale, wob: Math.random() * 6.3,
+        color: Math.random() < 0.35 ? "#c8ff8a" : "#7fd43c"
+      });
+    }
+
     function float(x, y, text, color) { floaters.push({ x, y, text, color, life: 0.9 }); }
     function puff(x, y, color, n = 8, sp = 150) {
       for (let i = 0; i < n; i += 1) {
@@ -507,6 +535,14 @@
         float(who.x, who.y - 46, "BLOCK", "#ffffff");
         return;
       }
+      // Aegis Bubble swallows the hit WHOLE — damage and shove together — so
+      // it is checked before any knockback. A DoT tick is not a hit.
+      if (who.shield > 0 && amount >= 5 && amount < 500) {
+        who.shield -= 1;
+        puff(who.x, who.y, "#7fd8ff", 22, 340);
+        float(who.x, who.y - who.stats.radius - 14, "ABSORBED", "#7fd8ff");
+        return;
+      }
       // knockback, with the attacker's kbDeal and the victim's resistance
       const kb = (1 - Math.min(0.9, who.stats.kbResist)) * (from ? 1 + from.stats.kbDeal : 1);
       const mag = Math.hypot(kx, ky) || 1;
@@ -518,14 +554,9 @@
       }
       if (who.stats.thorns && from && direct) {
         from.hp = Math.max(1, from.hp - amount * who.stats.thorns);
+        who.thornPulse = 0.35;
         float(from.x, from.y - 52, `-${Math.round(amount * who.stats.thorns)}`, "#ff5f8f");
         parts.push({ bolt: true, x1: who.x, y1: who.y, x2: from.x, y2: from.y, life: 0.18, max: 0.18, color: "#ff5f8f" });
-      }
-      // shields first
-      if (who.shield > 0) {
-        const s = Math.min(who.shield, amount);
-        who.shield -= s; amount -= s;
-        puff(who.x, who.y, "#7fd8ff", 8, 200);
       }
       if (amount > 0 && who.temp > 0) {
         const s = Math.min(who.temp, amount);
@@ -558,7 +589,8 @@
           // second, then climb back out of the same spot
           who.revives -= 1;
           who.dead = true;
-          who.rebirth = { t: 1, x: who.x, y: who.y };
+          // the pyre sits on the ground they fell on, not at chest height
+          who.rebirth = { t: 1, x: who.x, y: who.y + who.stats.radius * 0.85 };
           who.hp = 0;
           puff(who.x, who.y, "#ff9e3d", 26, 420);
           for (let i = 0; i < 18; i += 1) {
@@ -661,6 +693,7 @@
           wallPierce: st.wallPierce ? 70 + 50 * (st.wallPierce - 1) : 0,
           holePunch: st.holePunch,
           homing: st.homing, steer: st.steer, grow: st.grow, groundHug: st.groundHug,
+          glass: st.glass,
           explosive: st.explosive, shards: st.shards, chain: st.chain, popcorn: st.popcorn,
           poison: st.poison, burn: st.burn, chill: st.chill, stink: st.stink,
           voidPull: st.voidPull, dazzle: st.dazzle, silence: st.silence,
@@ -683,6 +716,13 @@
           who.queue.push({ t: 1 * i, mul: 0.5, angle: ang, pellets: 2, from: { x: who.x, y: who.y } });
         }
       }
+      // Blood Money: the pact collects on every trigger pull, and never
+      // finishes the shooter off
+      if (st.bloodMoney && !ghost) {
+        who.hp = Math.max(1, who.hp - 5 * st.bloodMoney);
+        puff(who.x, who.y, "#ff4d5f", 4, 110);
+        float(who.x + rand(-8, 8), who.y - 40, "-" + 5 * st.bloodMoney, "#ff4d5f");
+      }
       if (who.ammo < st.autoBlock) doBlock(who, true);
       if (who.ammo <= 0) who.reloadT = st.reload;
     }
@@ -691,7 +731,7 @@
       const st = who.stats;
       if (st.blockPush) fields.push({ type: "push", owner: who, x, y, r: 110, life: 0.3, scatter: true });
       if (st.frostBlock) { for (const e of enemies(who)) if (Math.hypot(e.x - x, e.y - y) < 150) e.chillT = 2.5; puff(x, y, "#8fd8ff", 16, 240); }
-      if (st.healField) fields.push({ type: "heal", owner: who, x, y, r: 86, life: 3, hps: 10 * st.healField });
+      if (st.healField) fields.push({ type: "heal", owner: who, x, y, r: 86, life: 10, hps: 10 * st.healField });
       if (st.stormBlock) {
         // a crown of lightning: a bright ring plus forked bolts to everyone in
         // it, held long enough to actually see
@@ -737,7 +777,7 @@
       if (st.warpBlock) { who.x = Math.max(60, Math.min(W - 60, who.x + who.facing * 110)); puff(who.x, who.y, who.color, 14, 240); }
       if (st.blockDash) who.vx += who.facing * 320;
       if (st.blockReload) { who.ammo = st.maxAmmo; who.reloadT = 0; float(who.x, who.y - 56, "RELOADED", "#ffe169"); }
-      if (st.sawBlock) fields.push({ type: "saw", owner: who, angle: 0, r: 58, life: 2, dmg: 9 });
+      if (st.sawBlock) fields.push({ type: "saw", owner: who, angle: 0, r: 58, life: 3, dmg: 9 });
       // stood on end, so it is cover you can hide behind
       if (st.brickBlock && slabs.length < 2) slabs.push({ x: who.x + who.facing * 84, y: GROUND - 62, w: 20, h: 118, vy: 0 });
       if (st.empowerBlock) { who.empower = st.empowerBlock; float(who.x, who.y - 56, "EMPOWERED", "#ffd700"); }
@@ -797,6 +837,7 @@
         who.stunT = Math.max(0, who.stunT - dt);
         who.silenceT = Math.max(0, who.silenceT - dt);
         who.chillT = Math.max(0, who.chillT - dt);
+        who.thornPulse = Math.max(0, (who.thornPulse || 0) - dt);
         if (who.echoT > 0) { who.echoT -= dt; if (who.echoT <= 0) { who.blockT = Math.max(who.blockT, 0.3); blockEffects(who, who.x, who.y); puff(who.x, who.y, "#fff", 10, 180); } }
         if (who.poisonT > 0) {
           who.poisonT -= dt; who.hp = Math.max(1, who.hp - who.dotDps * dt);
@@ -824,7 +865,20 @@
           }
         }
         if (who.decayPool > 0) { const bite = Math.min(who.decayPool, Math.max(who.decayPool / 3, 3) * dt); who.decayPool -= bite; who.hp = Math.max(0, who.hp - bite); }
-        if (who.stats.regen) heal(who, who.stats.regen * dt);
+        if (who.stats.regen) {
+          const before = who.hp;
+          heal(who, who.stats.regen * dt);
+          if (who.hp > before && Math.random() < dt * 14) {
+            const ang = rand(0, Math.PI * 2);
+            const rr = who.stats.radius * rand(1.8, 3.0);
+            parts.push({
+              x: who.x + Math.cos(ang) * rr, y: who.y + Math.sin(ang) * rr,
+              vx: -Math.cos(ang) * rand(60, 130), vy: -Math.sin(ang) * rand(60, 130),
+              life: 0.45, max: 0.45, r: rand(1.4, 2.6),
+              color: Math.random() < 0.4 ? "#c6ffd0" : "#74f08b", spark: true
+            });
+          }
+        }
         if (who.stats.hotStreak && who.hotWant) { who.temp = Math.max(who.temp, 25 * who.stats.hotStreak); who.hotWant = false; }
         if (who.temp > 0 && who.stats.hotStreak) who.temp = Math.max(0, who.temp - 10 * dt);
         if (who.reloadT > 0) {
@@ -850,7 +904,12 @@
             if (Math.abs(dx) < e.stats.radius + who.stats.radius * 0.7 &&
                 dy > 0 && dy < e.stats.radius + who.stats.radius + 10) {
               damage(e, 25 * who.stats.stomp, who, dx * 0.4, 120, false);
-              who.vy = -who.stats.jump * 1.05 * SCALE;
+              // the head squashes under the landing and springs back; the
+              // stomper rides it down and leaves on the way up
+              e.squish = SQUISH_TIME;
+              who.vy = 120 * SCALE;
+              who.stompHold = SQUISH_TIME * 0.45;
+              who.stompLaunch = who.stats.jump * 1.05 * SCALE;
               who.stompCd = 0.5;
               puff(e.x, e.y - e.stats.radius, "#ffe169", 14, 280);
               float(e.x, e.y - e.stats.radius - 20, "STOMP", "#ffe169");
@@ -859,6 +918,12 @@
           }
         }
         who.stompCd = Math.max(0, (who.stompCd || 0) - dt);
+        who.squish = Math.max(0, (who.squish || 0) - dt);
+        if (who.stompHold > 0) {
+          who.stompHold -= dt;
+          who.vy = 120 * SCALE;
+          if (who.stompHold <= 0) { who.vy = -(who.stompLaunch || 0); who.stompLaunch = 0; }
+        }
         // Phoenix Feather: the pyre burns where they fell, then they rise
         if (who.rebirth) {
           who.rebirth.t -= dt;
@@ -911,6 +976,25 @@
         who.facing = who.aimX;
       }
 
+      // Firecracker Heels: an air jump goes off like a mortar underneath them,
+      // and kicks lit crackers out of the heels that tumble down and pop
+      function jumpBlast(who) {
+        const dmg = 15 * who.stats.jumpBlast;
+        for (const e of enemies(who)) {
+          const d = Math.hypot(e.x - who.x, e.y - (who.y + 20));
+          if (d < 110) damage(e, (1 - d / 110) * dmg + 4, who, e.x - who.x, e.y - who.y, false);
+        }
+        puff(who.x, who.y + 16, "#ff9e3d", 16, 300);
+        for (let i = 0; i < 3 + who.stats.jumpBlast; i += 1) {
+          parts.push({
+            x: who.x + rand(-8, 8), y: who.y + who.stats.radius * 0.6,
+            vx: rand(-110, 110) + who.vx * 0.25, vy: rand(-45, 45),
+            rot: rand(0, Math.PI * 2), spin: rand(-9, 9),
+            life: rand(0.5, 1.1), max: 1.1, r: 3, color: "#d8322f", cracker: true
+          });
+        }
+      }
+
       // slabs fall
       for (const s of slabs) { s.vy += 900 * SCALE * dt; s.y += s.vy * dt; if (s.y > GROUND - s.h / 2) { s.y = GROUND - s.h / 2; s.vy = 0; } }
 
@@ -936,11 +1020,37 @@
         const foe = enemies(h)[0];
         const gap = foe.x - h.x;
         if (h.grounded) {
-          if (Math.abs(gap) > 78) h.vx += Math.sign(gap) * h.stats.speed * SCALE * dt * 7;
-          else { h.vy = -h.stats.jump * 1.02 * SCALE; h.grounded = false; }
-        } else if (h.vy > 0) {
-          // steer the descent onto the head
-          h.vx += Math.sign(foe.x - h.x) * 420 * SCALE * dt;
+          if (Math.abs(gap) > 92) h.vx += Math.sign(gap) * h.stats.speed * SCALE * dt * 7;
+          else {
+            // jump from a standing start: carrying the run into it sailed them
+            // clean over the head instead of onto it
+            h.vy = -h.stats.jump * 1.02 * SCALE;
+            h.vx = Math.sign(gap) * 30 * SCALE;
+            h.grounded = false;
+          }
+        } else {
+          // fly the whole arc onto the head rather than only correcting on the
+          // way down, so the landing is on top of them and not beside them
+          const want = (foe.x - h.x) * 2.6;
+          h.vx += (want - h.vx) * Math.min(1, dt * 7);
+        }
+      }
+      if (plan.blastDemo) {
+        // hop off the floor, then let go a second jump near the apex so the
+        // charge goes off in mid-air where it can be seen
+        const h = plan.holder === "target" ? bb : a;
+        const foe = enemies(h)[0];
+        if (h.grounded && (h.blastCd || 0) <= 0) {
+          h.vy = -h.stats.jump * SCALE; h.grounded = false;
+          h.vx += Math.sign(foe.x - h.x) * h.stats.speed * SCALE * 0.5;
+          h.blastPending = true;
+          h.blastCd = 1.6;
+        }
+        h.blastCd = Math.max(0, (h.blastCd || 0) - dt);
+        if (h.blastPending && !h.grounded && h.vy > -70 * SCALE) {
+          h.blastPending = false;
+          h.vy = -h.stats.jump * SCALE;
+          jumpBlast(h);
         }
       }
       if (plan.movementDemo) {
@@ -957,7 +1067,11 @@
       if (shooter.fireT <= 0 && shooter.reloadT <= 0 && shooter.ammo > 0 && shooter.stunT <= 0 && t > 0.7 &&
           (!shooter.stats.empowerBlock || shooter.empower > 0)) {
         fire(shooter);
-        shooter.fireT = Math.max(0.55, fireDelayOf(shooter.stats));
+        // The preview normally paces shots out so each one can be read, but a
+        // card whose whole point is cadence (Blood Money, Trigger Discipline)
+        // has to be seen firing fast, so it keeps its real delay.
+        const rapid = shooter.stats.fireDelay < baseStats().fireDelay * 0.75;
+        shooter.fireT = Math.max(rapid ? 0.1 : 0.55, fireDelayOf(shooter.stats));
       }
       // the receiver blocks incoming fire when blocking is what's on show
       if (plan.blockDemo) {
@@ -1078,7 +1192,7 @@
         // Comet Trail: the tail is sized off the round's CURRENT radius, so as
         // the comet swells with distance the trail thickens and lengthens with
         // it instead of staying a thin thread behind a growing head
-        const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 600) : 1;
+        const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 400) : 1;
         parts.push({ x: b.x, y: b.y, vx: 0, vy: 0, life: 0.2 * gr, max: 0.2 * gr, r: b.r * gr * 0.5, color: b.trailColor || (b.burn ? "#ff9e3d" : b.color), trail: true });
         if (b.grow && gr > 1.08) {
           // and once it is genuinely burning it throws embers as well
@@ -1204,7 +1318,7 @@
             continue;
           }
           const travel = Math.hypot(b.x - b.ox, b.y - b.oy);
-          const dmg = b.damage * (b.grow ? 1 + Math.min(1, travel / 420) : 1);
+          const dmg = b.damage * (b.grow ? 1 + Math.min(1, travel / 280) : 1);
           damage(who, dmg, b.owner, b.vx, b.vy);
           // the heal rides home as motes and lands when they arrive
           if (b.owner.stats.lifesteal) siphon(who, b.owner, dmg * b.owner.stats.lifesteal);
@@ -1322,6 +1436,18 @@
             });
           }
         }
+        if (f.type === "stink") {
+          // boiling off the ground under it, and off whoever is standing in it
+          if (Math.random() < dt * 30) {
+            const off = rand(-f.r * 0.85, f.r * 0.85);
+            simBubble(f.x + off, f.y + Math.sqrt(Math.max(0, f.r * f.r - off * off)) * 0.55);
+          }
+          for (const e of enemies(f.owner)) {
+            if (Math.hypot(e.x - f.x, e.y - f.y) < f.r && Math.random() < dt * 14) {
+              simBubble(e.x + rand(-10, 10), e.y + rand(-8, 10), 1.2);
+            }
+          }
+        }
         if (f.type === "stink") for (const e of enemies(f.owner)) {
           if (Math.hypot(e.x - f.x, e.y - f.y) < f.r) { e.chillT = 0.5; e.poisonT = 0.6; e.dotDps = 8 * f.stink; }
         }
@@ -1335,6 +1461,14 @@
         p.x += p.vx * dt; p.y += p.vy * dt;
         if (p.smoke) { p.vy -= 55 * dt; p.vx *= Math.pow(0.9, dt * 60); }
         else if (p.chunk) { p.vy += 900 * dt; p.rot += p.spin * dt; }
+        else if (p.cracker) {
+          p.vy += 900 * dt; p.rot += p.spin * dt; p.vx *= Math.pow(0.98, dt * 60);
+          if (p.y >= GROUND - 2 || p.life <= 0) {
+            p.life = 0;
+            puff(p.x, Math.min(p.y, GROUND - 2), "#ffcf4d", 7, 190);
+          }
+        }
+        else if (p.bubble) { p.vy -= 30 * dt; p.wob += dt * 7; p.x += Math.sin(p.wob) * 12 * dt; }
         else if (p.flame) p.vy -= 120 * dt;
         else if (p.spark) { /* vortex debris flies its own way */ }
         else p.vy += 400 * dt;
@@ -1421,6 +1555,11 @@
       const ch = who.character;
       ctx.save();
       ctx.translate(who.x, who.y);
+      const sq = squishScale(who);
+      if (sq) {
+        const rr = who.stats.radius;
+        ctx.translate(0, rr); ctx.scale(sq.sx, sq.sy); ctx.translate(0, -rr);
+      }
       if (who.stats.repel) {
         ctx.save();
         for (let i = 0; i < 2; i += 1) {
@@ -1442,6 +1581,11 @@
       }
       if (who.stats.hoard > 0 && window.ROUNDERS.drawHoardAura) {
         window.ROUNDERS.drawHoardAura(ctx, who.stats.radius, who.stats.hoard, t);
+      }
+      // Thorn Jacket's briar, roses swelling on each reflect
+      if (who.stats.thorns > 0 && window.ROUNDERS.drawThornVine) {
+        window.ROUNDERS.drawThornVine(ctx, who.stats.radius, who.stats.thorns, t,
+          Math.max(0, Math.min(1, (who.thornPulse || 0) / 0.35)));
       }
       // Hummingbird holding station: wings beating too fast to resolve
       if (who.hovering && window.ROUNDERS.drawHoverWings) {
@@ -1473,19 +1617,28 @@
       const x = who.x - w / 2, y = who.y - who.stats.radius - 22;
       ctx.fillStyle = "rgba(10,8,18,0.75)";
       ctx.beginPath(); ctx.roundRect(x, y, w, 7, 3.5); ctx.fill();
+      // Payment Plan lives INSIDE this bar rather than beside it: the health
+      // you still hold but have already lost on paper is the amber tail, and
+      // it drains toward the solid part as the bill is paid.
       const frac = Math.max(0, who.hp / who.maxHp);
+      const owed = Math.min(who.decayPool || 0, who.hp) / who.maxHp;
       if (frac > 0) {
-        ctx.fillStyle = frac < 0.28 ? "#ff5a6e" : who.color;
+        ctx.fillStyle = "#ffc44d";
         ctx.beginPath(); ctx.roundRect(x + 1.5, y + 1.5, Math.max(2, (w - 3) * frac), 4, 2); ctx.fill();
+        const keep = Math.max(0, frac - owed);
+        if (keep > 0) {
+          ctx.fillStyle = keep < 0.28 ? "#ff5a6e" : who.color;
+          ctx.beginPath(); ctx.roundRect(x + 1.5, y + 1.5, Math.max(2, (w - 3) * keep), 4, 2); ctx.fill();
+        }
       }
-      const temp = who.temp + who.shield;
-      if (temp > 0) {
-        ctx.fillStyle = who.shield > 0 ? "#7fd8ff" : "#ffd76e";
-        ctx.beginPath(); ctx.roundRect(x + 1, y - 5, Math.max(2, (w - 2) * Math.min(1, temp / who.maxHp)), 3, 1.5); ctx.fill();
+      if (who.temp > 0) {
+        ctx.fillStyle = "#ffd76e";
+        ctx.beginPath(); ctx.roundRect(x + 1, y - 5, Math.max(2, (w - 2) * Math.min(1, who.temp / who.maxHp)), 3, 1.5); ctx.fill();
       }
-      if (who.decayPool > 0) {
-        ctx.fillStyle = "rgba(200,143,255,0.85)";
-        ctx.beginPath(); ctx.roundRect(x + 1, y + 8, Math.max(2, (w - 2) * Math.min(1, who.decayPool / who.maxHp)), 2.5, 1.2); ctx.fill();
+      // the bubble is a count of hits it will eat, so it is drawn as pips
+      for (let i = 0; i < Math.min(4, who.shield); i += 1) {
+        ctx.fillStyle = "#7fd8ff";
+        ctx.beginPath(); ctx.arc(x + w + 5 + i * 6, y + 3.5, 2.4, 0, Math.PI * 2); ctx.fill();
       }
       // ammo pips
       const n = Math.min(10, Math.round(who.stats.maxAmmo));
@@ -1617,7 +1770,13 @@
           }
           ctx.restore();
         } else if (f.type === "stink") {
-          ctx.fillStyle = `rgba(110,190,60,${0.22 * Math.min(1, f.life)})`;
+          // no hard rim: the gas just thins out until it is gone
+          const al = Math.min(1, f.life);
+          const gg = ctx.createRadialGradient(f.x, f.y, f.r * 0.15, f.x, f.y, f.r);
+          gg.addColorStop(0, `rgba(126,205,68,${0.34 * al})`);
+          gg.addColorStop(0.6, `rgba(110,190,60,${0.2 * al})`);
+          gg.addColorStop(1, "rgba(88,155,44,0)");
+          ctx.fillStyle = gg;
           ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
         } else if (f.type === "boom") {
           const k = 1 - Math.max(0, f.life) / 0.5;
@@ -1674,6 +1833,20 @@
       }
       for (const p of parts) {
         const al = p.life / p.max;
+        if (p.cracker) {
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = "#d8322f";
+          ctx.strokeStyle = "#2a1410"; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.roundRect(-2, -5, 4, 10, 1.8); ctx.fill(); ctx.stroke();
+          ctx.strokeStyle = "#e8e2d4"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(2, -9); ctx.stroke();
+          ctx.fillStyle = Math.random() < 0.5 ? "#fff3b0" : "#ffb03a";
+          ctx.beginPath(); ctx.arc(2, -9, 1.6, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+          continue;
+        }
         if (p.bolt) {
           if (p.delay > 0) continue;                  // the return leg, not yet
           // Forked and glowing so a zap reads at a glance, and cleared in the
@@ -1710,6 +1883,17 @@
             ctx.stroke();
           }
           ctx.restore();
+        } else if (p.bubble) {
+          const grow = 1 + (1 - al) * 0.9;
+          ctx.globalAlpha = al * 0.75;
+          ctx.strokeStyle = p.color; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r * grow, 0, Math.PI * 2); ctx.stroke();
+          ctx.globalAlpha = al * 0.22; ctx.fillStyle = p.color; ctx.fill();
+          ctx.globalAlpha = al * 0.8; ctx.fillStyle = "rgba(240,255,220,0.9)";
+          ctx.beginPath();
+          ctx.arc(p.x - p.r * grow * 0.3, p.y - p.r * grow * 0.35, Math.max(0.5, p.r * grow * 0.22), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
         } else if (p.chunk) {
           // masonry: an angular shard of the wall, tumbling as it falls
           ctx.save();
@@ -1793,7 +1977,7 @@
         // viewer, from a spec read off the bullet itself — so a Railgun slug is
         // the elongated drill round in both places, and the pane can never
         // disagree with the preview.
-        const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 600) : 1;
+        const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 400) : 1;
         const look = b.cardId ? bulletLook(b.cardId) : { art: null, scale: 1, rotation: 0 };
         ctx.translate(b.x, b.y);
         // a boomerang tumbles end over end instead of pointing where it is going
@@ -1804,8 +1988,10 @@
           explosive: b.explosive > 0, explosivePower: b.explosive,
           burn: b.burn > 0, poison: b.poison > 0, chill: b.chill > 0,
           chain: b.chain > 0, pierce: b.pierce > 0,
-          wallPierce: b.wallPierce > 0, holePunch: b.holePunch > 0
+          wallPierce: b.wallPierce > 0, holePunch: b.holePunch > 0,
+          glass: b.glass > 0
         }, {
+          spin: b.boomerang ? t * 13 : Math.atan2(b.vy, b.vx),
           // Resolved here rather than on the bullet, so a sprite that finished
           // loading after the shot was fired still shows on it. A workbench
           // slider OVERRIDES the config rather than multiplying it, so the
@@ -1897,7 +2083,9 @@
         target: { hp: bb.hp, maxHp: bb.maxHp, shield: bb.shield, temp: bb.temp },
         bullets: bullets.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), vx: Math.round(b.vx), vy: Math.round(b.vy), hug: Boolean(b.hug), singularity: Boolean(b.singularity) })),
         fields: fields.length, cycle, rewinding: rewind.active, decoys: decoys.length, pillarHoles: pillarHoles.length, holeRects: pillarHoles.map(h => ({ lx: Math.round(h.lx), ly: Math.round(h.ly), w: Math.round(h.w), h: Math.round(h.h) })),
-        pos: { ax: Math.round(a.x), ay: Math.round(a.y), bx: Math.round(bb.x), by: Math.round(bb.y) }
+        pos: { ax: Math.round(a.x), ay: Math.round(a.y), bx: Math.round(bb.x), by: Math.round(bb.y) },
+        squish: { a: a.squish || 0, b: bb.squish || 0 },
+        crackers: parts.filter(p2 => p2.cracker).length
       })
     };
   }
@@ -1905,7 +2093,42 @@
   // Draw one bullet the way the game draws it, pointing right, centred at
   // (0,0) in the current transform. `art` is an optional loaded image that
   // replaces the procedural round; scale/rot are the viewer's tweaks.
+  // A blown-glass sphere around the round (Glass Cannon). Drawn over whatever
+  // the round already looks like, and counter-rotated so its highlights stay
+  // put on screen instead of tumbling with the bullet.
+  function glassShell(g, r) {
+    const R = r * 1.62;
+    g.save();
+    const gr = g.createRadialGradient(0, 0, R * 0.25, 0, 0, R);
+    gr.addColorStop(0, "rgba(200,235,255,0.04)");
+    gr.addColorStop(0.72, "rgba(200,235,255,0.12)");
+    gr.addColorStop(0.93, "rgba(235,250,255,0.42)");
+    gr.addColorStop(1, "rgba(255,255,255,0.06)");
+    g.fillStyle = gr;
+    g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = "rgba(226,246,255,0.6)";
+    g.lineWidth = Math.max(1, R * 0.09);
+    g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.stroke();
+    g.lineCap = "round";
+    g.strokeStyle = "rgba(255,255,255,0.9)";
+    g.lineWidth = Math.max(1, R * 0.14);
+    g.beginPath(); g.arc(0, 0, R * 0.72, Math.PI * 1.05, Math.PI * 1.42); g.stroke();
+    g.strokeStyle = "rgba(255,255,255,0.45)";
+    g.lineWidth = Math.max(1, R * 0.08);
+    g.beginPath(); g.arc(0, 0, R * 0.8, Math.PI * 0.12, Math.PI * 0.34); g.stroke();
+    g.restore();
+  }
+
   function drawBullet(ctx, spec, opts = {}) {
+    drawBulletBody(ctx, spec, opts);
+    if (!spec.glass) return;
+    ctx.save();
+    ctx.rotate(-(opts.spin || 0));
+    glassShell(ctx, spec.r * (opts.scale ?? 1));
+    ctx.restore();
+  }
+
+  function drawBulletBody(ctx, spec, opts = {}) {
     const scale = opts.scale ?? 1;
     const rot = (opts.rotation ?? 0) * Math.PI / 180;
     const r = spec.r * scale;

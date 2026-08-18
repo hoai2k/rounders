@@ -1313,11 +1313,101 @@
     ctx.restore();
   }
 
+  // Thorn Jacket: a briar wound round the fighter — a green vine that rides
+  // their bob like the metal ring does, thorns along it, and roses that swell
+  // for a moment each time the jacket bites something back (`pulse`, 0..1).
+  function drawThornVine(ctx, r, stacks = 1, t = 0, pulse = 0) {
+    const n = Math.max(1, stacks);
+    ctx.save();
+    ctx.translate(0, bodyWobble(r, t));
+
+    const ringR = r * 1.16;
+    const loops = 2 + Math.min(2, n - 1);
+    // the stem: a wavy closed briar, drawn twice so it reads as a rope with a
+    // lit side rather than a flat outline
+    for (const pass of [
+      { w: r * 0.15, color: "rgba(24, 62, 26, 0.95)", off: 0 },
+      { w: r * 0.085, color: "rgba(86, 168, 72, 0.95)", off: -r * 0.03 }
+    ]) {
+      ctx.strokeStyle = pass.color;
+      ctx.lineWidth = pass.w;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      const steps = 72;
+      for (let i = 0; i <= steps; i += 1) {
+        const a = (i / steps) * Math.PI * 2;
+        const wob = Math.sin(a * loops * 2 + t * 1.1) * r * 0.11;
+        const rr = ringR + wob + pass.off;
+        const x = Math.cos(a + t * 0.35) * rr;
+        const y = Math.sin(a + t * 0.35) * rr * 0.94;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    // thorns, hooked outward off the stem
+    ctx.fillStyle = "rgba(38, 84, 34, 0.95)";
+    const spikes = 10 + (n - 1) * 4;
+    for (let i = 0; i < spikes; i += 1) {
+      const a = (i / spikes) * Math.PI * 2 + t * 0.35;
+      const rr = ringR + Math.sin(a * loops * 2 + t * 1.1) * r * 0.11;
+      const cx = Math.cos(a) * rr, cy = Math.sin(a) * rr * 0.94;
+      const out = a + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a + 1.6) * r * 0.06, cy + Math.sin(a + 1.6) * r * 0.06);
+      ctx.lineTo(cx + Math.cos(out) * r * 0.22, cy + Math.sin(out) * r * 0.22);
+      ctx.lineTo(cx - Math.cos(a + 1.6) * r * 0.06, cy - Math.sin(a + 1.6) * r * 0.06);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // and the roses — three of them, turning with the vine, blooming wide on a
+    // reflect and settling back
+    const roses = 3 + (n - 1);
+    const bloom = 1 + pulse * 1.1;
+    for (let i = 0; i < roses; i += 1) {
+      const a = (i / roses) * Math.PI * 2 + t * 0.35 + 0.7;
+      const rr = ringR + Math.sin(a * loops * 2 + t * 1.1) * r * 0.11;
+      const cx = Math.cos(a) * rr, cy = Math.sin(a) * rr * 0.94;
+      const rad = r * 0.2 * bloom * (0.9 + 0.1 * Math.sin(t * 2.4 + i));
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(a + t * 0.6);
+      // leaves behind the bloom
+      ctx.fillStyle = "rgba(58, 126, 50, 0.9)";
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(side * rad * 0.9, rad * 0.5, rad * 0.62, rad * 0.3, side * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // petals, outer ring darkest
+      for (let ring = 3; ring >= 1; ring -= 1) {
+        const f = ring / 3;
+        ctx.fillStyle = ring === 3 ? "rgba(150, 16, 38, 0.96)"
+          : ring === 2 ? "rgba(200, 32, 56, 0.96)" : "rgba(240, 84, 104, 0.98)";
+        const petals = ring === 1 ? 3 : 5;
+        for (let q = 0; q < petals; q += 1) {
+          const pa = (q / petals) * Math.PI * 2 + ring * 0.6;
+          ctx.beginPath();
+          ctx.ellipse(Math.cos(pa) * rad * 0.34 * f, Math.sin(pa) * rad * 0.34 * f,
+            rad * 0.55 * f, rad * 0.42 * f, pa, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.fillStyle = "rgba(255, 214, 120, 0.95)";
+      ctx.beginPath(); ctx.arc(0, 0, rad * 0.14, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   window.ROUNDERS.CHARACTERS = CHARACTERS;
   window.ROUNDERS.drawCharacter = drawCharacter;
   window.ROUNDERS.drawIronHull = drawIronHull;
   window.ROUNDERS.bodyWobble = bodyWobble;
   window.ROUNDERS.drawHoardAura = drawHoardAura;
+  window.ROUNDERS.drawThornVine = drawThornVine;
   window.ROUNDERS.drawSawblade = drawSawblade;
   window.ROUNDERS.drawHoverWings = drawHoverWings;
   window.ROUNDERS.drawLemonade = drawLemonade;

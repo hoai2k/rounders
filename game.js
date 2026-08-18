@@ -155,6 +155,7 @@
   // the shooter down. The heal lands when the mote ARRIVES, not on impact, so
   // the number you see is the energy you watched come home.
   let siphons = [];
+  let crackers = [];
   // short-lived text that rises off a fighter: heal ticks and the like
   let floats = [];
   function floatText(x, y, text, color) {
@@ -224,7 +225,7 @@
       groundHug: 0, voidPull: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
-      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0, hover: 0, hoard: 0,
+      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0, hover: 0, hoard: 0, glass: 0,
       goldenShot: 0, killHeal: false,
       active: null, activeCooldown: 10,
       // gap-audit wave (CARD-GAP-AUDIT.md): offense & bullets
@@ -766,6 +767,7 @@
     bolts = [];
     fxShots = [];
     siphons = [];
+    crackers = [];
     floats = [];
     world.weather = [];
     world.lightningTimer = level.lightning ? level.lightning.period : 0;
@@ -795,7 +797,7 @@
       p.guardianCharges = p.stats.guardian;
       p.roundRevives = p.stats.revives;
       p.rebirth = null;
-      p.shield = p.stats.shield;
+      p.shield = p.stats.shield;      // whole hits it will swallow, not HP
       p.shieldDelay = 0;
       p.shieldFlash = 0;
       p.trail = [];
@@ -1491,6 +1493,7 @@
     updateParticles(step);
     updateBolts(step);
     updateSiphons(step);
+    updateCrackers(step);
     updateHud();
     checkRoundEnd();
   }
@@ -1938,6 +1941,8 @@
       p.spawnGrace = Math.max(0, p.spawnGrace - dt);
       p.hazardGrace = Math.max(0, p.hazardGrace - dt);
       p.hitFlash = Math.max(0, (p.hitFlash || 0) - dt);
+      p.thornPulse = Math.max(0, (p.thornPulse || 0) - dt);
+      p.squish = Math.max(0, (p.squish || 0) - dt);
       p.teleCooldown = Math.max(0, p.teleCooldown - dt);
       p.wallTimer = Math.max(0, p.wallTimer - dt);
       p.wallCooldown = Math.max(0, p.wallCooldown - dt);
@@ -2043,13 +2048,30 @@
         }
       }
       if (p.chillTimer > 0) p.chillTimer -= dt;
-      if (p.stats.regen > 0) p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.regen * dt);
+      if (p.stats.regen > 0) {
+        const before = p.hp;
+        p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.regen * dt);
+        // little motes of health drifting IN while it is actually mending
+        // something — silent once you are topped up
+        if (p.hp > before && Math.random() < dt * 14) {
+          const ang = rand(0, Math.PI * 2);
+          const rr = p.stats.radius * rand(1.8, 3.0);
+          particles.push({
+            x: p.x + Math.cos(ang) * rr, y: p.y + Math.sin(ang) * rr,
+            vx: -Math.cos(ang) * rand(60, 130), vy: -Math.sin(ang) * rand(60, 130),
+            life: rand(0.3, 0.55), maxLife: 0.55, r: rand(1.4, 2.6),
+            color: Math.random() < 0.4 ? "#c6ffd0" : "#74f08b", spark: true
+          });
+        }
+      }
       if (p.stats.shield > 0) {
         p.shieldFlash = Math.max(0, p.shieldFlash - dt);
         p.shieldDelay = Math.max(0, p.shieldDelay - dt);
         if (p.shieldDelay <= 0 && p.shield < p.stats.shield) {
           const was = p.shield;
-          p.shield = Math.min(p.stats.shield, p.shield + 26 * dt);
+          // a whole charge comes back at once, so the bubble is either there
+          // to eat a hit or it is not — no half-shield to reason about
+          p.shield = Math.min(p.stats.shield, p.shield + 1);
           if (was <= 0 && p.shield > 0) puff(p.x, p.y - p.stats.radius, "#7fd8ff", 6);
         }
       }
@@ -2161,6 +2183,16 @@
               if (d < 110) hurt(q, (1 - d / 110) * dmg + 4, p, q.x - p.x, q.y - p.y);
             }
             burst(p.x, p.y + 16, "#ff9e3d", 18, 320);
+            // and a handful of lit crackers kicked out of the heels, which
+            // tumble down and pop wherever they land
+            for (let i = 0; i < 3 + p.stats.jumpBlast; i += 1) {
+              crackers.push({
+                x: p.x + rand(-8, 8), y: p.y + p.stats.radius * 0.6,
+                vx: rand(-150, 150) + p.vx * 0.25, vy: rand(-60, 60),
+                rot: rand(0, Math.PI * 2), spin: rand(-9, 9),
+                fuse: rand(0.5, 1.1), owner: p
+              });
+            }
             flames(p.x, p.y + 18, 8, 12, 0.9);
             smoke(p.x, p.y + 16, 2, 10, 0.8);
             world.shake = Math.max(world.shake, 5);
@@ -2201,6 +2233,18 @@
 
       p.vy += levelGravity() * dt;
       if (p.hovering) p.vy -= levelGravity() * dt;    // the hover pays for itself
+      // Springload: the stomper rides the head DOWN while it compresses, and is
+      // thrown off it on the way back up, so the launch reads as a rebound
+      if (p.stompHold > 0) {
+        p.stompHold -= dt;
+        p.vy = 120;
+        if (p.stompHold <= 0) {
+          p.vy = -(p.stompLaunch || p.stats.jump * 1.05);
+          p.stompLaunch = 0;
+          pulse(p, 0.25, 80);
+          sfx("bounce");
+        }
+      }
       // Tailwind: holding jump in mid-air spends a float budget to hang, and
       // the budget refills once you touch down again
       if (p.stats.floatTime > 0) {
@@ -2248,12 +2292,16 @@
           if (Math.abs(dx) < q.stats.radius + p.stats.radius * 0.7 &&
               dy > 0 && dy < q.stats.radius + p.stats.radius + 10) {
             hurt(q, 25 * p.stats.stomp, p, dx * 0.4, 120);
-            p.vy = -p.stats.jump * 1.05;
+            // the head squashes under the landing and springs back, and the
+            // stomper leaves on the spring rather than the impact
+            q.squish = SQUISH_TIME;
+            p.vy = 120;
+            p.stompHold = SQUISH_TIME * 0.45;
+            p.stompLaunch = p.stats.jump * 1.05;
             p.jumpsLeft = Math.max(p.jumpsLeft, 1);
             p.stompGrace = 0.5;
             burst(q.x, q.y - q.stats.radius, "#ffe169", 14, 280);
-            pulse(p, 0.25, 80);
-            sfx("bounce");
+            sfx("thud");
             break;
           }
         }
@@ -2424,7 +2472,7 @@
     if (p.stats.healField) {
       fields.push({
         type: "heal", owner: p, x, y,
-        r: 130 + (p.stats.healField - 1) * 40, life: 3,
+        r: 130 + (p.stats.healField - 1) * 40, life: 10,
         hps: 10 * p.stats.healField
       });
       sfx("card");
@@ -2476,7 +2524,7 @@
     if (p.stats.sawBlock) {
       fields.push({
         type: "saw", owner: p, x: p.x, y: p.y,
-        r: 64 + p.stats.sawBlock * 8, life: 2, angle: Math.random() * 6.3,
+        r: 64 + p.stats.sawBlock * 8, life: 3, angle: Math.random() * 6.3,
         dmg: 9 + p.stats.sawBlock * 3
       });
     }
@@ -2637,6 +2685,7 @@
         shards: p.stats.shards,
         popcorn: p.stats.popcorn,
         grow: p.stats.grow,
+        glass: p.stats.glass,
         groundHug: p.stats.groundHug,
         voidPull: p.stats.voidPull,
         // Drill Rounds: how much solid a shot can bore through, in px of thickness
@@ -2981,7 +3030,7 @@
             sfx("parry");
           } else {
             const travel = Math.hypot(b.x - b.ox, b.y - b.oy);
-            const growBonus = b.grow ? 1 + Math.min(1, travel / 900) : 1;
+            const growBonus = b.grow ? 1 + Math.min(1, travel / 600) : 1;
             const damage = b.damage * growBonus;
             hurt(p, damage, b.owner, b.vx, b.vy);
             if (b.owner && b.owner.alive && b.owner.stats.lifesteal) {
@@ -3406,7 +3455,14 @@
             p.poisonDps = Math.max(p.poisonDps, 8 * f.stink);
             p.poisonAttacker = f.owner;
             p.chillTimer = Math.max(p.chillTimer, 0.5);
+            // it visibly boils off anyone standing in it
+            if (Math.random() < dt * 16) stinkBubble(p.x + rand(-14, 14), p.y + rand(-10, 14), 1.25);
           }
+        }
+        // and off the ground the cloud is sitting on
+        if (Math.random() < dt * 34) {
+          const off = rand(-f.r * 0.85, f.r * 0.85);
+          stinkBubble(f.x + off, f.y + Math.sqrt(Math.max(0, f.r * f.r - off * off)) * 0.55, 1);
         }
         continue;
       }
@@ -3644,6 +3700,10 @@
 
   function hurt(p, amount, attacker, kx, ky) {
     if (!p.alive || p.blockTimer > 0 || p.spawnGrace > 0) return;
+    // Aegis Bubble eats the hit ENTIRELY — the damage and the shove with it —
+    // so it has to be checked before any knockback is applied. A DoT tick is
+    // not a "hit" and must not waste the charge, hence the floor.
+    if (popAegis(p, amount)) return;
     const mag = Math.hypot(kx, ky) || 1;
     const kb = (1 - clamp(p.stats.kbResist, 0, 0.9))
       // Boxing Glove: the attacker's gloves add shove on top of the damage
@@ -3659,6 +3719,8 @@
     if (attacker && p.stats.thorns > 0 && attacker.alive && amount < 500) {
       hurtRaw(attacker, amount * p.stats.thorns, null);
       boltVisual(p.x, p.y, attacker.x, attacker.y, "#ff5f8f", 0.15);
+      // the briar blooms on the bite
+      p.thornPulse = 0.35;
     }
     applyDamage(p, amount, attacker);
   }
@@ -3669,26 +3731,28 @@
     applyDamage(p, amount, attacker);
   }
 
+  // Aegis Bubble: one charge swallows one whole hit. Returns true when the hit
+  // was eaten, so the caller stops — no damage, and in hurt() no knockback.
+  const AEGIS_MIN = 5;        // below this it is a tick, not a hit
+  function popAegis(p, amount) {
+    if (!(p.stats.shield > 0) || p.shield <= 0) return false;
+    if (amount >= 500 || amount < AEGIS_MIN) return false;   // world-kill / DoT
+    p.shield -= 1;
+    p.shieldDelay = 3.5;
+    p.shieldFlash = 0.3;
+    p.hitFlash = Math.max(p.hitFlash || 0, 0.14);
+    // the bubble coming apart into glassy shards, thrown wider than it was
+    fxShot("shield-break", p.x, p.y, (p.stats.radius + 19) * 2.7, 0.32);
+    burst(p.x, p.y, "#7fd8ff", 22, 360);
+    floatText(p.x, p.y - p.stats.radius - 14, "ABSORBED", "#7fd8ff");
+    sfx("block");
+    return true;
+  }
+
   function applyDamage(p, amount, attacker, fromDecay = false) {
     p.hitFlash = Math.max(p.hitFlash || 0, amount >= 8 ? 0.2 : 0.16);
-    // a regenerating shield soaks damage before health (world-kill bypasses)
-    if (p.stats.shield > 0 && amount < 500) {
-      p.shieldDelay = 3.5;
-      if (p.shield > 0) {
-        const soaked = Math.min(p.shield, amount);
-        p.shield -= soaked;
-        amount -= soaked;
-        p.shieldFlash = 0.25;
-        if (p.shield <= 0) {
-          // the bubble going: five frames of it coming apart into glassy shards,
-          // thrown wider than the bubble it was
-          fxShot("shield-break", p.x, p.y, (p.stats.radius + 19) * 2.7, 0.32);
-          burst(p.x, p.y, "#7fd8ff", 20, 340);
-          sfx("block");
-        }
-        if (amount <= 0) return;
-      }
-    }
+    if (popAegis(p, amount)) return;
+    if (p.stats.shield > 0 && amount < 500) p.shieldDelay = 3.5;
     // Hot Streak / Overflow temp shields soak next (world-kill bypasses)
     if (amount < 500 && p.hotShield > 0) {
       const soaked = Math.min(p.hotShield, amount);
@@ -3747,7 +3811,8 @@
         p.roundRevives -= 1;
         p.alive = false;
         p.hp = 0;
-        p.rebirth = { t: 1, x: p.x, y: p.y };
+        // the pyre sits on the ground they fell on, not at chest height
+        p.rebirth = { t: 1, x: p.x, y: p.y + p.stats.radius * 0.85 };
         burst(p.x, p.y, "#ff9e3d", 54, 660);
         flames(p.x, p.y, 26, 24, 1.5);
         smoke(p.x, p.y, 12, 20, 1.3);
@@ -4673,6 +4738,7 @@
       drawParticles();
       drawBoltsAll();
       drawFxShots();
+      drawCrackers();
       drawSiphons();
       drawFloats();
       if (world.lightningFlash > 0) {
@@ -5326,12 +5392,26 @@
   }
 
   // -------- entities
+  // Springload's squash: a quarter of their height goes on the compression and
+  // springs back out, pivoting on the feet so they stay planted.
+  const SQUISH_TIME = 0.22;
+  function squishScale(p) {
+    const left = p.squish || 0;
+    if (left <= 0) return null;
+    const k = 1 - left / SQUISH_TIME;                 // 0 at impact, 1 when done
+    const bend = Math.sin(Math.PI * Math.min(1, k / 0.55));       // down then up
+    const over = k > 0.55 ? Math.sin(Math.PI * (k - 0.55) / 0.45) * 0.1 : 0;
+    return { sy: 1 - 0.25 * bend + over, sx: 1 + 0.16 * bend - over * 0.6 };
+  }
+
   function drawPlayersAll() {
     for (const p of players) {
       if (!p.alive) continue;
       const r = p.stats.radius;
       ctx.save();
       ctx.translate(p.x, p.y);
+      const sq = squishScale(p);
+      if (sq) { ctx.translate(0, r); ctx.scale(sq.sx, sq.sy); ctx.translate(0, -r); }
 
       // Magnet Suit: a crackling magnetic field, so the deflection has a
       // visible cause rather than bullets mysteriously swerving
@@ -5367,6 +5447,11 @@
       if (p.stats.ironHull > 0) window.ROUNDERS.drawIronHull(ctx, r, p.stats.ironHull, world.time + p.botSeed);
       // Dragon's Hoard smoulders: curling smoke and gold embers off every side
       if (p.stats.hoard > 0) window.ROUNDERS.drawHoardAura(ctx, r, p.stats.hoard, world.time + p.botSeed);
+      // Thorn Jacket wears a briar: roses swell for a moment each time it bites
+      if (p.stats.thorns > 0) {
+        window.ROUNDERS.drawThornVine(ctx, r, p.stats.thorns, world.time + p.botSeed,
+          clamp((p.thornPulse || 0) / 0.35, 0, 1));
+      }
       // Hummingbird holding station: wings beating far too fast to resolve
       if (p.hovering) window.ROUNDERS.drawHoverWings(ctx, 0, 0, r, p.wingPhase || 0);
 
@@ -5489,14 +5574,28 @@
     ctx.fill();
     ctx.stroke();
 
+    // Payment Plan lives INSIDE this bar rather than beside it: health you
+    // still hold but have already lost on paper is drawn as an amber tail at
+    // the end of the fill, and the solid part eats into it as the bill is
+    // paid. One bar, and the number you are really on is where the amber ends.
+    const owed = clamp(Math.min(p.decayPool || 0, p.hp) / p.stats.maxHp, 0, frac);
     if (frac > 0) {
-      const low = frac < 0.28;
-      ctx.fillStyle = low
-        ? `rgba(255,90,110,${0.75 + 0.25 * Math.abs(Math.sin(world.time * 9))})`
-        : p.color;
-      ctx.beginPath();
-      ctx.roundRect(x + 1.5, y + 1.5, Math.max(2, (w - 3) * frac), h - 3, (h - 3) / 2);
-      ctx.fill();
+      if (owed > 0) {
+        ctx.fillStyle = `rgba(255,196,77,${0.72 + 0.18 * Math.abs(Math.sin(world.time * 6))})`;
+        ctx.beginPath();
+        ctx.roundRect(x + 1.5, y + 1.5, Math.max(2, (w - 3) * frac), h - 3, (h - 3) / 2);
+        ctx.fill();
+      }
+      const keep = Math.max(0, frac - owed);
+      const low = keep < 0.28;
+      if (keep > 0) {
+        ctx.fillStyle = low
+          ? `rgba(255,90,110,${0.75 + 0.25 * Math.abs(Math.sin(world.time * 9))})`
+          : p.color;
+        ctx.beginPath();
+        ctx.roundRect(x + 1.5, y + 1.5, Math.max(2, (w - 3) * keep), h - 3, (h - 3) / 2);
+        ctx.fill();
+      }
       // top highlight so the fill reads as a solid bar over busy backdrops
       ctx.fillStyle = "rgba(255,255,255,0.28)";
       ctx.beginPath();
@@ -5512,18 +5611,21 @@
       ctx.roundRect(x + 1, y - (p.stats.shield > 0 ? 9.5 : 5) + 0.6, Math.max(2, (w - 2) * tf), 2.4, 1.4);
       ctx.fill();
     }
-    // shield charge rides as a thin cyan sliver above the health bar
+    // Aegis charges are whole hits, so they read as pips — one dot per hit the
+    // bubble will still swallow, rather than a bar that could be half full
     if (p.stats.shield > 0) {
-      const sf = clamp(p.shield / p.stats.shield, 0, 1);
-      ctx.fillStyle = "rgba(30,50,70,0.7)";
-      ctx.beginPath();
-      ctx.roundRect(x, y - 5, w, 3.5, 2);
-      ctx.fill();
-      if (sf > 0) {
-        ctx.fillStyle = "#7fd8ff";
+      for (let i = 0; i < Math.min(5, p.stats.shield); i += 1) {
+        const cx = x + 4 + i * 8;
+        const lit = i < p.shield;
         ctx.beginPath();
-        ctx.roundRect(x + 1, y - 4.4, Math.max(2, (w - 2) * sf), 2.4, 1.4);
+        ctx.arc(cx, y - 5.5, 2.6, 0, Math.PI * 2);
+        ctx.fillStyle = lit ? "#7fd8ff" : "rgba(40,62,84,0.75)";
         ctx.fill();
+        if (lit) {
+          ctx.strokeStyle = "rgba(200,240,255,0.9)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
       }
     }
     ctx.restore();
@@ -5566,6 +5668,34 @@
 
   // Every card effect a bullet carries should be readable on the bullet
   // itself, so a loaded build LOOKS loaded mid-fight.
+  // A round sheathed in glass (Glass Cannon): a thin blown-glass sphere around
+  // the bullet, drawn procedurally so it sits over painted and procedural
+  // rounds alike. Highlights are fixed relative to the screen, which is what
+  // sells it as glass rather than a coloured ring.
+  function glassShell(g, x, y, r) {
+    const R = r * 1.62;
+    g.save();
+    g.translate(x, y);
+    const gr = g.createRadialGradient(0, 0, R * 0.25, 0, 0, R);
+    gr.addColorStop(0, "rgba(200,235,255,0.04)");
+    gr.addColorStop(0.72, "rgba(200,235,255,0.12)");
+    gr.addColorStop(0.93, "rgba(235,250,255,0.42)");
+    gr.addColorStop(1, "rgba(255,255,255,0.06)");
+    g.fillStyle = gr;
+    g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = "rgba(226,246,255,0.6)";
+    g.lineWidth = Math.max(1, R * 0.09);
+    g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.stroke();
+    g.lineCap = "round";
+    g.strokeStyle = "rgba(255,255,255,0.9)";
+    g.lineWidth = Math.max(1, R * 0.14);
+    g.beginPath(); g.arc(0, 0, R * 0.72, Math.PI * 1.05, Math.PI * 1.42); g.stroke();
+    g.strokeStyle = "rgba(255,255,255,0.45)";
+    g.lineWidth = Math.max(1, R * 0.08);
+    g.beginPath(); g.arc(0, 0, R * 0.8, Math.PI * 0.12, Math.PI * 0.34); g.stroke();
+    g.restore();
+  }
+
   function drawBullets() {
     const t = world.time;
     for (const b of bullets) {
@@ -5672,7 +5802,7 @@
       if (b.returning) { ctx.shadowColor = b.color; ctx.shadowBlur = 12; }
       if (b.explosive) { ctx.shadowColor = "#ff7a3d"; ctx.shadowBlur = 10 + Math.sin(t * 18) * 5; }
       // grown bullets read bigger the farther they've flown
-      const growF = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 1300) : 1;
+      const growF = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 867) : 1;
       const r = b.r * growF * (look.scale || 1);
       // Comet Trail: the tail is sized off the CURRENT radius, so the trail
       // thickens and lengthens along with the head instead of staying a thin
@@ -5797,6 +5927,15 @@
         }
       }
       ctx.restore();
+    }
+    // Glass Cannon's sheath goes on in a second pass so it lands over every
+    // kind of round — painted, golden, white-hot — instead of being repeated
+    // at each of the early exits above.
+    for (const b of bullets) {
+      if (!b.glass) continue;
+      const look = bulletLookFor(b.owner);
+      const growF = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 867) : 1;
+      glassShell(ctx, b.x, b.y, b.r * growF * (look.scale || 1));
     }
   }
 
@@ -5952,7 +6091,7 @@
         // Lemonade Stand: a faded lemon-yellow pool with a tall glass sitting
         // in the middle of it, so the zone reads as the card and not as a
         // generic green heal circle
-        const a = clamp(f.life / 3, 0.15, 1);
+        const a = clamp(f.life / 3, 0.15, 1);   // fades out over its last 3s
         ctx.save();
         const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
         g.addColorStop(0, `rgba(255,232,120,${0.42 * a})`);
@@ -5991,9 +6130,25 @@
         ctx.save();
         const cloud = fxImage("poison-cloud");
         if (cloud) {
-          ctx.globalAlpha = a * 0.9;
-          const d = f.r * 2.2;
-          ctx.drawImage(cloud, f.x - d / 2, f.y - d / 2, d, d);
+          // The sheet is a hard-edged disc. Drawn through a radial mask it
+          // dissolves at the rim instead, so the cloud has no boundary you can
+          // point at — which is what a gas should look like.
+          const d = f.r * 2.4;
+          const buf = softMask(d);
+          const bc = buf.getContext("2d");
+          bc.clearRect(0, 0, d, d);
+          bc.globalCompositeOperation = "source-over";
+          bc.drawImage(cloud, 0, 0, d, d);
+          bc.globalCompositeOperation = "destination-in";
+          const mg = bc.createRadialGradient(d / 2, d / 2, d * 0.18, d / 2, d / 2, d * 0.5);
+          mg.addColorStop(0, "rgba(0,0,0,1)");
+          mg.addColorStop(0.62, "rgba(0,0,0,0.85)");
+          mg.addColorStop(1, "rgba(0,0,0,0)");
+          bc.fillStyle = mg;
+          bc.fillRect(0, 0, d, d);
+          bc.globalCompositeOperation = "source-over";
+          ctx.globalAlpha = a * 0.92;
+          ctx.drawImage(buf, f.x - d / 2, f.y - d / 2);
           ctx.restore();
           continue;
         }
@@ -6084,6 +6239,57 @@
       });
     }
     puff(from.x, from.y, "#74f08b", 6, 180);
+  }
+
+  // Firecracker Heels: the crackers thrown out by an air jump. They carry no
+  // damage of their own — the blast under the heels already landed — they are
+  // there so the card reads as fireworks rather than a bare shove.
+  function updateCrackers(dt) {
+    if (!crackers.length) return;
+    const plats = activePlatforms(currentLevel(), world.time);
+    for (const c of crackers) {
+      c.fuse -= dt;
+      c.vy += 1900 * dt;
+      c.vx *= 1 - Math.min(1, dt * 1.2);
+      c.x += c.vx * dt;
+      c.y += c.vy * dt;
+      c.rot += c.spin * dt;
+      let hit = c.fuse <= 0;
+      if (!hit) {
+        for (const pl of plats) {
+          if (circleRect({ x: c.x, y: c.y, r: 3 }, pl)) { hit = true; break; }
+        }
+      }
+      if (Math.random() < dt * 30) {
+        puffOne(c.x + rand(-2, 2), c.y + rand(-2, 2), Math.random() < 0.5 ? "#ffd76a" : "#ff9e3d");
+      }
+      if (hit) {
+        c.dead = true;
+        burst(c.x, c.y, "#ffcf4d", 8, 210);
+        flames(c.x, c.y, 3, 7, 0.5);
+        sfx("pop");
+      }
+    }
+    crackers = crackers.filter(c => !c.dead);
+  }
+
+  function drawCrackers() {
+    for (const c of crackers) {
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(c.rot);
+      ctx.fillStyle = "#d8322f";
+      ctx.strokeStyle = "#2a1410";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(-2.5, -6, 5, 12, 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = "#e8e2d4";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(2.5, -11); ctx.stroke();
+      // the lit tip, flickering
+      ctx.fillStyle = Math.random() < 0.5 ? "#fff3b0" : "#ffb03a";
+      ctx.beginPath(); ctx.arc(2.5, -11, 1.9, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
   }
 
   function updateSiphons(dt) {
@@ -6452,6 +6658,12 @@
       else if (p.flame) p.vy -= 130 * dt;
       else if (p.spark) { p.vx *= Math.pow(0.94, dt * 60); p.vy = p.vy * Math.pow(0.94, dt * 60) + 40 * dt; }
       else if (p.chunk) { p.vy += 900 * dt; p.rot += p.spin * dt; }
+      else if (p.bubble) {
+        p.vy -= 34 * dt;                       // buoyant
+        p.wob += dt * 7;
+        p.x += Math.sin(p.wob) * 14 * dt;
+        p.vx *= Math.pow(0.94, dt * 60);
+      }
       else p.vy += 360 * dt;
     }
     particles = particles.filter(p => p.life > 0);
@@ -6483,6 +6695,24 @@
         ctx.fill();
         continue;
       }
+      if (p.bubble) {
+        const grow = 1 + (1 - a) * 0.9;        // swells on the way up
+        ctx.globalAlpha = a * 0.75;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * grow, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = a * 0.22;
+        ctx.fill();
+        ctx.globalAlpha = a * 0.8;
+        ctx.fillStyle = "rgba(240,255,220,0.9)";
+        ctx.beginPath();
+        ctx.arc(p.x - p.r * grow * 0.3, p.y - p.r * grow * 0.35, Math.max(0.6, p.r * grow * 0.22), 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
       if (p.chunk) {
         // masonry: an angular shard of the wall, tumbling as it falls
         ctx.save();
@@ -6510,6 +6740,30 @@
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+
+  // One scratch canvas for feathering a sprite's edge, resized as needed —
+  // allocating a canvas per frame per cloud would be silly.
+  let maskBuf = null;
+  function softMask(size) {
+    const px = Math.max(8, Math.ceil(size));
+    if (!maskBuf) maskBuf = document.createElement("canvas");
+    if (maskBuf.width !== px || maskBuf.height !== px) { maskBuf.width = px; maskBuf.height = px; }
+    return maskBuf;
+  }
+
+  // Stink Bomb boils. A bubble swells as it rises, wobbles on the way up and
+  // pops near the top of its climb, which is what makes the cloud read as
+  // something fermenting rather than a flat green disc.
+  function stinkBubble(x, y, scale = 1) {
+    particles.push({
+      x, y,
+      vx: rand(-16, 16), vy: rand(-52, -22) * scale,
+      life: rand(0.7, 1.3), maxLife: 1.3,
+      r: rand(1.6, 3.6) * scale,
+      color: Math.random() < 0.35 ? "#c8ff8a" : "#7fd43c",
+      bubble: true, wob: Math.random() * 6.3
+    });
   }
 
   // A wall coming apart: chunks of the terrain's own colour thrown out of the
@@ -6883,6 +7137,7 @@
     else if (name === "boom") { tone(70, 0.3, "sine", 0.12, now, 36); noise(0.22, 0.09, 500, now); }
     else if (name === "card") { tone(440, 0.08, "triangle", 0.06, now); tone(660, 0.12, "triangle", 0.05, now + 0.07); }
     else if (name === "chain") { tone(880, 0.05, "sawtooth", 0.05, now, 1400); noise(0.05, 0.04, 3200, now); }
+    else if (name === "pop") { tone(420, 0.05, "square", 0.05, now, 140); noise(0.05, 0.04, 2600, now); }
     else if (name === "bounce") { tone(240, 0.12, "sine", 0.09, now, 620); }
     else if (name === "thud") { tone(90, 0.18, "sine", 0.11, now, 45); noise(0.14, 0.08, 420, now); }
     else if (name === "teleport") { tone(500, 0.14, "sine", 0.07, now, 1200); tone(1200, 0.12, "sine", 0.05, now + 0.08, 500); }

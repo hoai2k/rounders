@@ -219,9 +219,9 @@
 
     card("wasp-venom", "Wasp Venom", "rare",
       "The sting is just the beginning.",
-      "Hits inject venom that deals damage over 3 seconds. Sting them again and the doses ADD UP. Direct damage drops.",
-      ["poison on hit (3s)", "doses stack", "−15% damage"], ["dot"],
-      p => { p.stats.poison += 1; p.stats.damage *= 0.85; }),
+      "Hits inject venom that deals damage over 3 seconds. Sting them again and the doses ADD UP. The sting drifts after its target. Direct damage drops.",
+      ["poison on hit (3s)", "doses stack", "slight homing", "−15% damage"], ["dot", "accuracy"],
+      p => { p.stats.poison += 1; p.stats.homing += 0.35; p.stats.damage *= 0.85; }),
 
     card("popcorn-payload", "Popcorn Payload", "rare",
       "Pop pop pop.",
@@ -262,8 +262,8 @@
     card("glass-cannon", "Glass Cannon", "rare",
       "Handle with care. Or don't.",
       "Massive damage boost, but your health bar becomes alarmingly small.",
-      ["+75% damage", "−30% health"], ["damage"],
-      p => { p.stats.damage *= 1.75; p.stats.maxHp *= 0.7; }),
+      ["+75% damage", "−30% health", "rounds fly sheathed in glass"], ["damage"],
+      p => { p.stats.damage *= 1.75; p.stats.maxHp *= 0.7; p.stats.glass += 1; }),
 
     card("comet-trail", "Comet Trail", "rare",
       "Give it room to breathe.",
@@ -285,20 +285,20 @@
 
     card("aegis-bubble", "Aegis Bubble", "rare",
       "Bring your own weather.",
-      "A regenerating energy shield absorbs 30 damage before your health is touched. It recharges after 3.5 seconds without being hit.",
-      ["+30 regenerating shield"], ["defense"],
-      p => { p.stats.shield += 30; }),
+      "A regenerating energy shield swallows one hit WHOLE — all of its damage and all of its knockback. It comes back 3.5 seconds after it pops.",
+      ["absorbs 1 whole hit", "recharges after 3.5s"], ["defense"],
+      p => { p.stats.shield += 1; }),
 
     card("lemonade-stand", "Lemonade Stand", "rare",
       "Fresh squeezed. Slightly radioactive.",
-      "Blocking plants a fizzy zone that heals anyone inside 10 HP a second for 3 seconds — stand in your own.",
-      ["block plants a heal zone (10 HP/s)"], ["block", "sustain"],
+      "Blocking plants a fizzy zone that heals anyone inside 10 HP a second for 10 seconds — stand in your own.",
+      ["block plants a heal zone (10 HP/s, 10s)"], ["block", "sustain"],
       p => { p.stats.healField += 1; }),
 
     card("sawblade", "Sawblade", "rare",
       "Mind the blade.",
-      "Blocking wraps you in a huge spinning sawblade for 2 seconds, shredding anyone who comes near.",
-      ["block = spinning saw (2s)"], ["block", "aoe"],
+      "Blocking wraps you in a huge spinning sawblade for 3 seconds, shredding anyone who comes near.",
+      ["block = spinning saw (3s)"], ["block", "aoe"],
       p => { p.stats.sawBlock += 1; }),
 
     card("bank-shot", "Bank Shot", "rare",
@@ -574,16 +574,18 @@
     wallPierce: 0, holePunch: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0,
     boomerang: 0, helium: 0, encore: 0, burstFire: 0, goldenShot: 0,
     lifesteal: 0, killHeal: false, rage: 0, scavenge: 0, bloodMoney: 0,
-    kbDeal: 0, sugarRush: 0, hotStreak: 0, hoard: 0,
+    kbDeal: 0, sugarRush: 0, hotStreak: 0, hoard: 0, glass: 0,
     // aim
     steer: 0,
     // Mythics
     active: null
   });
 
+  // `autoBlock` is deliberately absent: Panic Button throws the block for you
+  // when the magazine runs dry, so it never asks the player to press LT.
   const BLOCK_KEYS = ["blockPush", "echoBlock", "blockDash", "warpBlock", "stormBlock",
     "blockReload", "healField", "frostBlock", "sawBlock", "empowerBlock",
-    "brickBlock", "decoy", "blockRefresh", "autoBlock", "blockCooldown", "blockDuration"];
+    "brickBlock", "decoy", "blockRefresh", "blockCooldown", "blockDuration"];
   const JUMP_KEYS = ["floatTime", "extraJumps", "jumpBlast", "stomp", "hover", "jump"];
   // RT means "pulling the trigger DOES something different", not "your gun has
   // better numbers". Dragon's Hoard is more ammo, a faster reload and more

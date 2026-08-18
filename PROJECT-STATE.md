@@ -623,6 +623,10 @@ Pillars:
       through a 130x334 stone tower, a 220x24 breakable shelf and a 54px crate:
       each drilled through, came out the far side, and left the round with no
       holes to spare
+- [x] **Black Mamba only drifts**: homing cut from 0.7 to 0.35, the same
+      slight pull Wasp Venom carries, and the card says "slight homing" rather
+      than "strong". Its preview drops the off-target staging with it — below
+      0.5 a round cannot recover from that launch angle
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

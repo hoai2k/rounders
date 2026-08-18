@@ -386,9 +386,9 @@
 
     card("black-mamba", "Black Mamba", "epic",
       "It never misses twice.",
-      "Strong homing shots that inject double venom. Slightly weaker on impact.",
-      ["strong poison (2×)", "homing", "−12% damage"], ["dot", "accuracy"],
-      p => { p.stats.poison += 2; p.stats.homing += 0.7; p.stats.damage *= 0.88; }),
+      "Venom-heavy shots that drift after their target and inject a double dose. Softer on impact.",
+      ["strong poison (2×)", "slight homing", "−12% damage"], ["dot", "accuracy"],
+      p => { p.stats.poison += 2; p.stats.homing += 0.35; p.stats.damage *= 0.88; }),
 
     card("juggernaut", "Juggernaut", "epic",
       "Built like a planet.",

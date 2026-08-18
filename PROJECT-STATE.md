@@ -538,7 +538,10 @@ Pillars:
       Moon Shoes spends its extra jump at the apex; Tailwind hangs on its float
 - [x] **Grasshopper is a charged jump**: hold jump on the ground to coil (the
       fighter compresses and bobs), release to launch. A tap is an ordinary
-      hop; at `minHold` (0.5s) the wind-up is worth **2x normal jump height**
+      hop fired on the PRESS, exactly like anyone else's — the wind-up never
+      delays it. Holding banks charge in the air as well as on the ground, so a
+      held button lands already coiled and letting go from there launches. At
+      `minHold` (0.5s) the wind-up is worth **2x normal jump height**
       and at `maxHold` (7s) **the whole height of the arena** (`maxBoards: 1`),
       measured against that arena's own gravity, so a taller board is cleared
       just as completely. Configured in HEIGHT in `GAMEPLAY.chargeJump` and
@@ -593,6 +596,17 @@ Pillars:
       next kick, chaining a climb; the same reflex recovers it from a fall
       down the side of the arena. Measured after: 12 wall jumps in the same
       test, and a bot dropped past the edge kicks back off the wall
+- [x] **The card picker's All / None / Invert row is reachable on a pad**: the
+      card grid stands in the cursor list as a single cell sitting directly
+      under the Choose Cards mode buttons, and the reset row sits off to the
+      right — so walking down the panel always jumped straight past it into the
+      grid, and it could only ever be reached by climbing back OUT of the grid.
+      The spatial search now opens its cone close in (`along * 2 + 240`) and
+      weighs sideways distance less (1.2 rather than 2.2), and coming down the
+      panel the grid is entered THROUGH its own bar. Switching card mode also
+      re-anchors the cursor, so buttons that appear are usable at once instead
+      of after closing and reopening Settings. Measured cursor path: mode row
+      -> All -> None -> Invert -> the grid -> rarity sliders
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

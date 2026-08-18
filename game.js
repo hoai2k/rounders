@@ -2340,14 +2340,20 @@
       p.aimX /= aimMag; p.aimY /= aimMag;
 
       const chillJump = p.chillTimer > 0 ? 0.75 : 1;
-      // Grasshopper: the jump is wound up on the ground and fires on RELEASE,
-      // so a tap is an ordinary hop and a long hold is a launch. Only the
-      // ground jump is charged — air jumps and wall jumps still go on press.
+      // Grasshopper: a PRESS is an ordinary jump, fired the instant the button
+      // goes down like anyone else's — the wind-up never delays it. Keeping the
+      // button down banks charge, and the coil is entered the moment they are
+      // back on the ground with the button still held; letting go from there
+      // launches. So a tap hops, and a hold hops, lands coiled, and fires.
       const charging = p.stats.chargeJump > 0;
       if (charging && !stunned) {
-        if (p.grounded && p.input.jump) {
+        if (p.input.jump) {
+          // the clock runs from the press, in the air as well as on the ground,
+          // so a held button lands already wound up
           p.jumpCharge = Math.min(CHARGE.maxHold, (p.jumpCharge || 0) + dt);
-          const k = clamp(((p.jumpCharge || 0) - CHARGE.minHold) / (CHARGE.maxHold - CHARGE.minHold), 0, 1);
+          const k = p.grounded
+            ? clamp(((p.jumpCharge || 0) - CHARGE.minHold) / (CHARGE.maxHold - CHARGE.minHold), 0, 1)
+            : 0;
           if (k > 0 && Math.random() < dt * (8 + k * 40)) {
             const a = rand(0, Math.PI * 2);
             particles.push({
@@ -2358,7 +2364,8 @@
               color: k > 0.66 ? "#c9f7a8" : "#9fe870", spark: true
             });
           }
-        } else if (p.grounded && (p.jumpCharge || 0) > 0) {
+        } else if (p.grounded && (p.jumpCharge || 0) >= CHARGE.minHold) {
+          // let go on the ground with a wound-up reel: the launch
           const mul = chargeMul(p.jumpCharge, p);
           p.vy = -p.stats.jump * chillJump * mul;
           p.grounded = false;
@@ -2372,7 +2379,7 @@
             burst(p.x, p.y + p.stats.radius, "#9fe870", Math.round(6 + (mul - 1) * 14), 240);
             world.shake = Math.max(world.shake, (mul - 1) * 4);
           }
-        } else if (!p.grounded) p.jumpCharge = 0;
+        } else if (!p.input.jump) p.jumpCharge = 0;   // let go: the wind-up is spent
       }
       if (p.input.jumpPressed && !stunned) {
         const canWallJump = !p.grounded && p.wallTimer > 0 && p.wallCooldown <= 0;
@@ -2411,7 +2418,7 @@
           pulse(p, 0.16, 35);
           sfx("jump");
           burst(p.x - p.wallDir * p.stats.radius, p.y, "#ffffff", 9, 190);
-        } else if (p.jumpsLeft > 0 && !(charging && p.grounded)) {
+        } else if (p.jumpsLeft > 0) {
           // Firecracker Heels: an air jump goes off like a mortar under you
           if (!p.grounded && p.stats.jumpBlast) {
             const dmg = 15 * p.stats.jumpBlast;
@@ -4801,17 +4808,30 @@
     if (!current) return;
     const a = current.getBoundingClientRect();
     const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+    // The card grid stands in the list as one cell that sits directly under the
+    // Choose Cards mode buttons, so coming DOWN the panel it always won the
+    // spatial search and the All / None / Invert row above it — sitting off to
+    // the right — was stepped straight over and could never be reached on a
+    // pad. Walking down now enters the grid THROUGH that row.
+    const inPickerBar = Boolean(current.closest && current.closest(".card-picker-bar"));
     let best = -1, bestScore = Infinity;
     controls.forEach((el, i) => {
       if (el === current) return;
+      if (dir.y > 0 && !inPickerBar && el.dataset.cell !== undefined) return;
       const r = el.getBoundingClientRect();
       const vx = r.left + r.width / 2 - ax;
       const vy = r.top + r.height / 2 - ay;
       const along = vx * dir.x + vy * dir.y;
       if (along <= 6) return;                       // must lie that way
       const across = Math.abs(vx * -dir.y + vy * dir.x);
-      if (across > along * 2 + 90) return;          // and roughly in line
-      const score = along + across * 2.2;
+      // The cone is generous close in, so a control on the next row but well
+      // off to one side — the card picker's All / None / Invert — still counts
+      // as "that way", while distant off-axis controls stay excluded.
+      if (across > along * 2 + 240) return;
+      // Across is penalised, but not so hard that a control one row down and a
+      // little to the side loses to one straight ahead but far away — that is
+      // what hid the card picker's All / None / Invert row.
+      const score = along + across * 1.2;
       if (score < bestScore) { bestScore = score; best = i; }
     });
     if (best >= 0) setMenuIndex(best, controls);
@@ -5736,7 +5756,7 @@
     const left = p.squish || 0;
     // Grasshopper coiling on the spot: the deeper the wind-up, the lower they
     // get, with a bob on top so the fighter reads as loaded rather than stuck.
-    const held = p.jumpCharge || 0;
+    const held = p.grounded ? (p.jumpCharge || 0) : 0;
     if (left <= 0 && held <= 0) return null;
     let sy = 1, sx = 1, lift = 0;
     if (held > 0) {

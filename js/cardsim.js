@@ -83,7 +83,7 @@
   }
   function squishScale(who, t = 0) {
     const left = who.squish || 0;
-    const held = who.jumpCharge || 0;
+    const held = who.grounded ? (who.jumpCharge || 0) : 0;
     if (left <= 0 && held <= 0) return null;
     let sy = 1, sx = 1, lift = 0;
     if (held > 0) {
@@ -1165,22 +1165,28 @@
         h.vx += (want - h.vx) * Math.max(0, Math.min(1, accel * dt));
         if (!dir && h.grounded) h.vx += (0 - h.vx) * Math.max(0, Math.min(1, h.stats.brake * dt));
         if (h.stats.chargeJump > 0) {
-          // Grasshopper: coil on the spot, then let go. Held just past the
-          // half-second threshold, so the preview shows the card's HEADLINE
-          // jump — twice normal height, measured against a real 900px board
-          // rather than this little scene. That launch is taller than the
-          // preview frame, so the fighter does leave the top of it: the
-          // alternative is quoting a number the game never gives you.
-          if (h.grounded) {
-            h.jumpCharge = (h.jumpCharge || 0) + dt;
-            if (h.jumpCharge > 0.6) {
-              h.vy = -h.stats.jump * SCALE * chargeMul(h.jumpCharge);
-              h.grounded = false;
-              h.jumps = h.stats.extraJumps;
-              h.jumpCharge = 0;
-              puff(h.x, h.y + h.stats.radius, "#9fe870", 14, 260);
-            }
-          } else h.jumpCharge = 0;
+          // Grasshopper, exactly as the game plays it: the PRESS is an ordinary
+          // hop, the button stays down, and they land already wound up — then
+          // letting go launches. Held just past the half-second threshold, so
+          // the preview shows the headline jump (twice normal height, measured
+          // against a real 900px board rather than this little scene). That
+          // launch is taller than the preview frame, so the fighter does leave
+          // the top of it: the alternative is quoting a number the game never
+          // gives you.
+          h.jumpCharge = (h.jumpCharge || 0) + dt;
+          if (h.grounded && !h.hopped && h.jumpCharge > 0.12) {
+            h.vy = -h.stats.jump * SCALE;          // the press: a normal jump
+            h.grounded = false;
+            h.jumps = h.stats.extraJumps;
+            h.hopped = true;
+          } else if (h.grounded && h.hopped && h.jumpCharge > 0.62) {
+            h.vy = -h.stats.jump * SCALE * chargeMul(h.jumpCharge);   // the release
+            h.grounded = false;
+            h.jumps = h.stats.extraJumps;
+            h.hopped = false;
+            h.jumpCharge = 0;
+            puff(h.x, h.y + h.stats.radius, "#9fe870", 14, 260);
+          }
         } else if (h.grounded && Math.sin(t * 3.1) > 0.985) {
           h.vy = -h.stats.jump * SCALE;
           h.grounded = false;

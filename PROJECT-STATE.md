@@ -458,6 +458,28 @@ Pillars:
       the max 448. Supernova appears in 125% of the hottest 1% of builds (i.e.
       often twice) and Glass Cannon in 108%; damage multipliers compose and
       pellets multiply on top
+- [x] **Lifesteal is visible energy 2026-08-18**: Leech Lunch and Grim Harvest
+      tear health out of whoever was hit as green motes that chase the shooter
+      down, and the heal is applied when a mote ARRIVES rather than on impact —
+      so the health bar fills as the energy comes home. Measured at ~800ms
+      between hit and heal in the preview. A kill under Grim Harvest sprays the
+      whole pool. The preview also stages lifesteal holders at 45% health,
+      without which they were at full and the card looked like it did nothing
+- [x] **Body-attached effects ride the body bob**: `ROUNDERS.bodyWobble` is
+      exported from the character renderer, so Juggernaut's plate no longer
+      sits still while the fighter bobs in front of it — it is plate bolted on,
+      not a hoop they float inside
+- [x] **Dragon's Hoard smoulders**: curling smoke rises off every side, lit
+      from within, with gold embers turning in it, drawn behind the body and on
+      the same bob as Juggernaut's plate
+- [x] **Boomerang tumbles** end over end as it flies instead of pointing along
+      its path
+- [x] **RT means the shot behaves differently**, not that the gun has better
+      numbers. Dragon's Hoard is more ammo, a faster reload and more damage —
+      you shoot exactly as before — so it and Cannonball, Hair Trigger, Speed
+      Loader, Longshot and Bubblegum Rounds now wear no badge. 36 of 77 cards
+      carry RT, down from 47. Hummingbird names both A and RT, since you hold
+      station with one and dump the magazine with the other
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

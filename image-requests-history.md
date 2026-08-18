@@ -496,3 +496,25 @@ paths (already renamed `mosh-pit.png` → `sawblade.png`).
   > behind them, teeth throwing sparks off the arena floor. An enemy is
   > flinching back from the edge of it. Steel and hazard orange against a
   > darker arena. Read: they ARE the blade, it is not circling them.
+
+---
+
+## Health cards from the anti-one-shot balance pass (12 images, 2026-08-18)
+
+Six cards added to put health back on the draft table — one-shots were 7.1% of
+matchups, and health had nine sources in seventy-seven cards with none at all
+at uncommon. Each card carries an emblem (256x256, transparent) and a scene
+(512x384, opaque full-bleed), under the global style guide.
+
+| Card | Emblem | Scene |
+|---|---|---|
+| **Second Wind** · Common · *"You are not done yet."* | a lungful of bright air, a green swirl curling up out of a fighter's chest | a battered round fighter straightening back up mid-fight, a fresh green gust spiralling around them, colour flooding back into their body |
+| **Padded Vest** · Common · *"Bulk has its uses."* | a quilted flak vest, thick stitched panels, chunky buckles | a stout fighter in an overstuffed quilted vest shrugging off a hit, the round bouncing away in a puff of stuffing |
+| **Iron Rations** · Uncommon · *"Heavy, dull, and it keeps you alive."* | a dented tin of iron-grey field rations with a heavy ring pull | a fighter chewing through a slab of grey ration block, planted like a boulder while shots spark off them |
+| **Sandbags** · Uncommon · *"Dig in."* | three stacked sandbags, taut and heavy, sand trickling from a split seam | a fighter dug in behind a wall of sandbags they are visibly wearing, low and immovable, dust kicked up around their feet |
+| **Bulwark** · Rare · *"Hold the line."* | a broad tower shield planted in the ground, riveted iron band across it | a fighter braced behind an enormous planted shield taking a volley head on, sparks fanning off the face of it |
+| **Second Skin** · Rare · *"It moves when you do."* | a sleek second layer peeling over an arm, plated and flexible, faint blue sheen | a fighter mid-stride wrapped in a glossy plated second skin, a hit sliding off it without moving them an inch |
+
+All twelve arrived already keyed (40-56% transparent emblems) and were filed by
+`npm run intake-art` with nothing to key and nothing to archive.
+

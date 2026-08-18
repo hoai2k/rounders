@@ -646,8 +646,13 @@ Pillars:
       6 -> 8, volley p99 174 -> 144 and worst 448 -> 289. The 99th-percentile
       volley is still 4x the 36-damage baseline, so damage cards read as
       strong as they did
-- [ ] Art for the six new health cards (`image-requests.md`) — they ship on
-      procedural fallbacks until it lands
+- [x] **Art for the six new health cards landed 2026-08-18** and was filed with
+      `npm run intake-art` (already keyed on delivery, so nothing to key or
+      archive). Full art audit after it: 83/83 cards have an emblem and a
+      scene, 24/24 character rigs are complete, 25/25 arenas and 20/20 effect
+      sheets resolve — checked by loading every file the running game asks for
+      rather than by listing directories. Nothing is outstanding; the only name
+      in `js/bullet-art.js` without a PNG is Cannonball, which is deliberate
 - [x] **The preview paints the effects the game paints**: the two drew them
       from separate code — the game reached for `assets/images/fx/<name>.png`
       and the card workbench drew its own procedural version — so an Event

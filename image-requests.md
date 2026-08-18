@@ -1,33 +1,29 @@
 # Image Generation Requests — Rounders
 
-**Six cards are waiting on art** — the health cards added in the anti-one-shot
-balance pass. Each needs an emblem (`cards/<id>.png`) and a scene
-(`cards/art/<id>.png`). The game already ships them and draws procedural
-fallbacks, so nothing is broken while these are outstanding.
+**Nothing outstanding.** Every image the game asks for has been generated and is
+in the repo. The prompts everything was made from live in
+`image-requests-history.md`, which is where a re-generation or a style question
+goes looking.
 
-Prepend the global style guide below to every prompt.
-
-| id | emblem | scene |
-|---|---|---|
-| `second-wind` | a lungful of bright air, a green swirl curling up out of a fighter's chest | a battered round fighter straightening back up mid-fight, a fresh green gust spiralling around them, colour flooding back into their body |
-| `padded-vest` | a quilted flak vest, thick stitched panels, chunky buckles | a stout fighter in an overstuffed quilted vest shrugging off a hit, the round bouncing away in a puff of stuffing |
-| `iron-rations` | a dented tin of iron-grey field rations with a heavy ring pull | a fighter chewing through a slab of grey ration block, planted like a boulder while shots spark off them |
-| `sandbags` | three stacked sandbags, taut and heavy, sand trickling from a split seam | a fighter dug in behind a wall of sandbags they are visibly wearing, low and immovable, dust kicked up around their feet |
-| `bulwark` | a broad tower shield planted in the ground, riveted iron band across it | a fighter braced behind an enormous planted shield taking a volley head on, sparks fanning off the face of it |
-| `second-skin` | a sleek second layer peeling over an arm, plated and flexible, faint blue sheen | a fighter mid-stride wrapped in a glossy plated second skin, a hit sliding off it without moving them an inch |
-
-The prompts everything else was made from live in `image-requests-history.md`,
-which is where a re-generation or a style question goes looking.
-
-> Audited 2026-08-17, after the last six files landed (`fx/angel.png`,
-> `fx/lemonade.png` and re-arts for Second Defence and Sawblade):
+> Audited 2026-08-18, after the six health cards from the anti-one-shot balance
+> pass landed (`second-wind`, `padded-vest`, `iron-rations`, `sandbags`,
+> `bulwark`, `second-skin` — emblem and scene each):
 >
 > | | |
 > |---|---|
-> | Cards shipping | 83 — the six health cards above are the only ones missing art |
-> | Emblems / scenes on disk | 88 each: the extra 11 belong to cut cards, kept in case they come back |
+> | Cards shipping | 83 — **0 missing art**, each with an emblem and a scene |
+> | Emblems / scenes on disk | 94 each: the extra 11 belong to cut cards, kept in case they come back |
 > | Painted bullets | 29 |
 > | Effect sheets | 20 |
+> | Characters | 24, every one with body / weapon / arm |
+> | Arena backdrops | 25 |
+>
+> Checked by loading every file the running game asks for, not by listing the
+> directory: 83 emblems, 83 scenes, 25 arenas, 24 rigs and 20 effect sheets all
+> resolve. The one name in `js/bullet-art.js` with no PNG behind it is
+> **Cannonball**, which is deliberate — the entry is there to draw the
+> procedural round 1.4x bigger, and the card has never had painted art. If you
+> want one, it is the only bullet worth asking for.
 >
 > Art for the cut cards is unused but kept — `big-bore` (a strictly worse
 > Cannonball) and `gag-order` / `cold-shoulder` / `overflow` (effects that were
@@ -46,7 +42,15 @@ which is where a re-generation or a style question goes looking.
 > `lemonade`, `poison-cloud` and `sawblade` were already in; `explosion`,
 > `explosion-big`, `shockwave-ring`, `lightning-arc`, `storm-nova`,
 > `shield-bubble`, `shield-break`, `stun-stars`, `muzzle-flash`, `chill-aura`
-> and `frost-burst` were wired in on 2026-08-17.
+> and `frost-burst` were wired in on 2026-08-17. Since 2026-08-18 the card
+> workbench paints them too, from the same table (`js/fx.js`).
+>
+> **Strips are cut by detection, not by arithmetic.** The frames in
+> `explosion.png`, `explosion-big.png` and `shield-break.png` are drawn by eye
+> rather than on an exact grid — up to 168px off their nominal cell — so the
+> engine finds each frame in the artwork instead of slicing at `width / frames`.
+> A new strip does not have to be pixel-aligned; it does need visible gutters
+> between frames, or `centres: [...]` in `js/fx-art.js` to say where they are.
 >
 > **Four are deliberately unused, and should stay that way** unless the design
 > they lose to is revisited: `armor-plates` (Juggernaut wears rolled steel by
@@ -59,12 +63,6 @@ which is where a re-generation or a style question goes looking.
 
 The game ships with procedural fallbacks, so art can be dropped in
 incrementally: any missing file is fine and simply falls back.
-
-## Global style guide (prepend to every prompt)
-
-> Vibrant flat 2D indie game art, thick dark outlines, soft inner gradients, bold
-> saturated colors, playful and energetic, clean silhouette, no text, no watermark.
-> Consistent with a colorful physics party-brawler in the spirit of ROUNDS.
 
 ## File conventions
 
@@ -81,6 +79,12 @@ incrementally: any missing file is fine and simply falls back.
   delivered original is kept in `assets/images/archive/`. Card **scenes** are
   exempt (they are meant to be opaque). `npm run intake` is the separate,
   older pipeline for character art.
+
+## Global style guide (prepend to every prompt)
+
+> Vibrant flat 2D indie game art, thick dark outlines, soft inner gradients, bold
+> saturated colors, playful and energetic, clean silhouette, no text, no watermark.
+> Consistent with a colorful physics party-brawler in the spirit of ROUNDS.
 
 ---
 

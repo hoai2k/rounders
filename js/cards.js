@@ -169,7 +169,7 @@
 
     card("pit-stop", "Pit Stop", "uncommon",
       "Four seconds flat.",
-      "Blocking instantly refills your magazine.",
+      "Throwing a block instantly refills your magazine — it does not have to catch anything.",
       ["block = full reload", "+0.25s block cooldown"], ["block", "ammo"],
       p => { p.stats.blockReload += 1; p.stats.blockCooldown += 0.25; }),
 
@@ -181,7 +181,7 @@
 
     card("hot-streak", "Hot Streak", "uncommon",
       "Ride the wave.",
-      "Dealing bullet damage armors you with a 25-point shield that fades fast.",
+      "Dealing bullet damage wraps you in a 25-point shield that burns off over about four seconds.",
       ["hits grant a decaying 25 shield"], ["defense"],
       p => { p.stats.hotStreak += 1; }),
 

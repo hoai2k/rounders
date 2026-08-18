@@ -345,7 +345,7 @@
       return {
         x, y: GROUND - st.radius, vx: 0, vy: 0,
         stats: st, hp: st.maxHp * (holder && plan.wounded ? plan.wounded : 1), maxHp: st.maxHp,
-        shield: st.shield, temp: 0, decayPool: 0,
+        shield: st.shield, temp: 0, hot: 0, decayPool: 0,
         color, character, facing, aimX: facing, aimY: 0,
         ammo: st.maxAmmo, reloadT: 0, fireT: 0,
         blockT: 0, blockCd: 0, echoT: 0, stunT: 0, silenceT: 0,
@@ -464,6 +464,19 @@
       puff(from.x, from.y, "#74f08b", 6, 150);
     }
 
+    // Waste Not: the spent round comes back out of the wound and flies home
+    function returnAmmo(from, to) {
+      if (!to) return;
+      const ang = rand(0, Math.PI * 2);
+      siphons.push({
+        kind: "ammo",
+        x: from.x + Math.cos(ang) * rand(4, from.stats.radius * 0.6),
+        y: from.y + Math.sin(ang) * rand(4, from.stats.radius * 0.6),
+        vx: Math.cos(ang) * rand(50, 110) * SCALE, vy: (Math.sin(ang) * rand(50, 110) - 70) * SCALE,
+        to, amount: 0, t: 0, delay: 0
+      });
+    }
+
     function updateSiphons(dt) {
       for (const s of siphons) {
         if (s.delay > 0) { s.delay -= dt; continue; }
@@ -478,8 +491,13 @@
         if (sp > cap) { s.vx = (s.vx / sp) * cap; s.vy = (s.vy / sp) * cap; }
         s.x += s.vx * dt; s.y += s.vy * dt;
         if (d < s.to.stats.radius * 0.7 || s.t > 2.5) {
-          heal(s.to, s.amount);
-          float(s.to.x, s.to.y - s.to.stats.radius - 12, `+${Math.max(1, Math.round(s.amount))}`, "#74f08b");
+          if (s.kind === "ammo") {
+            puff(s.to.x, s.to.y, "#ffe169", 5, 120);
+            float(s.to.x, s.to.y - s.to.stats.radius - 12, "+1 AMMO", "#ffe169");
+          } else {
+            heal(s.to, s.amount);
+            float(s.to.x, s.to.y - s.to.stats.radius - 12, `+${Math.max(1, Math.round(s.amount))}`, "#74f08b");
+          }
           s.dead = true;
         }
       }
@@ -489,6 +507,19 @@
     function drawSiphons() {
       for (const s of siphons) {
         if (s.delay > 0) continue;
+        if (s.kind === "ammo") {
+          const sp2 = Math.hypot(s.vx, s.vy) || 1;
+          ctx.save();
+          ctx.translate(s.x, s.y);
+          ctx.rotate(Math.atan2(s.vy, s.vx));
+          ctx.fillStyle = "#ffe169";
+          ctx.strokeStyle = "#6b5410"; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.roundRect(-4, -2, 8, 4, 2); ctx.fill(); ctx.stroke();
+          ctx.strokeStyle = "rgba(255,225,105,0.45)"; ctx.lineWidth = 1.8;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-10, 0); ctx.stroke();
+          ctx.restore();
+          continue;
+        }
         const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 7);
         g.addColorStop(0, "rgba(198,255,208,0.95)");
         g.addColorStop(0.45, "rgba(116,240,139,0.75)");
@@ -557,6 +588,10 @@
         who.thornPulse = 0.35;
         float(from.x, from.y - 52, `-${Math.round(amount * who.stats.thorns)}`, "#ff5f8f");
         parts.push({ bolt: true, x1: who.x, y1: who.y, x2: from.x, y2: from.y, life: 0.18, max: 0.18, color: "#ff5f8f" });
+      }
+      if (amount > 0 && who.hot > 0) {
+        const s = Math.min(who.hot, amount);
+        who.hot -= s; amount -= s;
       }
       if (amount > 0 && who.temp > 0) {
         const s = Math.min(who.temp, amount);
@@ -838,6 +873,7 @@
         who.silenceT = Math.max(0, who.silenceT - dt);
         who.chillT = Math.max(0, who.chillT - dt);
         who.thornPulse = Math.max(0, (who.thornPulse || 0) - dt);
+        who.sugarT = Math.max(0, (who.sugarT || 0) - dt);
         if (who.echoT > 0) { who.echoT -= dt; if (who.echoT <= 0) { who.blockT = Math.max(who.blockT, 0.3); blockEffects(who, who.x, who.y); puff(who.x, who.y, "#fff", 10, 180); } }
         if (who.poisonT > 0) {
           who.poisonT -= dt; who.hp = Math.max(1, who.hp - who.dotDps * dt);
@@ -879,8 +915,10 @@
             });
           }
         }
-        if (who.stats.hotStreak && who.hotWant) { who.temp = Math.max(who.temp, 25 * who.stats.hotStreak); who.hotWant = false; }
-        if (who.temp > 0 && who.stats.hotStreak) who.temp = Math.max(0, who.temp - 10 * dt);
+        // Hot Streak rides on the fighter as a field, not on the bar, so it
+        // is kept apart from the Fresh Coat / Overflow pool
+        if (who.stats.hotStreak && who.hotWant) { who.hot = 25 * who.stats.hotStreak; who.hotWant = false; }
+        if (who.hot > 0) who.hot = Math.max(0, who.hot - 6 * dt);
         if (who.reloadT > 0) {
           who.reloadT -= dt;
           if (who.stats.reloadPulse) {
@@ -974,6 +1012,15 @@
         const foe = enemies(who)[0];
         who.aimX = Math.sign(foe.x - who.x) || who.facing;
         who.facing = who.aimX;
+        // Where the gun POINTS, as a unit vector, exactly as the game feeds the
+        // rig: the barrel follows the ballistic line onto the target instead of
+        // sitting flat while the shot arcs over it.
+        const st2 = who.stats;
+        const sp2 = st2.bulletSpeed * SCALE;
+        const gv2 = (st2.helium ? -st2.bulletGravity * 0.35 : st2.bulletGravity * (st2.homing ? 0.4 : 1)) * SCALE;
+        const la = aimAngle(who, foe, sp2, gv2);
+        who.aimVX = Math.cos(la);
+        who.aimVY = Math.sin(la);
       }
 
       // Firecracker Heels: an air jump goes off like a mortar underneath them,
@@ -1054,10 +1101,46 @@
         }
       }
       if (plan.movementDemo) {
-        // the holder runs and hops so speed / jump / stomp read on screen
+        // The holder paces back and forth so speed, grip and jumps read on
+        // screen. Driven through the SAME accel / brake / target-speed model
+        // the game uses, so Sticky Soles' sharper pickup and harder stops are
+        // actually visible, and Sugar Rush's doubled speed shows the moment a
+        // hit lands. The runs are cut with deliberate full stops, which is
+        // where braking reads.
         const h = plan.holder === "target" ? bb : a;
-        h.vx += (Math.sin(t * 1.6) > 0 ? 1 : -1) * h.stats.speed * SCALE * dt * 6;
-        if (h.grounded && Math.sin(t * 3.1) > 0.985) { h.vy = -h.stats.jump * SCALE; h.grounded = false; }
+        const phase = (t * 0.9) % 2;
+        const dir = phase < 0.75 ? 1 : phase < 1 ? 0 : phase < 1.75 ? -1 : 0;
+        const sugar = h.sugarT > 0 ? 1 + h.stats.sugarRush : 1;
+        const want = dir * h.stats.speed * SCALE * sugar;
+        const accel = h.grounded ? h.stats.accel : h.stats.airAccel;
+        h.vx += (want - h.vx) * Math.max(0, Math.min(1, accel * dt));
+        if (!dir && h.grounded) h.vx += (0 - h.vx) * Math.max(0, Math.min(1, h.stats.brake * dt));
+        if (h.grounded && Math.sin(t * 3.1) > 0.985) {
+          h.vy = -h.stats.jump * SCALE;
+          h.grounded = false;
+          h.jumps = h.stats.extraJumps;      // the hops left in the air, exactly
+        }
+        // Moon Shoes: spend the extra jump near the apex, so the second hop is
+        // unmistakably a second hop and not a tall first one
+        if (!h.grounded && h.stats.extraJumps > 0 && h.jumps > 0 && h.vy > -60 * SCALE && h.vy < 220 * SCALE) {
+          h.jumps -= 1;
+          h.vy = -h.stats.jump * SCALE;
+          puff(h.x, h.y + h.stats.radius * 0.6, "#ffffff", 10, 200);
+        }
+        // Tailwind: hold the jump button at the top of the arc and hang there
+        // until the float budget runs out
+        if (h.stats.floatTime > 0) {
+          if (h.grounded) h.floatLeft = h.stats.floatTime;
+          else if ((h.floatLeft || 0) > 0 && h.vy > -30 * SCALE) {
+            h.floatLeft = Math.max(0, h.floatLeft - dt);
+            h.vy = Math.min(h.vy, 30 * SCALE);
+            if (Math.random() < dt * 26) {
+              parts.push({ x: h.x + rand(-16, 16), y: h.y + h.stats.radius * 0.6,
+                vx: rand(-30, 30), vy: rand(20, 70), life: 0.4, max: 0.4,
+                r: rand(1.4, 2.6), color: "#cfe8ff" });
+            }
+          }
+        }
       }
       // Return to Sender only means anything on an EMPOWERED shot, so the
       // shooter blocks to charge one before pulling the trigger
@@ -1323,7 +1406,10 @@
           // the heal rides home as motes and lands when they arrive
           if (b.owner.stats.lifesteal) siphon(who, b.owner, dmg * b.owner.stats.lifesteal);
           if (b.owner.stats.hotStreak) b.owner.hotWant = true;
-          if (b.owner.stats.scavenge) { b.owner.ammo = Math.min(b.owner.stats.maxAmmo, b.owner.ammo + 1); float(b.owner.x, b.owner.y - 56, "+1 AMMO", "#ffe169"); }
+          if (b.owner.stats.scavenge) {
+            b.owner.ammo = Math.min(b.owner.stats.maxAmmo, b.owner.ammo + 1);
+            for (let i = 0; i < b.owner.stats.scavenge; i += 1) returnAmmo(who, b.owner);
+          }
           if (b.owner.stats.sugarRush) b.owner.sugarT = 2.5;
           if (b.poison || b.burn) {
             // venom doses ADD UP, up to a ceiling
@@ -1582,6 +1668,29 @@
       if (who.stats.hoard > 0 && window.ROUNDERS.drawHoardAura) {
         window.ROUNDERS.drawHoardAura(ctx, who.stats.radius, who.stats.hoard, t);
       }
+      // Hot Streak worn as a golden field that thins as the shield burns down
+      if (who.hot > 0) {
+        const k = Math.max(0, Math.min(1, who.hot / (25 * Math.max(1, who.stats.hotStreak))));
+        const rr = who.stats.radius * (1.5 + 0.12 * k) + Math.sin(t * 7) * 1.5;
+        ctx.save();
+        const hg = ctx.createRadialGradient(0, 0, who.stats.radius * 0.8, 0, 0, rr);
+        hg.addColorStop(0, "rgba(255,214,110,0)");
+        hg.addColorStop(0.7, `rgba(255,201,74,${0.16 * k})`);
+        hg.addColorStop(1, `rgba(255,236,150,${0.42 * k})`);
+        ctx.fillStyle = hg;
+        ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `rgba(255,226,120,${0.75 * k})`;
+        ctx.lineWidth = 2 + k;
+        ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = `rgba(255,244,196,${0.85 * k})`;
+        for (let i = 0; i < 4; i += 1) {
+          const a2 = t * (1.6 + i * 0.4) + i * 1.7;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a2) * rr, Math.sin(a2) * rr, 1.6 + k, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
       // Thorn Jacket's briar, roses swelling on each reflect
       if (who.stats.thorns > 0 && window.ROUNDERS.drawThornVine) {
         window.ROUNDERS.drawThornVine(ctx, who.stats.radius, who.stats.thorns, t,
@@ -1592,10 +1701,32 @@
         window.ROUNDERS.drawHoverWings(ctx, 0, 0, who.stats.radius, who.wingPhase || 0);
       }
       if (ch && window.ROUNDERS.drawCharacter) {
-        window.ROUNDERS.drawCharacter(ctx, ch, who.stats.radius, { t, aimX: who.aimX, aimY: who.aimY });
+        window.ROUNDERS.drawCharacter(ctx, ch, who.stats.radius, {
+          t, aimX: who.aimVX ?? who.aimX, aimY: who.aimVY ?? who.aimY, facing: who.facing
+        });
       } else {
         ctx.fillStyle = who.color;
         ctx.beginPath(); ctx.arc(0, 0, who.stats.radius, 0, Math.PI * 2); ctx.fill();
+      }
+      // Permafrost: frozen through — a white-blue tint over the body itself,
+      // brightest at the rim, under the vapour that already wreathes them
+      if (who.chillT > 0) {
+        const rr = who.stats.radius;
+        const fg = ctx.createRadialGradient(0, 0, rr * 0.15, 0, 0, rr * 1.02);
+        fg.addColorStop(0, "rgba(198,238,255,0.22)");
+        fg.addColorStop(0.65, "rgba(150,214,255,0.32)");
+        fg.addColorStop(1, "rgba(236,250,255,0.5)");
+        ctx.fillStyle = fg;
+        ctx.beginPath(); ctx.arc(0, 0, rr * 1.02, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(240,252,255,0.8)";
+        ctx.lineWidth = 1.4;
+        for (let i = 0; i < 7; i += 1) {
+          const a2 = (i / 7) * Math.PI * 2 + (who.seed || 0);
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a2) * rr * 0.72, Math.sin(a2) * rr * 0.72);
+          ctx.lineTo(Math.cos(a2) * rr, Math.sin(a2) * rr);
+          ctx.stroke();
+        }
       }
       ctx.restore();
       // block bubble

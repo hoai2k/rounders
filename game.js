@@ -1955,7 +1955,7 @@
       p.stompGrace = Math.max(0, p.stompGrace - dt);
       p.refreshLock = Math.max(0, p.refreshLock - dt);
       // Hot Streak armor bleeds away fast; Overflow shield sticks around
-      if (p.hotShield > 0) p.hotShield = Math.max(0, p.hotShield - 10 * dt);
+      if (p.hotShield > 0) p.hotShield = Math.max(0, p.hotShield - 6 * dt);
       // Payment Plan: the pool of deferred damage drips into your health bar
       if (p.decayPool > 0) {
         // one copy spreads the bill over 3s; each extra copy stretches it out
@@ -3042,6 +3042,7 @@
               if (o.stats.scavenge) {
                 if (o.reloadTimer > 0) o.reloadTimer = Math.max(0, o.reloadTimer - 0.4 * o.stats.scavenge);
                 else o.ammo = Math.min(o.stats.maxAmmo, o.ammo + 1);
+                for (let i = 0; i < o.stats.scavenge; i += 1) returnAmmo(p, o);
               }
               // Sugar Rush / Hot Streak / Second Serve: landing a hit pays out
               if (o.stats.sugarRush) o.sugarTimer = 2.5;
@@ -5447,6 +5448,31 @@
       if (p.stats.ironHull > 0) window.ROUNDERS.drawIronHull(ctx, r, p.stats.ironHull, world.time + p.botSeed);
       // Dragon's Hoard smoulders: curling smoke and gold embers off every side
       if (p.stats.hoard > 0) window.ROUNDERS.drawHoardAura(ctx, r, p.stats.hoard, world.time + p.botSeed);
+      // Hot Streak: the fighter wears their streak as a golden field that
+      // thins out as the shield burns down
+      if (p.hotShield > 0) {
+        const k = clamp(p.hotShield / (25 * Math.max(1, p.stats.hotStreak)), 0, 1);
+        const rr = r * (1.5 + 0.12 * k) + Math.sin(world.time * 7) * 1.5;
+        ctx.save();
+        const hg = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, rr);
+        hg.addColorStop(0, "rgba(255,214,110,0)");
+        hg.addColorStop(0.7, `rgba(255,201,74,${0.16 * k})`);
+        hg.addColorStop(1, `rgba(255,236,150,${0.42 * k})`);
+        ctx.fillStyle = hg;
+        ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `rgba(255,226,120,${0.75 * k})`;
+        ctx.lineWidth = 2 + k;
+        ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.stroke();
+        // a few sparks riding the shell so it reads as heat, not glass
+        ctx.fillStyle = `rgba(255,244,196,${0.85 * k})`;
+        for (let i = 0; i < 4; i += 1) {
+          const a2 = world.time * (1.6 + i * 0.4) + i * 1.7;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a2) * rr, Math.sin(a2) * rr, 1.6 + k, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
       // Thorn Jacket wears a briar: roses swell for a moment each time it bites
       if (p.stats.thorns > 0) {
         window.ROUNDERS.drawThornVine(ctx, r, p.stats.thorns, world.time + p.botSeed,
@@ -5470,8 +5496,25 @@
         blink: p.blinkClock % 4 > 3.8
       });
       if (p.chillTimer > 0) {
-        ctx.fillStyle = "rgba(140,220,255,0.3)";
-        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+        // frozen through: a white-blue tint over the whole body, brightest at
+        // the rim where the frost has taken, so the chill reads on the fighter
+        // and not only in the vapour around them
+        const fg = ctx.createRadialGradient(0, 0, r * 0.15, 0, 0, r * 1.02);
+        fg.addColorStop(0, "rgba(198,238,255,0.22)");
+        fg.addColorStop(0.65, "rgba(150,214,255,0.32)");
+        fg.addColorStop(1, "rgba(236,250,255,0.5)");
+        ctx.fillStyle = fg;
+        ctx.beginPath(); ctx.arc(0, 0, r * 1.02, 0, Math.PI * 2); ctx.fill();
+        // rime crystals clinging to the outline
+        ctx.strokeStyle = "rgba(240,252,255,0.8)";
+        ctx.lineWidth = 1.4;
+        for (let i = 0; i < 7; i += 1) {
+          const a2 = (i / 7) * Math.PI * 2 + p.botSeed;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a2) * r * 0.72, Math.sin(a2) * r * 0.72);
+          ctx.lineTo(Math.cos(a2) * r * 1.0, Math.sin(a2) * r * 1.0);
+          ctx.stroke();
+        }
         // A wreath of cold vapour around the frozen fighter, over the flat tint.
         // The art is a ring with a hollow middle and it is drawn wide enough for
         // that hollow to clear the body — a chilled fighter you cannot see is a
@@ -5602,8 +5645,10 @@
       ctx.roundRect(x + 2.5, y + 2, Math.max(1, (w - 5) * frac), 1.6, 1);
       ctx.fill();
     }
-    // temp armor (Hot Streak, Overflow, Fresh Coat) rides as a gold sliver
-    const temp = (p.hotShield || 0) + (p.overShield || 0) + (p.freshPool || 0);
+    // temp armor (Overflow, Fresh Coat) rides as a gold sliver. Hot Streak is
+    // NOT in here — it is worn as a field around the fighter instead, so the
+    // streak is visible on the fighter rather than read off a bar.
+    const temp = (p.overShield || 0) + (p.freshPool || 0);
     if (temp > 0) {
       const tf = clamp(temp / p.stats.maxHp, 0, 1);
       ctx.fillStyle = "#ffd76e";
@@ -6241,6 +6286,21 @@
     puff(from.x, from.y, "#74f08b", 6, 180);
   }
 
+  // Waste Not: the round that just landed comes back out of the wound and
+  // flies home to the magazine. Pure show — the ammo is already back — but it
+  // is what makes the refund legible.
+  function returnAmmo(from, to) {
+    if (!to || !to.alive) return;
+    const a = rand(0, Math.PI * 2);
+    siphons.push({
+      kind: "ammo",
+      x: from.x + Math.cos(a) * rand(4, from.stats.radius * 0.6),
+      y: from.y + Math.sin(a) * rand(4, from.stats.radius * 0.6),
+      vx: Math.cos(a) * rand(70, 150), vy: Math.sin(a) * rand(70, 150) - 90,
+      to, amount: 0, t: 0, delay: 0
+    });
+  }
+
   // Firecracker Heels: the crackers thrown out by an air jump. They carry no
   // damage of their own — the blast under the heels already landed — they are
   // there so the card reads as fireworks rather than a bare shove.
@@ -6310,13 +6370,19 @@
       s.x += s.vx * dt;
       s.y += s.vy * dt;
       if (Math.random() < dt * 40) {
-        puffOne(s.x + rand(-3, 3), s.y + rand(-3, 3), "rgba(116,240,139,0.7)");
+        puffOne(s.x + rand(-3, 3), s.y + rand(-3, 3),
+          s.kind === "ammo" ? "rgba(255,225,105,0.7)" : "rgba(116,240,139,0.7)");
       }
       // arrived: this is where the health is actually handed over
       if (d < s.to.stats.radius * 0.7 || s.t > 2.5) {
-        healPlayer(s.to, s.amount);
-        floatText(s.to.x, s.to.y - s.to.stats.radius - 12, `+${Math.max(1, Math.round(s.amount))}`, "#74f08b");
-        burst(s.to.x, s.to.y, "#74f08b", 5, 130);
+        if (s.kind === "ammo") {
+          puff(s.to.x, s.to.y, "#ffe169", 5, 140);
+          sfx("pop");
+        } else {
+          healPlayer(s.to, s.amount);
+          floatText(s.to.x, s.to.y - s.to.stats.radius - 12, `+${Math.max(1, Math.round(s.amount))}`, "#74f08b");
+          burst(s.to.x, s.to.y, "#74f08b", 5, 130);
+        }
         s.dead = true;
       }
     }
@@ -6327,6 +6393,23 @@
     ctx.save();
     for (const s of siphons) {
       if (s.delay > 0) continue;
+      if (s.kind === "ammo") {
+        // a spent round tumbling home, half size so it never reads as a shot
+        const sp = Math.hypot(s.vx, s.vy) || 1;
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(Math.atan2(s.vy, s.vx));
+        ctx.shadowColor = "#ffe169"; ctx.shadowBlur = 8;
+        ctx.fillStyle = "#ffe169";
+        ctx.strokeStyle = "#6b5410"; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.roundRect(-4.5, -2.2, 9, 4.4, 2.2); ctx.fill(); ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "rgba(255,225,105,0.45)";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-12, 0); ctx.stroke();
+        ctx.restore();
+        continue;
+      }
       const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 9);
       g.addColorStop(0, "rgba(198,255,208,0.95)");
       g.addColorStop(0.45, "rgba(116,240,139,0.75)");

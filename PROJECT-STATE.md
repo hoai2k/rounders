@@ -637,6 +637,13 @@ Pillars:
       it, players shove it, ride it, get crushed under it, and wall-kick off
       it; it floats in water. Sleeps when still, wakes on impulse; rebuilt
       per round in `resetProps`
+- [x] **Tease-gap pass + `npm run audit-arenas`** (AUDIT.md §5 L11): 17 gaps
+      that looked walkable but were narrower than the 54px body widened past a
+      body width (or sealed flush); the audit tool scans doorways and vertical
+      squeezes in every arena, reads the body size from `js/gameplay.js`, and
+      fails CI-style on any find
+- [x] **Swimming** (AUDIT.md §5 L12): underwater, jump is a repeatable stroke —
+      paddle up, steer with left/right, breach with the last kick
 - [x] **Scale & ballistics pass** (AUDIT.md §5 follow-up): per-level playfield
       sizes (`size:{w,h}` — 1460×820 tight up to 2000×1000 grand, ROUNDS-style
       scale variety); default bullets retuned for lobbing (speed 1180, gravity

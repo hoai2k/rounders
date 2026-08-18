@@ -2376,6 +2376,17 @@
       }
       if (p.input.jumpPressed && !stunned) {
         const canWallJump = !p.grounded && p.wallTimer > 0 && p.wallCooldown <= 0;
+        // Swimming: underwater, jump is a stroke — a repeatable paddle kick
+        // that costs no air jump, so mashing A works you up to the surface
+        // and one last kick breaches you out of it.
+        if (!p.grounded && !canWallJump && inWater(p.x, p.y, level)) {
+          p.vy = Math.min(p.vy, 0) - 440 * chillJump;
+          const move = clamp(p.input.move, -1, 1);
+          p.vx += move * 130;
+          sfx("jump");
+          burst(p.x + rand(-8, 8), p.y + p.stats.radius * 0.6, "#9ff0e0", 8, 200);
+          pulse(p, 0.1, 25);
+        } else {
         // Hummingbird: tap jump a second time in the air and you stop dead,
         // wings blurring, for as long as this jump's budget lasts. Tapping
         // again drops you out of it. Checked before the ordinary air jump so
@@ -2444,6 +2455,7 @@
           pulse(p, 0.12, 25);
           sfx("jump");
           puff(p.x, p.y + p.stats.radius, "#ffffff", 10);
+        }
         }
       }
 

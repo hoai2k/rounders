@@ -69,6 +69,19 @@
       floorDrag: 0.86   // ...and while grounded (lower = stops faster)
     },
 
+    // ------------------------------------------------------- CHARGED JUMP
+    // Grasshopper: hold jump on the ground to wind up, release to launch. A
+    // tap is an ordinary jump; past `minHold` the launch speed climbs to
+    // `maxMul` at `maxHold`. 2.15x on the baseline 880 clears ~850px, which is
+    // the height of the board.
+    chargeJump: {
+      minHold: 0.5,     // seconds before winding up buys anything
+      maxHold: 7,       // fully wound
+      maxMul: 2.15,     // launch speed multiplier when fully wound
+      squash: 0.3,      // how far they compress at full charge (fraction)
+      bob: 3.5          // px of bob while winding
+    },
+
     // ------------------------------------------------------------ WALL MOVES
     wall: {
       coyote: 0.12,     // seconds a wall touch stays "jumpable" after leaving it

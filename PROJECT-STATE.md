@@ -503,6 +503,43 @@ Pillars:
       Loader, Longshot and Bubblegum Rounds now wear no badge. 36 of 77 cards
       carry RT, down from 47. Hummingbird names both A and RT, since you hold
       station with one and dump the magazine with the other
+- [x] **Glass Cannon flies sheathed in glass**: a procedurally blown sphere
+      drawn in a second pass over the round, so it lands over painted, golden
+      and white-hot rounds alike, with highlights pinned to the screen
+- [x] **Blood Money reads in the preview**: the sim now charges the 5 HP a
+      shot, and a card built on cadence keeps its real fire delay instead of
+      the preview's 0.55s pacing floor
+- [x] **Thorn Jacket wears a briar**: a green vine on the fighter's bob with
+      thorns and roses, the roses swelling each time the jacket bites back
+- [x] **Panic Button wears no badge**: it throws the block for you when the
+      magazine runs dry, so `autoBlock` left the LT key list
+- [x] **Wasp Venom drifts after its target** (+0.35 homing). Its preview keeps
+      a straight shot — a slight drift cannot recover from the off-target
+      launch the strong seekers are staged with
+- [x] **Firecracker Heels kicks crackers** out of the heels on an air jump;
+      they tumble, spin and pop where they land, carrying no damage of their own
+- [x] **Springload squashes the head it lands on** a quarter of its height and
+      springs back, with the stomper riding it down and leaving on the way up.
+      The preview lands on the head again — the run-up was carrying it over
+- [x] **Hot Streak is worn, not read**: a golden field around the fighter that
+      thins as the shield burns down, lasting ~4s instead of 2.5s. Overflow and
+      Fresh Coat keep the gold sliver on the bar
+- [x] **Waste Not's refund flies home**: the spent round leaves the wound and
+      lands in the magazine, half size and trailing. The ammo is still credited
+      on the hit, so the card's timing is unchanged
+- [x] **Permafrost tints its victim** white-blue with rime on the outline,
+      under the vapour wreath
+- [x] **Preview fighters aim their guns**: the sim fed the rig a flat aim
+      vector, so barrels sat horizontal while shots arced away from them
+- [x] **Movement previews move**: speed runs through the game's own accel /
+      brake / target-speed model with stops cut into them, so Sticky Soles
+      reads; Sugar Rush doubles speed on a hit (360 px/s against 180 baseline);
+      Moon Shoes spends its extra jump at the apex; Tailwind hangs on its float
+- [x] **Grasshopper is a charged jump**: hold jump on the ground to coil (the
+      fighter compresses and bobs), release to launch. A tap is an ordinary
+      hop, `minHold` 0.5s starts the wind-up and 7s reaches 2.15x launch speed
+      — an ~850px rise, the height of the board. Tuned in
+      `GAMEPLAY.chargeJump`; measured 838 / 922 / 1908 px/s at tap / 0.8s / 7s
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

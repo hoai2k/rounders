@@ -64,13 +64,36 @@
   // Springload's squash: a quarter of their height on the compression, sprung
   // back out, pivoting on the feet. Same curve as game.js.
   const SQUISH_TIME = 0.22;
-  function squishScale(who) {
+  const CHARGE = () => (window.ROUNDERS.GAMEPLAY && window.ROUNDERS.GAMEPLAY.chargeJump)
+    || { minHold: 0.5, maxHold: 7, maxMul: 2.15, squash: 0.3, bob: 3.5 };
+  // Grasshopper's wind-up, same curve as game.js
+  function chargeMul(held) {
+    const c = CHARGE();
+    if (!held || held < c.minHold) return 1;
+    const k = Math.min(1, (held - c.minHold) / (c.maxHold - c.minHold));
+    return 1 + (c.maxMul - 1) * k;
+  }
+  function squishScale(who, t = 0) {
     const left = who.squish || 0;
-    if (left <= 0) return null;
-    const k = 1 - left / SQUISH_TIME;
-    const bend = Math.sin(Math.PI * Math.min(1, k / 0.55));
-    const over = k > 0.55 ? Math.sin(Math.PI * (k - 0.55) / 0.45) * 0.1 : 0;
-    return { sy: 1 - 0.25 * bend + over, sx: 1 + 0.16 * bend - over * 0.6 };
+    const held = who.jumpCharge || 0;
+    if (left <= 0 && held <= 0) return null;
+    let sy = 1, sx = 1, lift = 0;
+    if (held > 0) {
+      const c = CHARGE();
+      const k = Math.max(0, Math.min(1, (held - c.minHold) / (c.maxHold - c.minHold)));
+      const coil = 0.12 + c.squash * k;
+      sy *= 1 - coil;
+      sx *= 1 + coil * 0.55;
+      lift = Math.sin(t * (9 + k * 9)) * c.bob * (0.35 + k);
+    }
+    if (left > 0) {
+      const k = 1 - left / SQUISH_TIME;
+      const bend = Math.sin(Math.PI * Math.min(1, k / 0.55));
+      const over = k > 0.55 ? Math.sin(Math.PI * (k - 0.55) / 0.45) * 0.1 : 0;
+      sy *= 1 - 0.25 * bend + over;
+      sx *= 1 + 0.16 * bend - over * 0.6;
+    }
+    return { sy, sx, lift };
   }
   const TIME = 0.8;
 
@@ -117,7 +140,7 @@
       blockReload: 0, healField: 0, frostBlock: 0, sawBlock: 0,
       empowerBlock: 0, autoBlock: 0, brickBlock: 0, decoy: 0, blockRefresh: 0,
       scavenge: 0, reloadPulse: 0, sugarRush: 0, hotStreak: 0, overflow: 0, floatTime: 0,
-      decay: 0, freshCoat: 0, chillAura: 0, stomp: 0, jumpBlast: 0, repel: 0
+      decay: 0, freshCoat: 0, chillAura: 0, stomp: 0, jumpBlast: 0, repel: 0, chargeJump: 0
     };
   }
 
@@ -288,6 +311,10 @@
       plan.stompDemo = true;
       plan.close = true;
       watch.push("landing on a head deals damage and bounces them off it");
+    }
+    if (on("chargeJump")) {
+      plan.movementDemo = true;
+      watch.push("they coil on the spot while the jump is held, and the launch grows with it");
     }
     if (on("jumpBlast")) {
       plan.blastDemo = true;
@@ -1111,11 +1138,26 @@
         const phase = (t * 0.9) % 2;
         const dir = phase < 0.75 ? 1 : phase < 1 ? 0 : phase < 1.75 ? -1 : 0;
         const sugar = h.sugarT > 0 ? 1 + h.stats.sugarRush : 1;
-        const want = dir * h.stats.speed * SCALE * sugar;
+        // a fighter winding up a jump stands their ground rather than sliding
+        const want = (h.jumpCharge > 0 ? 0 : dir) * h.stats.speed * SCALE * sugar;
         const accel = h.grounded ? h.stats.accel : h.stats.airAccel;
         h.vx += (want - h.vx) * Math.max(0, Math.min(1, accel * dt));
         if (!dir && h.grounded) h.vx += (0 - h.vx) * Math.max(0, Math.min(1, h.stats.brake * dt));
-        if (h.grounded && Math.sin(t * 3.1) > 0.985) {
+        if (h.stats.chargeJump > 0) {
+          // Grasshopper: coil on the spot, then let go. Held for two and a half
+          // seconds, which is enough charge to read as a launch and still fit
+          // the preview's loop.
+          if (h.grounded) {
+            h.jumpCharge = (h.jumpCharge || 0) + dt;
+            if (h.jumpCharge > 2.5) {
+              h.vy = -h.stats.jump * SCALE * chargeMul(h.jumpCharge);
+              h.grounded = false;
+              h.jumps = h.stats.extraJumps;
+              h.jumpCharge = 0;
+              puff(h.x, h.y + h.stats.radius, "#9fe870", 14, 260);
+            }
+          } else h.jumpCharge = 0;
+        } else if (h.grounded && Math.sin(t * 3.1) > 0.985) {
           h.vy = -h.stats.jump * SCALE;
           h.grounded = false;
           h.jumps = h.stats.extraJumps;      // the hops left in the air, exactly
@@ -1641,10 +1683,10 @@
       const ch = who.character;
       ctx.save();
       ctx.translate(who.x, who.y);
-      const sq = squishScale(who);
+      const sq = squishScale(who, t);
       if (sq) {
         const rr = who.stats.radius;
-        ctx.translate(0, rr); ctx.scale(sq.sx, sq.sy); ctx.translate(0, -rr);
+        ctx.translate(0, rr + (sq.lift || 0)); ctx.scale(sq.sx, sq.sy); ctx.translate(0, -rr);
       }
       if (who.stats.repel) {
         ctx.save();

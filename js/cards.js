@@ -71,9 +71,9 @@
 
     card("grasshopper", "Grasshopper", "common",
       "The floor is merely a suggestion.",
-      "Launch off the floor like you were fired from it — a much faster, much higher jump.",
-      ["+38% jump speed & height", "+8% air control"], ["movement"],
-      p => { p.stats.jump *= 1.38; p.stats.airAccel *= 1.08; }),
+      "Hold jump on the ground to coil, release to launch. A tap hops as normal; wind up for seven seconds and you can clear the whole arena.",
+      ["hold jump to charge (up to 7s)", "up to 2.15× launch speed", "+8% air control"], ["movement"],
+      p => { p.stats.chargeJump += 1; p.stats.airAccel *= 1.08; }),
 
     card("brick-wall", "Brick Wall", "common",
       "You shall not pass. Probably.",
@@ -563,7 +563,7 @@
     brickBlock: 0, decoy: 0, blockRefresh: 0, blockCooldown: 1.55, blockDuration: 0.25,
     autoBlock: 0,
     // movement family
-    floatTime: 0, extraJumps: 0, jump: 880, jumpBlast: 0, stomp: 0, hover: 0,
+    floatTime: 0, extraJumps: 0, jump: 880, jumpBlast: 0, stomp: 0, hover: 0, chargeJump: 0,
     // the shot: anything that changes what pulling the trigger does, or what
     // landing a hit pays out
     damage: 36, fireDelay: 0.22, reload: 2, maxAmmo: 3,
@@ -586,7 +586,7 @@
   const BLOCK_KEYS = ["blockPush", "echoBlock", "blockDash", "warpBlock", "stormBlock",
     "blockReload", "healField", "frostBlock", "sawBlock", "empowerBlock",
     "brickBlock", "decoy", "blockRefresh", "blockCooldown", "blockDuration"];
-  const JUMP_KEYS = ["floatTime", "extraJumps", "jumpBlast", "stomp", "hover", "jump"];
+  const JUMP_KEYS = ["floatTime", "extraJumps", "jumpBlast", "stomp", "hover", "jump", "chargeJump"];
   // RT means "pulling the trigger DOES something different", not "your gun has
   // better numbers". Dragon's Hoard is more ammo, a faster reload and more
   // damage — you shoot exactly as you always did, so it wears no badge, and
@@ -617,7 +617,12 @@
     if (BLOCK_KEYS.some(moved)) out.push({ action: "block", why: "block" });
     if (SHOOT_KEYS.some(moved)) out.push({ action: "shoot", why: "shoot" });
     if (JUMP_KEYS.some(moved)) {
-      out.push({ action: "jump", why: up("floatTime") ? "hold to float" : up("hover") ? "double-tap to hover" : "jump" });
+      out.push({
+        action: "jump",
+        why: up("chargeJump") ? "hold to charge the jump"
+          : up("floatTime") ? "hold to float"
+          : up("hover") ? "double-tap to hover" : "jump"
+      });
     }
     if (moved("steer")) out.push({ action: "aim", why: "steer the shot" });
     return out;

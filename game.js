@@ -237,7 +237,7 @@
       empowerBlock: 0, autoBlock: 0, brickBlock: 0, decoy: 0, blockRefresh: 0,
       // reload / sustain / triggered
       scavenge: 0, reloadPulse: 0, sugarRush: 0, hotStreak: 0, overflow: 0, floatTime: 0,
-      decay: 0, freshCoat: 0, chillAura: 0, stomp: 0, jumpBlast: 0, repel: 0
+      decay: 0, freshCoat: 0, chillAura: 0, stomp: 0, jumpBlast: 0, repel: 0, chargeJump: 0
     };
   }
 
@@ -2136,6 +2136,39 @@
       p.aimX /= aimMag; p.aimY /= aimMag;
 
       const chillJump = p.chillTimer > 0 ? 0.75 : 1;
+      // Grasshopper: the jump is wound up on the ground and fires on RELEASE,
+      // so a tap is an ordinary hop and a long hold is a launch. Only the
+      // ground jump is charged — air jumps and wall jumps still go on press.
+      const charging = p.stats.chargeJump > 0;
+      if (charging && !stunned) {
+        if (p.grounded && p.input.jump) {
+          p.jumpCharge = Math.min(CHARGE.maxHold, (p.jumpCharge || 0) + dt);
+          const k = clamp(((p.jumpCharge || 0) - CHARGE.minHold) / (CHARGE.maxHold - CHARGE.minHold), 0, 1);
+          if (k > 0 && Math.random() < dt * (8 + k * 40)) {
+            const a = rand(0, Math.PI * 2);
+            particles.push({
+              x: p.x + Math.cos(a) * p.stats.radius * 1.3,
+              y: p.y + p.stats.radius * rand(0.3, 0.95),
+              vx: -Math.cos(a) * rand(20, 90), vy: rand(-90, -20) * (0.4 + k),
+              life: 0.35, maxLife: 0.35, r: rand(1.4, 2.8 + k * 2),
+              color: k > 0.66 ? "#c9f7a8" : "#9fe870", spark: true
+            });
+          }
+        } else if (p.grounded && (p.jumpCharge || 0) > 0) {
+          const mul = chargeMul(p.jumpCharge);
+          p.vy = -p.stats.jump * chillJump * mul;
+          p.grounded = false;
+          p.groundPlatform = null;
+          p.jumpCharge = 0;
+          pulse(p, 0.12 + (mul - 1) * 0.14, 25 + (mul - 1) * 90);
+          sfx("jump");
+          puff(p.x, p.y + p.stats.radius, "#ffffff", 10 + Math.round((mul - 1) * 14));
+          if (mul > 1.2) {
+            burst(p.x, p.y + p.stats.radius, "#9fe870", Math.round(6 + (mul - 1) * 14), 240);
+            world.shake = Math.max(world.shake, (mul - 1) * 4);
+          }
+        } else if (!p.grounded) p.jumpCharge = 0;
+      }
       if (p.input.jumpPressed && !stunned) {
         const canWallJump = !p.grounded && p.wallTimer > 0 && p.wallCooldown <= 0;
         // Hummingbird: tap jump a second time in the air and you stop dead,
@@ -2172,7 +2205,7 @@
           pulse(p, 0.16, 35);
           sfx("jump");
           burst(p.x - p.wallDir * p.stats.radius, p.y, "#ffffff", 9, 190);
-        } else if (p.jumpsLeft > 0) {
+        } else if (p.jumpsLeft > 0 && !(charging && p.grounded)) {
           // Firecracker Heels: an air jump goes off like a mortar under you
           if (!p.grounded && p.stats.jumpBlast) {
             const dmg = 15 * p.stats.jumpBlast;
@@ -2415,6 +2448,14 @@
   // two after sliding off the edge of a wall still counts (coyote time).
   const WALL_COYOTE = GP.wall.coyote;
   const WALL_JUMP_PUSH = GP.wall.jumpPush;
+  const CHARGE = GP.chargeJump;
+  // How much of a launch a wind-up has bought. A tap is worth nothing extra;
+  // past minHold it climbs to maxMul at maxHold.
+  function chargeMul(held) {
+    if (!held || held < CHARGE.minHold) return 1;
+    const k = Math.min(1, (held - CHARGE.minHold) / (CHARGE.maxHold - CHARGE.minHold));
+    return 1 + (CHARGE.maxMul - 1) * k;
+  }
   const WALL_SLIDE_MAX = GP.wall.slideMax;
   function touchWall(p, awayDir) {
     if (p.grounded) return;
@@ -5398,11 +5439,27 @@
   const SQUISH_TIME = 0.22;
   function squishScale(p) {
     const left = p.squish || 0;
-    if (left <= 0) return null;
-    const k = 1 - left / SQUISH_TIME;                 // 0 at impact, 1 when done
-    const bend = Math.sin(Math.PI * Math.min(1, k / 0.55));       // down then up
-    const over = k > 0.55 ? Math.sin(Math.PI * (k - 0.55) / 0.45) * 0.1 : 0;
-    return { sy: 1 - 0.25 * bend + over, sx: 1 + 0.16 * bend - over * 0.6 };
+    // Grasshopper coiling on the spot: the deeper the wind-up, the lower they
+    // get, with a bob on top so the fighter reads as loaded rather than stuck.
+    const held = p.jumpCharge || 0;
+    if (left <= 0 && held <= 0) return null;
+    let sy = 1, sx = 1, lift = 0;
+    if (held > 0) {
+      const k = clamp((held - CHARGE.minHold) / (CHARGE.maxHold - CHARGE.minHold), 0, 1);
+      const coil = 0.12 + CHARGE.squash * k;
+      const bob = Math.sin(world.time * (9 + k * 9)) * CHARGE.bob * (0.35 + k);
+      sy *= 1 - coil;
+      sx *= 1 + coil * 0.55;
+      lift = bob;
+    }
+    if (left > 0) {
+      const k = 1 - left / SQUISH_TIME;               // 0 at impact, 1 when done
+      const bend = Math.sin(Math.PI * Math.min(1, k / 0.55));     // down then up
+      const over = k > 0.55 ? Math.sin(Math.PI * (k - 0.55) / 0.45) * 0.1 : 0;
+      sy *= 1 - 0.25 * bend + over;
+      sx *= 1 + 0.16 * bend - over * 0.6;
+    }
+    return { sy, sx, lift };
   }
 
   function drawPlayersAll() {
@@ -5412,7 +5469,7 @@
       ctx.save();
       ctx.translate(p.x, p.y);
       const sq = squishScale(p);
-      if (sq) { ctx.translate(0, r); ctx.scale(sq.sx, sq.sy); ctx.translate(0, -r); }
+      if (sq) { ctx.translate(0, r + (sq.lift || 0)); ctx.scale(sq.sx, sq.sy); ctx.translate(0, -r); }
 
       // Magnet Suit: a crackling magnetic field, so the deflection has a
       // visible cause rather than bullets mysteriously swerving

@@ -2971,7 +2971,9 @@
         groundHug: p.stats.groundHug,
         voidPull: p.stats.voidPull,
         // Drill Rounds: how much solid a shot can bore through, in px of thickness
-        wallPierce: p.stats.wallPierce ? 70 + 50 * (p.stats.wallPierce - 1) : 0,
+        // Drill Rounds: how many pieces of terrain a shot can bore through,
+        // whatever they are made of and however thick they are
+        wallPierce: p.stats.wallPierce,
         holePunch: p.stats.holePunch,
         bankShot: p.stats.bankShot,
         kbDeal: p.stats.kbDeal,
@@ -3242,7 +3244,16 @@
             explodeBullet(b);
             continue;
           }
-          if (platform.isCrate) {
+          // Drill Rounds go through ANYTHING — stone, breakable panel, crate,
+          // thick or thin — and spend one hole doing it. Checked before the
+          // material-specific cases so no material is exempt; whatever the
+          // round would have done to it on impact, it still does on the way
+          // through.
+          if (b.wallPierce > 0 && drillThrough(b, platform)) {
+            if (platform.isCrate) damageCrate(platform.crateRef, b.damage, b.vx, b.vy);
+            else if (platform.breakRef) damageBreakable(platform.breakRef, b.x, b.y, b.damage);
+            sfx("block");
+          } else if (platform.isCrate) {
             damageCrate(platform.crateRef, b.damage, b.vx, b.vy);
             b.life = -1;
             explodeBullet(b);
@@ -3256,8 +3267,6 @@
               b.life = -1;
               explodeBullet(b);
             }
-          } else if (b.wallPierce > 0 && drillThrough(b, platform)) {
-            sfx("block");
           } else if (b.bounces > 0) {
             bounceBullet(b, platform);
             b.bounces -= 1;
@@ -3658,19 +3667,24 @@
     }
   }
 
-  // Open Plan: bore straight through a platform and come out the far side,
-  // spending thickness from the bullet's drill budget. Returns false when the
-  // wall is too thick to finish, so the shot dies in it like any other.
+  // Drill Rounds: bore straight through a platform and come out the far side,
+  // spending one of the round's holes. Material and thickness do not enter
+  // into it — the only way this fails is a shot running the LENGTH of a wall
+  // rather than across it, which has no far side to reach.
   function drillThrough(b, platform) {
     const vx = b.vx, vy = b.vy;
     const mag = Math.hypot(vx, vy) || 1;
     const dx = vx / mag, dy = vy / mag;
-    // walk forward until we're clear of this platform (bounded, so a shot that
-    // enters along a wall's length can't loop forever)
+    // Walk forward until we are clear of this platform. The reach is taken
+    // from the platform ITSELF — its own diagonal plus the round's width — so
+    // thickness never decides whether a drill round makes it out the far side;
+    // it is only a bound that stops a shot travelling along a wall's length
+    // from looping forever.
     const step = 4;
+    const reach = Math.hypot(platform.w, platform.h) + b.r * 4 + 64;
     let dist = 0;
     let x = b.x, y = b.y;
-    while (dist < b.wallPierce) {
+    while (dist < reach) {
       x += dx * step;
       y += dy * step;
       dist += step;
@@ -3679,7 +3693,11 @@
       if (!inside) {
         b.x = x + dx * 2;
         b.y = y + dy * 2;
-        b.wallPierce -= dist;
+        // the walk across the wall was a straight line; hand the round back
+        // the drop it would have taken in that time, so a thick wall does not
+        // flatten the shot's arc
+        b.vy += (b.gravity || 0) * (dist / mag);
+        b.wallPierce -= 1;                     // one hole spent, whatever it was
         b.drilled = (b.drilled || 0) + 1;
         // dust on both faces so the hole is legible
         puff(b.x, b.y, "#e8e2d4", 7);
@@ -8135,7 +8153,7 @@
     bullets: () => bullets.map(b => ({
       x: Math.round(b.x), y: Math.round(b.y), vx: Math.round(b.vx), ghost: Boolean(b.ghost),
       damage: Math.round(b.damage), empowered: b.empowered || 0, explosive: b.explosive,
-      singularity: b.singularity || 0
+      singularity: b.singularity || 0, wallPierce: b.wallPierce || 0, drilled: b.drilled || 0
     })),
     // how a fighter's round is drawn, for checking the bullet-art config
     bulletLook: p => bulletLookFor(p),
@@ -8181,6 +8199,10 @@
     probe: (px, py, rad = 27) => activePlatforms(currentLevel(), world.time)
       .filter(pl => pl.holes && pl.holes.length)
       .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, hasHoles: pl.holes.length, inHole: inHole(pl, px, py, rad) })),
+    // every solid the level currently has, for tests that need to shoot at one
+    platforms: () => activePlatforms(currentLevel(), world.time)
+      .map(pl => ({ x: pl.x, y: pl.y, w: pl.w, h: pl.h,
+        breakable: Boolean(pl.breakRef), crate: Boolean(pl.isCrate) })),
     punch: (px, py, size = 64) => {
       const plats = activePlatforms(currentLevel(), world.time);
       for (const pl of plats) if (circleRect({ x: px, y: py, r: 4 }, pl)) return punchHole(pl, px, py, size);

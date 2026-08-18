@@ -71,8 +71,8 @@
 
     card("grasshopper", "Grasshopper", "common",
       "The floor is merely a suggestion.",
-      "Hold jump to coil, then launch: 0.5s doubles your height, 7s clears the board.",
-      ["charge jump (hold, 7s)", "2× at 0.5s, a board at 7s"], ["movement"],
+      "Tap jump as normal. Hold it and you land coiled — let go to launch, up to a full board.",
+      ["tap = a normal jump", "hold 0.5s+ = a charged one"], ["movement"],
       p => { p.stats.chargeJump += 1; p.stats.airAccel *= 1.08; }),
 
     card("brick-wall", "Brick Wall", "common",

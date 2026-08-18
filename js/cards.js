@@ -297,8 +297,8 @@
 
     card("sawblade", "Sawblade", "rare",
       "Mind the blade.",
-      "Blocking wraps you in a spinning sawblade for 3 seconds, shredding anyone near.",
-      ["block = spinning saw (3s)"], ["block", "aoe"],
+      "Blocking wraps you in a spinning sawblade for 3 seconds; the block cooldown starts when it stops.",
+      ["block = spinning saw (3s)", "cooldown starts after it"], ["block", "aoe"],
       p => { p.stats.sawBlock += 1; }),
 
     card("bank-shot", "Bank Shot", "rare",

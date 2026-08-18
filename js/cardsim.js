@@ -859,7 +859,11 @@
       if (st.warpBlock) { who.x = Math.max(60, Math.min(W - 60, who.x + who.facing * 110)); puff(who.x, who.y, who.color, 14, 240); }
       if (st.blockDash) who.vx += who.facing * 320;
       if (st.blockReload) { who.ammo = st.maxAmmo; who.reloadT = 0; float(who.x, who.y - 56, "RELOADED", "#ffe169"); }
-      if (st.sawBlock) fields.push({ type: "saw", owner: who, angle: 0, r: 58, life: 3, dmg: 9 });
+      if (st.sawBlock) {
+        fields.push({ type: "saw", owner: who, angle: 0, r: 58, life: 3, dmg: 9 });
+        // the cooldown only starts once the disc is gone, same as in game
+        if (!free) who.blockCd += 3;
+      }
       // stood on end, so it is cover you can hide behind
       if (st.brickBlock && slabs.length < 2) slabs.push({ x: who.x + who.facing * 84, y: GROUND - 62, w: 20, h: 118, vy: 0 });
       if (st.empowerBlock) { who.empower = st.empowerBlock; float(who.x, who.y - 56, "EMPOWERED", "#ffd700"); }

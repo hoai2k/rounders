@@ -596,17 +596,22 @@ Pillars:
       next kick, chaining a climb; the same reflex recovers it from a fall
       down the side of the arena. Measured after: 12 wall jumps in the same
       test, and a bot dropped past the edge kicks back off the wall
-- [x] **The card picker's All / None / Invert row is reachable on a pad**: the
-      card grid stands in the cursor list as a single cell sitting directly
-      under the Choose Cards mode buttons, and the reset row sits off to the
-      right — so walking down the panel always jumped straight past it into the
-      grid, and it could only ever be reached by climbing back OUT of the grid.
-      The spatial search now opens its cone close in (`along * 2 + 240`) and
-      weighs sideways distance less (1.2 rather than 2.2), and coming down the
-      panel the grid is entered THROUGH its own bar. Switching card mode also
-      re-anchors the cursor, so buttons that appear are usable at once instead
-      of after closing and reopening Settings. Measured cursor path: mode row
-      -> All -> None -> Invert -> the grid -> rarity sliders
+- [x] **Every settings control is reachable on a pad**: the Reset buttons sit
+      at the right-hand end of their rows and were skipped entirely — a
+      disabled control was left out of the cursor list altogether (so a greyed
+      Reset was somewhere the cursor had never been able to go), and the
+      spatial search preferred whatever was nearest in a straight line over
+      whatever shared the current row. The search now tracks two candidates —
+      the nearest control sharing this one's row or column, and the best of
+      everything else — and takes the in-line one unless it is far away and
+      something else is right there. Greyed Reset buttons keep their place in
+      the cursor list. Measured: Choose Cards -> Reset -> the rarity Reset ->
+      the sliders, and in the card panel the grid is entered through its own
+      All / None / Invert bar rather than over the top of it
+- [x] **Sawblade's cooldown starts when the disc stops**: the block cooldown
+      was ticking away underneath the 3s guard, which made the shield close to
+      free. It now runs 3s + the usual cooldown (measured 4.55s against a
+      1.55s base)
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

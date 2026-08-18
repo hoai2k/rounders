@@ -2746,6 +2746,8 @@
   // `free` is Panic Button's automatic block: an EXTRA shield, so it neither
   // waits on the block cooldown nor spends it — your manual parry is still
   // there the instant you want it.
+  const SAW_LIFE = 3;                 // how long Sawblade's disc rides you
+
   function tryBlock(p, free = false) {
     if (p.silenceTimer > 0) return;
     if (!free && p.blockCooldown > 0) return;
@@ -2788,9 +2790,13 @@
     if (p.stats.sawBlock) {
       fields.push({
         type: "saw", owner: p, x: p.x, y: p.y,
-        r: 64 + p.stats.sawBlock * 8, life: 3, angle: Math.random() * 6.3,
+        r: 64 + p.stats.sawBlock * 8, life: SAW_LIFE, angle: Math.random() * 6.3,
         dmg: 9 + p.stats.sawBlock * 3
       });
+      // A block that leaves a guard running ON you does not start its cooldown
+      // until that guard is gone — otherwise the cooldown ticks away underneath
+      // the saw and the shield is effectively free.
+      if (!free) p.blockCooldown += SAW_LIFE;
     }
     // Bricklayer: conjure a loose slab in front of you; it drops into the
     // arena's rigid-body pool and lives by the same physics as a cut platform
@@ -4739,7 +4745,12 @@
     const out = [];
     for (const root of roots) {
       for (const el of root.querySelectorAll("button, input, select")) {
-        if (el.disabled || el.offsetParent === null) continue;
+        if (el.offsetParent === null) continue;
+        // A greyed-out Reset still takes the cursor. It is a control the player
+        // can see, and skipping it meant the pad could never walk onto one —
+        // so the moment it DID have something to undo, it was somewhere the
+        // cursor had never been able to go.
+        if (el.disabled && !el.classList.contains("reset-btn")) continue;
         // The card grid appears here as its own cursor cell and nothing else:
         // eighty-odd buttons would otherwise flood the spatial search, and
         // crossing them one press at a time is nobody's idea of comfortable.
@@ -4814,9 +4825,20 @@
     // the right — was stepped straight over and could never be reached on a
     // pad. Walking down now enters the grid THROUGH that row.
     const inPickerBar = Boolean(current.closest && current.closest(".card-picker-bar"));
-    let best = -1, bestScore = Infinity;
+    // Two candidates are tracked: the nearest control that shares this one's
+    // row (moving sideways) or column (moving up and down), and the best of
+    // everything else. In-line wins — that is what makes a row of buttons walk
+    // straight across, and what lets the cursor reach a Reset sitting at the
+    // far right of a row. It only loses when it is a long way off and
+    // something else is right there: the bottom Back button is "in column"
+    // with almost everything, and without that escape a press of down from a
+    // heading's Reset would leap over every slider under it.
+    let inBest = -1, inAlong = Infinity;
+    let outBest = -1, outScore = Infinity, outAlong = Infinity;
     controls.forEach((el, i) => {
       if (el === current) return;
+      // Coming DOWN the panel the card grid is entered through its own bar, so
+      // the row above it is never stepped over.
       if (dir.y > 0 && !inPickerBar && el.dataset.cell !== undefined) return;
       const r = el.getBoundingClientRect();
       const vx = r.left + r.width / 2 - ax;
@@ -4824,16 +4846,19 @@
       const along = vx * dir.x + vy * dir.y;
       if (along <= 6) return;                       // must lie that way
       const across = Math.abs(vx * -dir.y + vy * dir.x);
-      // The cone is generous close in, so a control on the next row but well
-      // off to one side — the card picker's All / None / Invert — still counts
-      // as "that way", while distant off-axis controls stay excluded.
-      if (across > along * 2 + 240) return;
-      // Across is penalised, but not so hard that a control one row down and a
-      // little to the side loses to one straight ahead but far away — that is
-      // what hid the card picker's All / None / Invert row.
-      const score = along + across * 1.2;
-      if (score < bestScore) { bestScore = score; best = i; }
+      if (across > along * 2 + 420) return;         // and not absurdly off to the side
+      const inLine = dir.x
+        ? (r.bottom > a.top + 2 && r.top < a.bottom - 2)
+        : (r.right > a.left + 2 && r.left < a.right - 2);
+      if (inLine) {
+        if (along < inAlong) { inAlong = along; inBest = i; }
+        return;
+      }
+      const score = along + across * 2.2;
+      if (score < outScore) { outScore = score; outBest = i; outAlong = along; }
     });
+    let best = inBest >= 0 ? inBest : outBest;
+    if (inBest >= 0 && outBest >= 0 && inAlong > outAlong * 4 + 260) best = outBest;
     if (best >= 0) setMenuIndex(best, controls);
     return best >= 0;
   }

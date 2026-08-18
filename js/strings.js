@@ -147,7 +147,7 @@
       keyboard2Html: "<kbd>◀</kbd><kbd>▶</kbd> move · <kbd>▲</kbd> jump · <kbd>/</kbd> shoot · <kbd>.</kbd> block",
 
       loopTitle: "The Loop",
-      loopHtml: "Last one standing wins the round. The players furthest behind draft a power card — at the same time. First to the score limit takes the match.",
+      loopHtml: "Last one standing wins the round. The players furthest behind draft a power card — at the same time, and every screen that locks in folds away so the ones still choosing take the space. With three or more fighters the round's runner-up is offered <b>Photo Finish</b> in place of one of their cards: half a round win, banked on the spot. First to the score limit takes the match.",
 
       blockingTitle: "Blocking",
       blockingHtml: "A well-timed block reflects bullets back at the shooter. Cards can make blocks dash, teleport, echo, or explode.",
@@ -165,7 +165,7 @@
     // ---------------------------------------------------------------- DRAFT
     draft: {
       titleSolo: "{name} drafts",
-      titleMulti: "Draft — both pick at once",
+      titleMulti: "Draft — {count} picking at once",
       autoPick: "{title} — auto-pick in {seconds}s",
       rowPrompt: "◀ ▶ browse · shoot to pick",
       rowLocked: "Locked in!",
@@ -182,6 +182,7 @@
       subSolo: "{name} drafts a new power…",
       subMulti: "The fallen draft new powers…",
       subTwo: "The two furthest behind draft new powers…",
+      subRunnerUp: "{name} came second — half a round win is on the table…",
       subEvil: "The Evil Bots grow stronger…",
       ready: "READY",
       fight: "FIGHT!",

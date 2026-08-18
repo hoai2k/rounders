@@ -3,6 +3,7 @@
   "use strict";
 
   const { CARDS, RARITIES, CHARACTERS, LEVELS, drawCharacter, setProceduralCharacters, arenaImage } = window.ROUNDERS;
+  const { HALF_WIN_CARD } = window.ROUNDERS;
   const { cardArt, cardArtUrl, cardScene, cardSceneUrl } = window.ROUNDERS;
   const str = window.ROUNDERS.str;
   const GP = window.ROUNDERS.GAMEPLAY;
@@ -33,6 +34,7 @@
   const howPanel = document.getElementById("how");
   const draftPanel = document.getElementById("draft");
   const draftGrid = document.getElementById("draftGrid");
+  const draftLocked = document.getElementById("draftLocked");
   const draftTitle = document.getElementById("draftTitle");
   const joinSlots = document.getElementById("joinSlots");
   const battleSplash = document.getElementById("battleSplash");
@@ -106,6 +108,7 @@
     roundCount: 0,     // completed rounds this match, for the splash kicker
     endedAt: 0,        // world.time when the match ended, for victory easing
     roundWinner: null,
+    fallOrder: [],   // who fell, in order, this round — the last name is the runner-up
     drafters: [],
     botPicks: [],
     cardShows: [],
@@ -819,6 +822,7 @@
     world.winners = null;
     world.roundCount = 0;
     world.roundWinner = null;
+    world.fallOrder = [];
     world.drafters = [];
     world.lastLevelIndex = -1;
     hideAllPanels();
@@ -940,6 +944,8 @@
       p.spawnGrace = 1.6;
     });
     decoys = [];
+    // Round placement is read off the order fighters fall, so it starts empty.
+    world.fallOrder = [];
     history = [];
     rewind.active = false;
     rewind.owner = null;
@@ -948,6 +954,31 @@
     arenaTag.textContent = level.tagline;
     arenaBanner.classList.remove("hidden");
     setTimeout(() => arenaBanner.classList.add("hidden"), 2100);
+  }
+
+  // The match is over and the victory screen takes it from here. Split out of
+  // endRound because Photo Finish can also carry someone over the line, and
+  // that happens on the card screen rather than in the arena.
+  function declareMatchWon(winner) {
+    const teamGame = settings.coop && players.some(p => p.evil);
+    world.state = "ended";
+    world.winner = winner;
+    world.winners = players.filter(p => p.team === winner.team);
+    world.endedAt = world.time;
+    updateHud(true);   // the frozen margin cards show the final score
+    showToast(teamGame
+      ? str("round.matchWonTeam", { team: winner.evil ? str("round.teamEvil") : str("round.teamPlayers") })
+      : str("round.matchWon", { name: winner.name }));
+    sfx("win");
+  }
+
+  // Whoever is at or past the score limit right now, best score first. Only
+  // half-win cards can put someone here outside of endRound.
+  function matchWinnerByScore() {
+    const at = players.filter(p => p.score >= settings.scoreLimit);
+    if (!at.length) return null;
+    at.sort((a, b) => b.score - a.score || a.id - b.id);
+    return at[0];
   }
 
   function endRound(winner) {
@@ -964,28 +995,30 @@
     }
     const teamLabel = winner.evil ? str("round.teamEvil") : str("round.teamPlayers");
     if (winner.score >= settings.scoreLimit) {
-      world.state = "ended";
-      world.winner = winner;
-      world.winners = winners;
-      world.endedAt = world.time;
-      updateHud(true);   // the frozen margin cards show the final score
-      showToast(teamGame
-        ? str("round.matchWonTeam", { team: teamLabel })
-        : str("round.matchWon", { name: winner.name }));
-      sfx("win");
+      declareMatchWon(winner);
       return;
     }
     world.state = "round-won";
     world.roundWinner = winner;
     let losers;
+    let runnerUp = null;
     if (teamGame) {
       // the whole losing side drafts — every fallen player, or the bot squad
       losers = players.filter(p => p.team !== winner.team);
     } else {
-      // ranked worst-first; only the bottom two draft, so a 4-player match
-      // never has more than two hands on screen at once
+      // ranked worst-first; the bottom two draft, so the comeback stays a
+      // comeback rather than handing the whole board a power every round
       const ranked = players.filter(p => p !== winner).sort((a, b) => a.score - b.score || a.id - b.id);
       losers = ranked.slice(0, 2);
+      // From three players up, whoever placed second is offered Photo Finish —
+      // half a round win in place of one of their cards. They need a hand to be
+      // offered it in, so the runner-up joins the draft even when the score
+      // table would have left them out. That is the only way a free-for-all
+      // ever puts three hands on screen at once.
+      if (!settings.coop && players.length >= 3) {
+        runnerUp = roundRunnerUp(winner);
+        if (runnerUp && !losers.includes(runnerUp)) losers.push(runnerUp);
+      }
     }
     battleKicker.textContent = str("round.kicker", { number: world.roundCount });
     battleTitle.textContent = teamGame
@@ -994,6 +1027,7 @@
     battleTitle.style.color = winner.color;
     battleSub.textContent =
       teamGame && losers.every(p => p.bot) ? str("round.subEvil")
+      : runnerUp ? str("round.subRunnerUp", { name: runnerUp.name })
       : !teamGame && players.length - 1 > 2 ? str("round.subTwo")
       : losers.length === 1 ? str("round.subSolo", { name: losers[0].name })
       : str("round.subMulti");
@@ -1002,9 +1036,20 @@
     setTimeout(() => {
       if (world.state === "round-won") {
         battleSplash.classList.add("hidden");
-        beginDraft(losers);
+        beginDraft(losers, runnerUp);
       }
     }, 1500);
+  }
+
+  // Second place in the round: the last fighter to fall before the winner was
+  // left standing. A round that ends without anyone falling (the bots-only
+  // early call) has no fall order to read, so the healthiest loser stands in.
+  function roundRunnerUp(winner) {
+    const fell = world.fallOrder.filter(p => p !== winner && players.includes(p));
+    if (fell.length) return fell[fell.length - 1];
+    const rest = players.filter(p => p !== winner);
+    rest.sort((a, b) => b.hp / b.stats.maxHp - a.hp / a.stats.maxHp || b.score - a.score || a.id - b.id);
+    return rest[0] || null;
   }
 
   // ---------------------------------------------------------------- drafting
@@ -1046,11 +1091,26 @@
     return picked;
   }
 
+  // The runner-up's hand gives up its weakest card to Photo Finish, so the
+  // choice reads "half a win, or the best thing on offer" rather than "half a
+  // win, or the Mythic you will never be dealt again".
+  function offerHalfWin(options) {
+    if (!options.length) return [HALF_WIN_CARD];
+    const order = window.ROUNDERS.RARITY_ORDER;
+    let worst = 0;
+    for (let i = 1; i < options.length; i += 1) {
+      if (order.indexOf(options[i].rarity) < order.indexOf(options[worst].rarity)) worst = i;
+    }
+    const out = options.slice();
+    out[worst] = HALF_WIN_CARD;
+    return out;
+  }
+
   // Humans draft on the card screen. Bots don't need a screen — nobody is
   // choosing — so they take a card off-screen and it is *shown*: the card flies
   // up over the arena and then flings back into the bot that took it. A round
   // with only bots drafting never opens the panel at all.
-  function beginDraft(losers) {
+  function beginDraft(losers, runnerUp = null) {
     world.state = "draft";
     // The match's song keeps playing under the card screen, just quieter, and
     // carries on at full volume when the next round starts.
@@ -1060,15 +1120,22 @@
     // The Evil Bot squad is one mind in several bodies: it draws ONE card and
     // every copy gets it, so the squad stays identical build for build.
     if (settings.coop && bots.length > 1 && bots.every(p => p.evil)) bots = [bots[0]];
+    const handFor = p => {
+      const options = drawCards(settings.draftCount);
+      return p === runnerUp ? offerHalfWin(options) : options;
+    };
     world.drafters = humans.map(p => ({
       player: p,
-      options: drawCards(settings.draftCount),
+      options: handFor(p),
       index: 0,
-      picked: false
+      picked: false,
+      folded: false,
+      halfWin: p === runnerUp
     }));
-    // Bots pick from a real hand, so the rarity odds are the ones everyone plays.
+    // Bots pick from a real hand, so the rarity odds are the ones everyone
+    // plays — and a bot that came second is offered the same trade.
     world.botPicks = bots.map(p => {
-      const options = drawCards(settings.draftCount);
+      const options = handFor(p);
       return { player: p, card: options[Math.floor(Math.random() * options.length)] };
     });
 
@@ -1076,10 +1143,9 @@
       showBotPicks();
       return;
     }
-    world.draftBaseTitle = humans.length > 1 ? str("draft.titleMulti") : str("draft.titleSolo", { name: humans[0].name });
     world.draftTimer = 30;
-    draftTitle.textContent = world.draftBaseTitle;
-    renderDraftPanel();
+    world.draftBaseTitle = "";
+    renderDraftPanel();   // sets the title from how many stages are live
     draftPanel.classList.remove("hidden");
   }
 
@@ -1161,6 +1227,15 @@
   function finishDraft() {
     if (world.state !== "draft" && world.state !== "card-show") return;
     draftPanel.classList.add("hidden");
+    // Photo Finish pays out the moment it is taken, so the half win that ends
+    // the match lands here, between rounds, instead of in the arena.
+    const early = matchWinnerByScore();
+    if (early) {
+      duckMusic(DUCK.none);
+      buildHud();
+      declareMatchWon(early);
+      return;
+    }
     world.state = "playing";
     buildHud();
     resetRound();
@@ -1181,11 +1256,12 @@
   }
 
   // Each chooser gets a full stage washed in their color: their character
-  // large at the bottom, holding a fanned hand of playing cards. One chooser
-  // fills the screen; two stand side by side with a slimmer hand.
+  // large at the bottom, holding a fanned hand of playing cards. The stages
+  // share the screen evenly, and hand it back to each other as they lock in —
+  // see updateDraftLayout.
   function renderDraftPanel() {
     draftGrid.innerHTML = "";
-    draftGrid.classList.toggle("multi", world.drafters.length > 1);
+    draftLocked.innerHTML = "";
     world.drafters.forEach(d => {
       const stage = document.createElement("section");
       stage.className = `draft-stage${d.picked ? " locked" : ""}`;
@@ -1206,41 +1282,95 @@
       const hand = document.createElement("div");
       hand.className = "draft-hand";
       hand.style.setProperty("--n", d.options.length);
-      d.options.forEach((c, i) => {
-        const rar = RARITIES[c.rarity];
-        const el = document.createElement("article");
-        el.className = `card r-${c.rarity}${i === d.index ? " selected" : ""}${d.picked && i === d.index ? " picked" : ""}`;
-        el.style.setProperty("--rcol", rar.color);
-        el.style.setProperty("--rglow", rar.glow);
-        // fan the hand around its middle like held playing cards
-        el.style.setProperty("--tilt", `${(i - (d.options.length - 1) / 2) * 5.5}deg`);
-        el.style.setProperty("--deal", `${i * 70}ms`);
-        el.innerHTML = `
-          <span class="card-pip">${rar.name[0]}</span>
-          <span class="rarity">${rar.name}</span>
-          <span class="card-art" style="--scene:url('${cardSceneUrl(c.id)}');--emblem:url('${cardArtUrl(c.id)}')"></span>
-          <strong class="card-name">${c.name}</strong>
-          <em class="card-tagline">${c.tagline}</em>
-          <p class="card-desc">${c.description}</p>
-          <div class="stat-list">${c.effects.map(s => `<span>${s}</span>`).join("")}</div>
-          <span class="card-pip flip">${rar.name[0]}</span>
-          ${(c.buttons || []).length ? `<span class="card-btns">${c.buttons.map(b =>
-            `<b data-b="${b.b}" title="${escapeHtml(b.why)}">${b.b}</b>`).join("")}</span>` : ""}
-        `;
-        el.addEventListener("pointerdown", event => {
-          event.preventDefault();
-          if (world.state !== "draft" || d.picked || d.player.bot) return;
-          d.index = i;
-          confirmPick(d);
-        });
-        hand.appendChild(el);
-      });
+      d.options.forEach((c, i) => hand.appendChild(buildDraftCard(d, c, i)));
 
       stage.appendChild(hand);
       stage.appendChild(who);
       draftGrid.appendChild(stage);
       d.rowEl = stage;
     });
+    updateDraftLayout();
+  }
+
+  // One card in a hand. Photo Finish is the odd one out: it has no painted art
+  // of its own, so its panel is the drafter's own character with a +1/2 stamped
+  // over them — the card is about *them*, not about a new power.
+  function buildDraftCard(d, c, i) {
+    const rar = RARITIES[c.rarity];
+    const el = document.createElement("article");
+    el.className = `card r-${c.rarity}${c.special === "halfWin" ? " half-win" : ""}` +
+      `${i === d.index ? " selected" : ""}${d.picked && i === d.index ? " picked" : ""}`;
+    el.style.setProperty("--rcol", rar.color);
+    el.style.setProperty("--rglow", rar.glow);
+    // fan the hand around its middle like held playing cards. The card's place
+    // in the fan is what JS knows; how far a place tilts is CSS's business,
+    // because a squeezed hand closes the fan and flattens it at the same time.
+    el.style.setProperty("--i", i - (d.options.length - 1) / 2);
+    el.style.setProperty("--deal", `${i * 70}ms`);
+    const art = c.special === "halfWin"
+      ? `<span class="card-art half-art"><canvas width="320" height="152"></canvas><b class="half-badge">+&frac12;</b></span>`
+      : `<span class="card-art" style="--scene:url('${cardSceneUrl(c.id)}');--emblem:url('${cardArtUrl(c.id)}')"></span>`;
+    el.innerHTML = `
+      <span class="card-pip">${rar.name[0]}</span>
+      <span class="rarity">${rar.name}</span>
+      ${art}
+      <strong class="card-name">${c.name}</strong>
+      <em class="card-tagline">${c.tagline}</em>
+      <p class="card-desc">${c.description}</p>
+      <div class="stat-list">${c.effects.map(sEff => `<span>${sEff}</span>`).join("")}</div>
+      <span class="card-pip flip">${rar.name[0]}</span>
+      ${(c.buttons || []).length ? `<span class="card-btns">${c.buttons.map(b =>
+        `<b data-b="${b.b}" title="${escapeHtml(b.why)}">${b.b}</b>`).join("")}</span>` : ""}
+    `;
+    const face = el.querySelector(".half-art canvas");
+    if (face) {
+      const fc = face.getContext("2d");
+      // the panel is a wide letterbox, so the fighter is sized off its HEIGHT
+      // and sits left of centre with the +1/2 stamped beside them
+      fc.translate(128, 78);
+      drawCharacter(fc, d.player.character, 56, { t: world.time, aimX: 1, aimY: -0.2 });
+    }
+    el.addEventListener("pointerdown", event => {
+      event.preventDefault();
+      if (world.state !== "draft" || d.picked || d.player.bot) return;
+      d.index = i;
+      confirmPick(d);
+    });
+    return el;
+  }
+
+  // How many stages are still choosing, and how wide each one gets. A stage
+  // that has folded away keeps its slot in the DOM at zero width, so the ones
+  // left grow into the space instead of the whole row snapping across.
+  function updateDraftLayout() {
+    const live = world.drafters.filter(d => !d.folded);
+    draftGrid.style.setProperty("--stages", Math.max(1, live.length));
+    draftGrid.classList.toggle("multi", live.length > 1);
+    draftLocked.classList.toggle("hidden", !draftLocked.children.length);
+    if (live.length > 1) world.draftBaseTitle = str("draft.titleMulti", { count: live.length });
+    else if (live.length === 1) world.draftBaseTitle = str("draft.titleSolo", { name: live[0].player.name });
+    draftTitle.textContent = world.draftBaseTitle;
+  }
+
+  // A chooser who is done parks in the corner: their fighter, the card they
+  // took, and a locked-in stamp. Small enough that the stages still choosing
+  // own the screen.
+  function addLockedChip(d, card) {
+    const rar = RARITIES[card.rarity];
+    const chip = document.createElement("div");
+    chip.className = "draft-chip";
+    chip.style.setProperty("--pcol", d.player.color);
+    chip.innerHTML = `
+      <canvas width="140" height="140"></canvas>
+      <div class="draft-chip-text">
+        <strong>${escapeHtml(d.player.name)}</strong>
+        <span class="draft-chip-card" style="--rcol:${rar.color};--art:url('${cardArtUrl(card.id)}')">${escapeHtml(card.name)}</span>
+        <em>${escapeHtml(str("draft.rowLocked"))}</em>
+      </div>`;
+    const cc = chip.querySelector("canvas").getContext("2d");
+    cc.translate(70, 84);
+    drawCharacter(cc, d.player.character, 40, { t: world.time, aimX: 1, aimY: -0.15 });
+    draftLocked.appendChild(chip);
   }
 
   function refreshDraftSelection(d) {
@@ -1263,15 +1393,29 @@
     pulse(d.player, 0.5, 150);
     refreshDraftSelection(d);
     showToast(str("draft.picked", { name: d.player.name, card: c.name }));
-    if (world.drafters.every(x => x.picked)) {
+    if (!world.drafters.every(x => x.picked)) {
+      // Someone is still choosing, so this stage gets out of their way: once
+      // the picked-card flourish has played, it folds to nothing and the hands
+      // still live grow into the space — three stages become two, two become
+      // one full-screen hand. The card just committed to parks in the corner
+      // tray with its owner, so the board still reads at a glance.
       setTimeout(() => {
-        if (world.state !== "draft") return;
-        draftPanel.classList.add("hidden");
-        // Bots that lost the same round take their cards now, on the arena,
-        // where the fling is visible instead of hidden behind the panel.
-        showBotPicks();
-      }, 650);
+        if (world.state !== "draft" || d.folded) return;
+        if (world.drafters.every(x => x.picked)) return;   // the panel is closing anyway
+        d.folded = true;
+        addLockedChip(d, c);
+        if (d.rowEl) d.rowEl.classList.add("gone");
+        updateDraftLayout();
+      }, 620);
+      return;
     }
+    setTimeout(() => {
+      if (world.state !== "draft") return;
+      draftPanel.classList.add("hidden");
+      // Bots that lost the same round take their cards now, on the arena,
+      // where the fling is visible instead of hidden behind the panel.
+      showBotPicks();
+    }, 650);
   }
 
   function updateDraftInput(dt) {
@@ -4138,6 +4282,9 @@
       } else {
         p.alive = false;
         p.hp = 0;
+        // out for good this round — the fall order is the round's placement,
+        // read backwards: whoever falls last is the runner-up
+        if (!world.fallOrder.includes(p)) world.fallOrder.push(p);
         burst(p.x, p.y, p.color, 70, 760);
         world.shake = Math.max(world.shake, 12);
         if (attacker) {
@@ -5066,11 +5213,19 @@
     }
   }
 
+  // Photo Finish puts halves on the scoreboard; show them the way a scoreboard
+  // would — 2½, not 2.5 — and a bare ½ for someone still short of their first.
+  function fmtScore(v) {
+    const whole = Math.floor(v);
+    if (v - whole < 0.25) return String(whole);
+    return `${whole || ""}\u00bd`;
+  }
+
   function updateHud(force = false) {
     for (const ref of hudRefs) {
       const p = ref.p;
       ref.el.classList.toggle("dead", !p.alive);
-      ref.score.textContent = str("hud.score", { score: p.score, limit: settings.scoreLimit });
+      ref.score.textContent = str("hud.score", { score: fmtScore(p.score), limit: settings.scoreLimit });
       if (force || p.cards.length !== ref.lastCards) {
         ref.lastCards = p.cards.length;
         const shown = p.cards.slice(-3);
@@ -8148,6 +8303,14 @@
     // what a draft is allowed to offer, and a real hand rolled from it
     cardPool,
     drawCards,
+    // the lobby and the round loop, so a test can seat four fighters and call
+    // a round without pretending to be four gamepads
+    lobbySlots,
+    startMatch,
+    endRound,
+    roundRunnerUp,
+    confirmPick,
+    drafters: () => world.drafters,
     // Effect hooks, so a delivered fx sheet can be posed and eyeballed without
     // waiting for the card that fires it to turn up in a draft. `fields` below
     // is a read-only summary — this one is the live array, to push onto.

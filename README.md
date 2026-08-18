@@ -67,7 +67,13 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
   or turn the whole thing off with **Settings → Visuals → Use Procedural
   Characters** to play with the built-in vector art.
 - **Simultaneous drafting** — when several players lose a round, they all draft at
-  once, each with their own hand and controls.
+  once, each with their own hand and controls. The moment someone commits, their
+  stage folds into the locked-in tray in the corner and the hands still choosing
+  grow into the space, until the last chooser has the whole screen to themselves.
+- **Photo Finish** — with three or more fighters, the round's runner-up finds a
+  special card swapped into their hand: take it instead of a power and bank half
+  a round win on the spot. Two of them are a whole round, and half-scores show on
+  the HUD as `1½/5`.
 - **Choose Cards** (**Settings → Choose Cards**) — draft from the whole set at the
   usual rarity rates (*Default*), from the whole set with every card equally
   likely (*Equalize*), or from a set you build yourself (*Choose*): a scrollable

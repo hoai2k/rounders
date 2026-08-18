@@ -675,9 +675,33 @@
     });
   }
 
+  // -------------------------------------------------------- special drafts
+  // Deliberately NOT in CARDS: it is never rolled into a hand, never listed in
+  // the Choose Cards window, and never counted by the card pool. In a 3+ player
+  // free-for-all the round's runner-up finds it swapped into their hand in
+  // place of one real card — a straight trade, a power for half a round win.
+  // It carries no art of its own: the draft panel paints the drafter's own
+  // character on the face and stamps a +1/2 badge on it (see image-requests.md
+  // if a painted version ever lands).
+  const HALF_WIN_CARD = {
+    id: "half-round-win",
+    name: "Photo Finish",
+    rarity: "legendary",
+    special: "halfWin",
+    tagline: "Second place, paid out.",
+    description: "Half a round win, banked on the spot instead of a power.",
+    effects: ["+0.5 Round Win"],
+    tags: ["score"],
+    actions: [],
+    buttons: [],
+    // The only card that touches the scoreboard rather than the stat block.
+    apply: p => { p.score += 0.5; }
+  };
+
   window.ROUNDERS.RARITIES = RARITIES;
   window.ROUNDERS.RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
   window.ROUNDERS.CARDS = CARDS;
+  window.ROUNDERS.HALF_WIN_CARD = HALF_WIN_CARD;
   window.ROUNDERS.cardArt = cardArt;
   window.ROUNDERS.cardArtUrl = cardArtUrl;
   window.ROUNDERS.cardScene = cardScene;

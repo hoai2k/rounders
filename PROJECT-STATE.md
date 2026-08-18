@@ -852,12 +852,30 @@ Pillars:
 - [x] Random arena every round (no immediate repeats)
 - [x] Settings: arena picker — Random or lock any of the 25
 - [x] **Simultaneous drafting**: the two lowest-ranked losers draft at the same
-      time (max 2 hands on screen — in 4-player the third loser sits out), each
-      with their own hand and their own controls
+      time, each with their own hand and their own controls. From three players
+      up the round's runner-up joins them if the score table left them out (see
+      Photo Finish below), so a free-for-all can put three hands on screen
 - [x] **Draft stage redesign**: full-screen scene per chooser washed in their
       color, their character shown large, cards fanned like a held hand of
-      playing cards (corner pips, deal-in animation, lift on select); two
-      choosers split the screen side by side
+      playing cards (corner pips, deal-in animation, lift on select); choosers
+      split the screen between them
+- [x] **The screen belongs to whoever is still choosing**: a chooser who commits
+      folds their stage away and parks in the locked-in tray in the corner —
+      their fighter, the card they took, a stamp — and the hands still live grow
+      into the space they leave. Three stages become two, two become one
+      full-screen hand, exactly as a solo draft has always looked. A squeezed
+      hand closes and flattens its fan rather than shrinking the faces, so the
+      card being browsed is readable at every stage count
+- [x] **Photo Finish** (`js/cards.js`, `HALF_WIN_CARD`): in a 3+ player
+      free-for-all the round's runner-up — the last fighter to fall — finds this
+      swapped into their hand in place of its weakest card. Taking it banks
+      **+0.5 of a round win** instead of granting a power, so second place is
+      worth something and two of them are a whole round. It is never in the card
+      pool, never in the Choose Cards window, and never offered in co-op. The
+      face has no painted art: the panel is the drafter's own character with a
+      `+1/2` stamped beside them. Half-scores show on the HUD as `1½/5`, and a
+      half win can take the match on the card screen — the victory splash comes
+      up straight out of the draft
 - [x] **ROUNDS-style baseline**: 100 HP, no regen, damage subtracted and reset
       each round; default gun three-shots (36 dmg — one full clip is exactly
       lethal), 3 ammo, automatic whole-clip reload when empty (2s), no manual

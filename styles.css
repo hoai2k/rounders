@@ -573,14 +573,20 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   display: flex;
   width: 100%;
   min-height: 0;
+  /* how many stages are still choosing — folded ones keep their slot at zero
+     width so the survivors grow into it instead of the row snapping across */
+  --stages: 1;
 }
 
 /* one chooser's whole scene: their color washes the stage, character at the
    bottom, hand of cards above */
 .draft-stage {
   position: relative;
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  /* the hand sizes itself off the stage's ACTUAL width, so cards grow smoothly
+     as a neighbour folds away rather than jumping a step */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -590,14 +596,31 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   background:
     radial-gradient(ellipse 90% 68% at 50% 108%, color-mix(in srgb, var(--pcol) 34%, transparent), transparent 72%),
     radial-gradient(ellipse 70% 45% at 50% -12%, color-mix(in srgb, var(--pcol) 14%, transparent), transparent 75%);
-  transition: filter 0.4s, opacity 0.4s;
+  transition: flex-grow 0.45s cubic-bezier(0.3, 0.8, 0.3, 1), filter 0.4s, opacity 0.4s;
 }
 
 .draft-grid.multi .draft-stage + .draft-stage {
   border-left: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+/* a folded stage is not a stage any more, so it neither draws a divider nor
+   leaves one hanging on the neighbour it used to sit beside */
+.draft-stage.gone,
+.draft-stage.gone + .draft-stage { border-left: none; }
+
 .draft-stage.locked { filter: saturate(0.55) brightness(0.75); }
+
+/* This chooser is done: their stage folds to nothing and the hands still live
+   grow into the space. It stays in the DOM at zero width so the growth reads
+   as one continuous movement. */
+.draft-stage.gone {
+  flex-grow: 0;
+  opacity: 0;
+  padding-left: 0;
+  padding-right: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
 
 .draft-who {
   display: flex;
@@ -621,6 +644,66 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 
 .draft-who-text span { display: block; font-size: 13px; opacity: 0.75; }
 
+/* -------- locked-in tray: everyone who is already done, out of the way ----
+   A chooser's stage folds away the moment they commit, so their pick still has
+   to be visible somewhere. It lands here, in the corner: their fighter, the
+   card they took, and a stamp. */
+.draft-locked {
+  position: absolute;
+  left: 16px;
+  top: 58px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.draft-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 5px;
+  border-radius: 14px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--pcol) 26%, rgba(12, 10, 22, 0.88)), rgba(12, 10, 22, 0.88));
+  border: 1px solid color-mix(in srgb, var(--pcol) 55%, transparent);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  animation: chip-in 0.4s cubic-bezier(0.2, 1.3, 0.4, 1) backwards;
+}
+
+@keyframes chip-in {
+  from { transform: translateX(-40px) scale(0.86); opacity: 0; }
+}
+
+.draft-chip canvas {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--pcol) 55%, transparent));
+}
+
+.draft-chip-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.draft-chip-text strong { font-size: 13px; color: var(--pcol); line-height: 1.1; }
+.draft-chip-text em { font-size: 10px; font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.6; }
+
+/* the card they took, as a one-line chip with its emblem — same shape the HUD
+   uses in the arena margins, so it reads as the same object */
+.draft-chip-card {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--rcol);
+  padding: 2px 8px 2px 22px;
+  border-radius: 8px;
+  background:
+    var(--art, none) 3px 50% / 15px 15px no-repeat,
+    color-mix(in srgb, var(--rcol) 18%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+}
+
 /* the hand: cards fanned from a shared pivot below, like held playing cards */
 .draft-hand {
   flex: 1;
@@ -629,12 +712,20 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   justify-content: center;
   padding: 26px 0 30px;
   min-height: 0;
-  /* never wider than the stage, whatever the hand size */
-  --cardw: min(clamp(220px, 27vh, 330px), calc((100vw - 120px) / var(--n, 4)));
-}
-
-.draft-grid.multi .draft-hand {
-  --cardw: min(clamp(180px, 21vh, 260px), calc((50vw - 80px) / var(--n, 4)));
+  /* never wider than the stage it sits in, whatever the hand size — measured in
+     container units, so one chooser left over gets the full-screen hand that a
+     solo draft has always had */
+  /* How far the cards overlap each other, as a fraction of a card. A hand with
+     the whole screen barely overlaps; a squeezed one closes the fan like a real
+     hand of cards, which keeps the FACES big and readable — only the selected
+     card is fully visible anyway, since it lifts clear of the others. */
+  --fan: 0.055;
+  /* how far each step out from the middle of the fan tilts */
+  --tilt-step: 5.5deg;
+  --span: calc(var(--n, 4) - (var(--n, 4) - 1) * 2 * var(--fan));
+  /* the slack is for the tilt: a rotated card reaches wider than it lays out,
+     and the outermost one must not lean over the divider into the next stage */
+  --cardw: min(clamp(150px, 27vh, 330px), calc((100cqw - 56px) / var(--span)));
 }
 
 .card {
@@ -642,7 +733,10 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   width: var(--cardw);
   aspect-ratio: 5 / 7;
   border-radius: 14px;
-  padding: 26px 12px 10px;
+  /* Every measurement on a card face is a fraction of its own width, because a
+     three-way draft squeezes the same face down to half the size a solo draft
+     gives it and the rules still have to be readable. */
+  padding: calc(var(--cardw) * 0.098) calc(var(--cardw) * 0.045) calc(var(--cardw) * 0.038);
   background:
     radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--rcol) 16%, transparent), transparent 62%),
     linear-gradient(165deg, #262a36, #14161e 55%, #1b1e28);
@@ -656,7 +750,8 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   gap: 4px;
   overflow: hidden;
   cursor: pointer;
-  margin: 0 calc(var(--cardw) * -0.055);
+  margin: 0 calc(var(--cardw) * var(--fan) * -1);
+  --tilt: calc(var(--i, 0) * var(--tilt-step, 5.5deg));
   transform: rotate(var(--tilt)) translateY(0);
   transform-origin: 50% 240%;
   transition: transform 0.18s cubic-bezier(0.2, 1.2, 0.4, 1), box-shadow 0.18s, border-color 0.18s, filter 0.18s;
@@ -664,7 +759,7 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   animation-delay: var(--deal, 0ms);
 }
 
-.draft-grid.multi .card { padding-top: 26px; }
+
 
 @keyframes card-deal {
   from { transform: rotate(var(--tilt)) translateY(150px); opacity: 0; }
@@ -754,12 +849,57 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 
 .card.selected .card-art { box-shadow: inset 0 0 0 1px var(--rcol), inset 0 -18px 26px -18px rgba(0, 0, 0, 0.9); }
 
+/* Photo Finish has no painted art: the panel is the drafter's own fighter with
+   a half-win stamped over them, so the card is unmistakably about THEM. */
+.card-art.half-art {
+  position: relative;
+  overflow: hidden;
+  background-image: radial-gradient(ellipse at 50% 42%, color-mix(in srgb, var(--rcol) 34%, transparent), transparent 72%);
+}
+
+.card-art.half-art canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.half-badge {
+  position: absolute;
+  right: 4%;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: clamp(11px, calc(var(--cardw) * 0.105), 24px);
+  font-weight: 900;
+  line-height: 1;
+  padding: 0.18em 0.42em;
+  border-radius: 999px;
+  color: #1b1206;
+  background: linear-gradient(150deg, #ffe9a8, var(--rcol));
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+/* it is the only card in the hand that is not a power, so it wears a warmer
+   frame than its rarity alone would give it */
+.card.half-win {
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--rcol) 28%, transparent), transparent 66%),
+    linear-gradient(165deg, #33291c, #16130f 55%, #221b12);
+}
+
+.card.half-win .stat-list span:first-child {
+  color: #1b1206;
+  background: var(--rcol);
+  border-color: transparent;
+  font-weight: 900;
+}
+
 /* corner pips, like the index of a playing card */
 .card-pip {
   position: absolute;
   top: 8px;
   left: 11px;
-  font-size: 15px;
+  font-size: clamp(9px, calc(var(--cardw) * 0.062), 15px);
   font-weight: 900;
   color: var(--rcol);
   opacity: 0.9;
@@ -775,7 +915,7 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 
 .card .rarity {
   align-self: flex-start;
-  font-size: 9.5px;
+  font-size: clamp(6.5px, calc(var(--cardw) * 0.044), 9.5px);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.22em;
@@ -796,13 +936,13 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 
 @keyframes mythic-shimmer { to { background-position: 300% 0; } }
 
-.card-name { font-size: clamp(14px, 1.95vh, 18px); font-weight: 900; letter-spacing: 0.01em; color: var(--rcol); line-height: 1.15; }
-.card-tagline { font-size: clamp(10px, 1.35vh, 12px); font-style: italic; opacity: 0.65; line-height: 1.2; }
+.card-name { font-size: clamp(10.5px, calc(var(--cardw) * 0.083), 18px); font-weight: 900; letter-spacing: 0.01em; color: var(--rcol); line-height: 1.15; }
+.card-tagline { font-size: clamp(7.5px, calc(var(--cardw) * 0.056), 12px); font-style: italic; opacity: 0.65; line-height: 1.2; }
 /* the art takes the top third, so the rules get the room that is left and are
    clamped rather than allowed to spill past the card edge */
 .card-desc {
   margin: 0;
-  font-size: clamp(10.5px, 1.5vh, 12.5px);
+  font-size: clamp(8px, calc(var(--cardw) * 0.058), 12.5px);
   line-height: 1.35;
   color: rgba(245, 242, 255, 0.9);
   flex: 1;
@@ -824,6 +964,10 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   display: flex;
   gap: 3px;
   z-index: 3;
+  /* the badges are a shared component with the workbench, so a small card
+     shrinks the whole cluster rather than restyling each shape */
+  transform: scale(clamp(0.62, calc(var(--cardw, 240px) / 250), 1));
+  transform-origin: 100% 0;
 }
 
 /* Controller badges are drawn as the buttons themselves: the four face
@@ -933,12 +1077,32 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 .stat-list { display: flex; flex-wrap: wrap; gap: 3px; flex: none; }
 
 .stat-list span {
-  font-size: 9px;
+  font-size: clamp(6.5px, calc(var(--cardw, 240px) * 0.04), 9px);
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--rcol) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--rcol) 35%, transparent);
+}
+
+/* A three-way draft squeezes each face to roughly half the width a solo draft
+   gives it, and at that size the rules no longer fit under a full-height art
+   panel. Below this the panel gives some of its height back and the
+   description settles for three lines — measured against the STAGE, so it is
+   the number of people still choosing that decides it. */
+@container (max-width: 780px) {
+  /* three stages on one screen: close the fan rather than shrink the faces */
+  .draft-hand { --fan: 0.21; --tilt-step: 3.2deg; }
+  .card { gap: 3px; }
+  .card-art { height: 30%; }
+  /* flavor is the first thing to give — one line of it, and the rules keep the
+     room they need to actually be read */
+  .card-tagline {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
+  }
 }
 
 /* ----------------------------------------------------------------- splash */

@@ -1,9 +1,33 @@
 # Image Generation Requests — Rounders
 
-**Nothing outstanding.** Every image the game asks for has been generated and is
-in the repo. The prompts everything was made from live in
-`image-requests-history.md`, which is where a re-generation or a style question
-goes looking.
+**One optional request outstanding** (below). Everything else the game asks for
+has been generated and is in the repo. The prompts everything was made from live
+in `image-requests-history.md`, which is where a re-generation or a style
+question goes looking.
+
+## Outstanding
+
+### `cards/half-round-win.png` — Photo Finish emblem (256x256, transparent) — *optional*
+
+Photo Finish is the special card offered to the round's runner-up in a 3+ player
+free-for-all: it banks half a round win instead of granting a power. It is not
+in the card list, so it is never rolled into an ordinary hand.
+
+**Its card face needs no art.** The panel is painted at draft time from the
+drafting fighter's own canonical character with a `+1/2` badge stamped beside
+them, which is the point — the card is about *them*, not about a new power. That
+is a deliberate design, not a fallback, so no `cards/art/half-round-win.png`
+scene is wanted.
+
+What it *would* use is the small square emblem, for the two places a card is
+shown as a chip rather than a face: the locked-in tray on the card screen, and
+the fighter's card list in the arena HUD. Missing, those chips simply show the
+name with no icon, which is why this is optional.
+
+> Prompt: a golden photo-finish line at a racetrack, a chunky white "1/2"
+> medallion breaking the tape, tiny motion streaks behind it, gold and warm
+> amber palette to match a Legendary card. Centred square emblem on a
+> transparent background, no scene, no text beyond the 1/2.
 
 > Audited 2026-08-18, after the six health cards from the anti-one-shot balance
 > pass landed (`second-wind`, `padded-vest`, `iron-rations`, `sandbags`,

@@ -212,12 +212,18 @@
     <script src="../js/characters.js"></script>
     <script src="../js/cards.js"></script>
     <script src="../js/bullet-art.js"></script>
+    <script src="../js/fx-art.js"></script>
+    <script src="../js/fx.js"></script>
     <script src="../js/gameplay.js"></script>
     <script src="../js/cardsim.js"></script>
     <script>
       (() => {
         "use strict";
         const { CARDS, RARITIES, RARITY_ORDER, CARD_SIM, cardArtUrl, cardSceneUrl } = window.ROUNDERS;
+        // The preview paints the same effect sheets the game does, and they
+        // load on demand — without this the first Event Horizon you open shows
+        // the procedural swirl and the second shows the painted maw.
+        if (window.ROUNDERS.fx) window.ROUNDERS.fx.warm();
         const COLS = 3;
         const DWELL_MS = 220;           // how long you must rest on a card before it animates
 

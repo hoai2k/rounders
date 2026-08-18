@@ -99,7 +99,9 @@ button.wide { width: 100%; margin-top: 8px; }
 
 .rosterHead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 
-.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* minmax(0, …) rather than 1fr: an unbreakable name like "shockwave-ring"
+   sets the track's min-content width otherwise, and the roster overflows */
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 
 .tile {
   position: relative;
@@ -199,3 +201,39 @@ code { background: #2d2740; padding: 1px 4px; border-radius: 4px; font-size: 11p
 
 button:disabled { opacity: 0.35; cursor: default; }
 button:disabled:hover { border-color: var(--line); }
+
+/* ---------------------------------------------------------------- effects
+   The Effects section reuses the three-pane layout: the roster lists sheets,
+   the stage shows the sheet itself over a live preview of the card that uses
+   it, and the inspector carries the trim that both of them read. */
+.rosterMode {
+  background: #171a24;
+  color: #e8ecf6;
+  border: 1px solid #2b3040;
+  border-radius: 7px;
+  padding: 3px 8px;
+  font: inherit;
+  font-weight: 700;
+}
+
+.fxStage { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; overflow: auto; }
+.fxStage h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #8f9ab4;
+}
+.fxStage h3 .muted { text-transform: none; letter-spacing: 0; margin-left: 8px; }
+.fxRow canvas {
+  display: block;
+  width: 100%;
+  max-width: 760px;
+  border: 1px solid #262b39;
+  border-radius: 10px;
+  background:
+    repeating-conic-gradient(#1a1d27 0% 25%, #151821 0% 50%) 50% / 22px 22px;
+}
+.tile.fx canvas { background: repeating-conic-gradient(#1a1d27 0% 25%, #151821 0% 50%) 50% / 14px 14px; }
+.tile.fx .nm { font-size: 10px; }
+.tile.missing { opacity: 0.45; }

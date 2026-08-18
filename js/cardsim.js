@@ -61,6 +61,12 @@
   // The game's speeds would cross a 720px view instantly, so space and time are
   // scaled together (v and g both by SCALE, keeping trajectory shape).
   const SCALE = 0.42;
+  // The painted effect sheets, exactly as the game draws them. Anything the
+  // game paints, the preview paints — and each falls back to its procedural
+  // drawing when the file is missing.
+  const FX = () => window.ROUNDERS.fx;
+  const fxDraw = (ctx, name, x, y, size, u = 0, opts = {}) =>
+    Boolean(FX() && FX().draw(ctx, name, x, y, size, u, opts));
   // Springload's squash: a quarter of their height on the compression, sprung
   // back out, pivoting on the feet. Same curve as game.js.
   const SQUISH_TIME = 0.22;
@@ -1807,6 +1813,8 @@
       // tint rides the body exactly instead of sitting in front of it
       if (who.chillT > 0 && ch && window.ROUNDERS.drawFrostTint) {
         window.ROUNDERS.drawFrostTint(ctx, ch, who.stats.radius, pose);
+        // and the game's wreath of cold vapour over the top of it
+        fxDraw(ctx, "chill-aura", 0, 0, who.stats.radius * 4, 0, { rot: t * 0.5, alpha: 0.4 });
       }
       // the bulb going off, blowing out past the body
       if (who.flashPop > 0) {
@@ -1833,10 +1841,19 @@
         ctx.restore();
       }
       if (who.shield > 0) {
-        ctx.save();
-        ctx.strokeStyle = "rgba(127,216,255,0.85)"; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(who.x, who.y, who.stats.radius + 7, 0, Math.PI * 2); ctx.stroke();
-        ctx.restore();
+        const rr = who.stats.radius;
+        // same painted bubble the game wears, at the same sizing
+        if (!fxDraw(ctx, "shield-bubble", who.x, who.y, (rr + 19) * 2 + Math.sin(t * 5) * 3, 0, { alpha: 0.85 })) {
+          ctx.save();
+          ctx.strokeStyle = "rgba(127,216,255,0.85)"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(who.x, who.y, rr + 7, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        }
+      }
+      // Camera Flash: the stars the game draws over a stunned fighter
+      if (who.stunT > 0) {
+        fxDraw(ctx, "stun-stars", who.x, who.y - who.stats.radius - 34, 74, 0,
+          { rot: Math.sin(t * 7) * 0.2, alpha: Math.max(0, Math.min(1, who.stunT / 0.25)) });
       }
       // health bar (this is where damage/health cards read)
       const w = Math.max(34, Math.min(120, 52 * (who.maxHp / 100)));
@@ -1929,10 +1946,18 @@
           if (window.ROUNDERS.drawLemonade) window.ROUNDERS.drawLemonade(ctx, f.x, f.y, f.r * 0.62, t);
           ctx.restore();
         } else if (f.type === "saw") {
-          window.ROUNDERS.drawSawblade(ctx, f.x, f.y, f.r, t * 9,
-            window.ROUNDERS.fxImage && window.ROUNDERS.fxImage("sawblade"));
+          const sawT = FX() ? FX().tune("sawblade") : { scale: 1, rotation: 0 };
+          window.ROUNDERS.drawSawblade(ctx, f.x, f.y, f.r * (sawT.scale || 1),
+            t * 9 + (sawT.rotation || 0) * Math.PI / 180,
+            FX() && FX().image("sawblade"));
         } else if (f.type === "void" || f.type === "vortex") {
           const a01 = Math.min(1, f.life);
+          // the painted maw the game uses, over the procedural swirl
+          const painted = fxDraw(ctx, "black-hole", f.x, f.y, f.r * 1.9, 0, { rot: t * 1.6, alpha: a01 });
+          if (painted) {
+            ctx.save();
+            ctx.globalAlpha = 0.55;
+          }
           const rg = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
           rg.addColorStop(0, "rgba(6,3,14,0.96)");
           rg.addColorStop(0.35, "rgba(90,30,170,0.55)");
@@ -1956,6 +1981,7 @@
           ctx.strokeStyle = `rgba(255,255,255,${0.5 * a01})`;
           ctx.lineWidth = 2;
           ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 0.3, 0, Math.PI * 2); ctx.stroke();
+          if (painted) ctx.restore();
         } else if (f.type === "guardian") {
           // mirrors game.js: a warm glow on the fighter who was spared, a halo
           // over their head, and an angel rising away and thinning to nothing
@@ -1979,10 +2005,7 @@
           ctx.globalAlpha = (1 - k) * 0.85;
           ctx.translate(px, py - 20 - k * 130);
           ctx.scale(0.7 + k * 0.5, 0.7 + k * 0.5);
-          const ang = window.ROUNDERS.fxImage && window.ROUNDERS.fxImage("angel");
-          if (ang) {
-            ctx.drawImage(ang, -26, -30, 52, 60);
-          } else {
+          if (!fxDraw(ctx, "angel", 0, 0, 52)) {
             ctx.fillStyle = "rgba(255,248,214,0.95)";
             ctx.beginPath(); ctx.arc(0, -12, 7, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.ellipse(0, 6, 7, 14, 0, 0, Math.PI * 2); ctx.fill();
@@ -1998,6 +2021,7 @@
         } else if (f.type === "stink") {
           // no hard rim: the gas just thins out until it is gone
           const al = Math.min(1, f.life);
+          if (fxDraw(ctx, "poison-cloud", f.x, f.y, f.r * 2.1, 0, { alpha: 0.75 * al })) continue;
           const gg = ctx.createRadialGradient(f.x, f.y, f.r * 0.15, f.x, f.y, f.r);
           gg.addColorStop(0, `rgba(126,205,68,${0.34 * al})`);
           gg.addColorStop(0.6, `rgba(110,190,60,${0.2 * al})`);
@@ -2006,6 +2030,8 @@
           ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
         } else if (f.type === "boom") {
           const k = 1 - Math.max(0, f.life) / 0.5;
+          // the painted blast, same sheet and sizing the game uses
+          if (fxDraw(ctx, f.power >= 1.5 ? "explosion-big" : "explosion", f.x, f.y, f.r * 2.5, k)) continue;
           const R = f.r * (0.25 + k * 0.95);
           const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
           g.addColorStop(0, `rgba(255,255,255,${(1 - k) * 0.95})`);
@@ -2030,6 +2056,7 @@
           }
         } else if (f.type === "nova") {
           const k = 1 - Math.max(0, f.life) / 0.5;
+          if (fxDraw(ctx, "storm-nova", f.x, f.y, f.r * 2 * (0.5 + k * 0.8), 0, { alpha: 1 - k })) continue;
           ctx.save();
           ctx.strokeStyle = `rgba(255,233,94,${(1 - k) * 0.95})`;
           ctx.lineWidth = 6 * (1 - k) + 1.5;
@@ -2039,8 +2066,12 @@
           ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (0.25 + k * 0.7), 0, Math.PI * 2); ctx.stroke();
           ctx.restore();
         } else if (f.type === "push") {
-          ctx.strokeStyle = `rgba(255,255,255,${0.35 * Math.min(1, f.life / 0.25)})`; ctx.lineWidth = 4;
-          ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1.2 - f.life), 0, Math.PI * 2); ctx.stroke();
+          const k = 1 - Math.max(0, Math.min(1, f.life / (f.maxLife || 0.18)));
+          if (!fxDraw(ctx, "shockwave-ring", f.x, f.y, f.r * 2 * (0.25 + k * 1.05), 0,
+              { alpha: 0.95 * (1 - k * k) })) {
+            ctx.strokeStyle = `rgba(255,255,255,${0.35 * Math.min(1, f.life / 0.25)})`; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1.2 - f.life), 0, Math.PI * 2); ctx.stroke();
+          }
         }
       }
       for (const d of decoys) {

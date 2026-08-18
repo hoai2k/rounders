@@ -39,14 +39,21 @@
     <main class="layout">
       <aside class="roster">
         <div class="rosterHead">
-          <strong>Characters</strong>
+          <select id="rosterMode" class="rosterMode" title="What this workbench is showing">
+            <option value="characters">Characters</option>
+            <option value="effects">Effects</option>
+          </select>
           <span id="rosterCount" class="muted"></span>
         </div>
         <div id="grid" class="grid"></div>
-        <p class="muted legend">
+        <p class="muted legend" id="charLegend">
           Badges show which files exist in
           <code>assets/images/characters/render/</code>:
           <b>B</b>ody, <b>W</b>eapon, <b>A</b>rm.
+        </p>
+        <p class="muted legend" id="fxLegend" hidden>
+          The sheets in <code>assets/images/fx/</code>. Dimmed ones have no file
+          yet; the engine draws its own version until one lands.
         </p>
       </aside>
 
@@ -60,6 +67,16 @@
           <div id="parts" class="parts" hidden></div>
           <div id="gizmoHint" class="gizmoHint" hidden></div>
           <div id="empty" class="empty" hidden></div>
+        </div>
+        <div id="fxStage" class="fxStage" hidden>
+          <div class="fxRow">
+            <h3>The sheet <span id="fxSpriteInfo" class="muted"></span></h3>
+            <canvas id="fxSprite" width="520" height="300"></canvas>
+          </div>
+          <div class="fxRow">
+            <h3>In play <span id="fxPreviewInfo" class="muted"></span></h3>
+            <canvas id="fxPreview" width="720" height="320"></canvas>
+          </div>
         </div>
         <div class="hint" id="hint"></div>
       </section>
@@ -75,6 +92,13 @@
           <label class="check"><input id="faceLeft" type="checkbox" /> Face left (mirrored)</label>
           <label class="check"><input id="onion" type="checkbox" /> Onion-skin other parts (anchors)</label>
         </div>
+        <div id="fxPanel" class="panel" hidden>
+          <h2>Effect</h2>
+          <label class="row">Size <input id="fxScale" type="range" min="0.2" max="3" step="0.01" value="1" /><output id="fxScaleOut"></output></label>
+          <label class="row">Rotation <input id="fxRot" type="range" min="-180" max="180" step="1" value="0" /><output id="fxRotOut"></output></label>
+          <button id="fxReset" class="ghost wide">Reset this effect</button>
+          <p class="muted" id="fxNote"></p>
+        </div>
         <div id="selPanel" class="panel" hidden></div>
         <div class="panel">
           <h2>JSON</h2>
@@ -88,6 +112,12 @@
     <script src="../js/chroma.js"></script>
     <script src="../js/rig.js"></script>
     <script src="../js/characters.js"></script>
+    <script src="../js/cards.js"></script>
+    <script src="../js/gameplay.js"></script>
+    <script src="../js/bullet-art.js"></script>
+    <script src="../js/fx-art.js"></script>
+    <script src="../js/fx.js"></script>
+    <script src="../js/cardsim.js"></script>
     <script src="workbench.js"></script>
   </body>
 </html>

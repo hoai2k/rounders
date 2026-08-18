@@ -21,11 +21,16 @@
   const { CHARACTERS, drawCharacter, characterImage, rig } = window.ROUNDERS;
 
   const $ = (id) => document.getElementById(id);
+  // Read once, at boot: the first select() writes the URL back out, so anything
+  // that reads location.search later sees the rewritten one and a deep link
+  // into the Effects section would be lost.
+  const bootQ = new URLSearchParams(location.search);
   const view = $("view");
   const ctx = view.getContext("2d");
 
   const state = {
     id: CHARACTERS[0].id,
+    section: "characters", // characters | effects — which roster is showing
     mode: "view",          // view | edit | anchor
     part: "body",          // anchor mode: which source image
     arm: 0,                // anchor/arm mode: which arm is being placed
@@ -230,11 +235,16 @@
       const d = diffRecord(ch.id, record(ch.id));
       if (d) characters[ch.id] = d;
     }
-    return {
+    const effects = fxExport();
+    const out = {
       version: 1,
       note: "Authored in /workbench. Overrides only — anything not listed here is detected from the art. Values are source-image pixels unless noted.",
       characters
     };
+    // Effect sheets ride along in the same file: name -> { scale, rotation },
+    // and only the ones moved off 1x / 0°.
+    if (Object.keys(effects).length) out.effects = effects;
+    return out;
   }
 
   function download(name, text, type) {
@@ -262,6 +272,12 @@
 
   function writeUrl() {
     const q = new URLSearchParams();
+    if (state.section === "effects") {
+      q.set("section", "effects");
+      if (fxState.name) q.set("fx", fxState.name);
+      history.replaceState(null, "", `${location.pathname}?${q}`);
+      return;
+    }
     q.set("c", state.id);
     q.set("mode", state.mode);
     if (state.mode === "anchor") q.set("part", state.part);
@@ -899,6 +915,7 @@
   }
 
   function refreshTiles() {
+    if (state.section === "effects") return;   // the roster is showing sheets
     let rigged = 0;
     for (const tile of document.querySelectorAll(".tile")) {
       const id = tile.dataset.id;
@@ -939,6 +956,7 @@
   }
 
   function syncHead() {
+    if (state.section === "effects") return;
     const ch = CHARACTERS.find((c) => c.id === state.id);
     $("charName").textContent = `${ch.name} — ${ch.title}`;
     const R = rig.resolved(state.id);
@@ -1510,12 +1528,16 @@
     if (!file) return;
     file.text().then((text) => {
       try {
-        rig.setRigs(JSON.parse(text));
+        const data = JSON.parse(text);
+        rig.setRigs(data);
+        // the same file carries the effect trim, so an import restores both
+        if (data.effects && window.ROUNDERS.fx) {
+          for (const [name, t] of Object.entries(data.effects)) window.ROUNDERS.fx.setTune(name, t);
+        }
         work.clear();
         dirty.clear();
         record(state.id);
-        rebuild();
-        syncHead();
+        if (state.section === "characters") { rebuild(); syncHead(); }
       } catch (err) {
         alert(`Could not read that JSON: ${err.message}`);
       }
@@ -1623,6 +1645,11 @@
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    if (state.section === "effects") {
+      drawFxSprite(dt);
+      requestAnimationFrame(loop);
+      return;
+    }
     pollGamepad(dt);
     stepShots(dt);
     if (state.spin) {
@@ -1643,18 +1670,253 @@
   rig.ready().then(() => {
     for (const id of [...work.keys()]) if (!dirty.has(id)) work.delete(id);
     record(state.id);
-    rebuild();
-    syncHead();
+    if (state.section === "characters") { rebuild(); syncHead(); }
   });
 
   // Assets stream in one character at a time; keep refreshing until every
   // character has settled, then stop. (Panels rebuild on every state change of
   // their own accord — this only catches art that arrives late.)
   const poll = setInterval(() => {
+    if (state.section === "effects") return;
     refreshTiles();
     syncHead();
     const stamp = `${state.id}|${state.mode}|${state.part}|${state.arm}|${armCount()}`;
     if (state.built !== stamp && record(state.id)) rebuild();
     if (CHARACTERS.every((c) => rig.assets(c.id).state !== "loading")) clearInterval(poll);
   }, 250);
+
+  // ================================================================ effects
+  // The same three panes, pointed at the painted effect sheets instead of the
+  // characters. Top of the stage is the sheet itself; under it the card that
+  // uses the effect plays in the card-workbench preview, so a trim is judged
+  // against the thing in motion and not just the file. Both read the same
+  // table the game reads (js/fx-art.js), so what is dialled here is what a
+  // match looks like.
+  const FX = window.ROUNDERS.fx;
+  const CARD_SIM = window.ROUNDERS.CARD_SIM;
+
+  // which card puts each sheet on screen
+  const FX_CARD = {
+    "black-hole": "event-horizon",
+    "explosion": "cluster-bomb",
+    "explosion-big": "supernova",
+    "shockwave-ring": "bodyguard",
+    "lightning-arc": "storm-caller",
+    "storm-nova": "crown-of-storms",
+    "shield-bubble": "aegis-bubble",
+    "shield-break": "aegis-bubble",
+    "stun-stars": "camera-flash",
+    "muzzle-flash": "hair-trigger",
+    "chill-aura": "permafrost",
+    "frost-burst": "permafrost",
+    "poison-cloud": "stink-bomb",
+    "sawblade": "sawblade",
+    "angel": "guardian-halo",
+    "lemonade": "lemonade-stand"
+  };
+
+  const fxState = { name: null, sim: null, t: 0 };
+  const FX_DEFAULT = { scale: 1, rotation: 0 };
+  const fxDirty = new Set();
+
+  function fxNames() { return FX ? FX.names() : []; }
+
+  function buildFxRoster() {
+    const grid = $("grid");
+    grid.textContent = "";
+    for (const name of fxNames()) {
+      const tile = document.createElement("div");
+      tile.className = "tile fx";
+      tile.dataset.fx = name;
+      tile.title = FX_CARD[name] ? `${name} — used by ${FX_CARD[name]}` : `${name} — not drawn by anything today`;
+      const cv = document.createElement("canvas");
+      cv.width = 128; cv.height = 128;
+      const nm = document.createElement("div");
+      nm.className = "nm";
+      nm.textContent = name;
+      tile.append(cv, nm);
+      tile.addEventListener("click", () => selectFx(name));
+      grid.appendChild(tile);
+    }
+    refreshFxTiles();
+  }
+
+  function refreshFxTiles() {
+    let have = 0;
+    const names = fxNames();
+    for (const tile of document.querySelectorAll(".tile.fx")) {
+      const name = tile.dataset.fx;
+      const img = FX && FX.image(name);
+      if (img) have += 1;
+      tile.classList.toggle("on", name === fxState.name);
+      tile.classList.toggle("missing", !img);
+      let dot = tile.querySelector(".dirty");
+      if (fxDirty.has(name) && !dot) {
+        dot = document.createElement("span");
+        dot.className = "dirty";
+        tile.appendChild(dot);
+      } else if (!fxDirty.has(name) && dot) dot.remove();
+      const cv = tile.querySelector("canvas");
+      const c = cv.getContext("2d");
+      c.clearRect(0, 0, cv.width, cv.height);
+      if (img) {
+        const n = FX.frames(name);
+        const fw = img.width / n;
+        const k = Math.min(cv.width / fw, cv.height / img.height);
+        const w = fw * k, h = img.height * k;
+        c.drawImage(img, 0, 0, fw, img.height, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+      }
+    }
+    $("rosterCount").textContent = `${have}/${names.length} on disk`;
+  }
+
+  function selectFx(name) {
+    if (!name || !fxNames().includes(name)) return;
+    fxState.name = name;
+    if (fxState.sim) { fxState.sim.stop(); fxState.sim = null; }
+    const cardId = FX_CARD[name];
+    const card = cardId && window.ROUNDERS.CARDS.find((c) => c.id === cardId);
+    if (card && CARD_SIM) {
+      fxState.sim = CARD_SIM.createSim($("fxPreview"), card);
+      fxState.sim.start();
+    }
+    $("charName").textContent = name;
+    $("charInfo").textContent = cardId ? `drawn by ${cardId}` : "not drawn by anything today";
+    $("fxPreviewInfo").textContent = cardId ? `${cardId} — the preview the card workbench runs` : "no card uses this sheet";
+    syncFxPanel();
+    refreshFxTiles();
+    writeUrl();
+  }
+
+  function syncFxPanel() {
+    const name = fxState.name;
+    if (!name || !FX) return;
+    const t = FX.tune(name);
+    $("fxScale").value = t.scale ?? 1;
+    $("fxScaleOut").textContent = `${(t.scale ?? 1).toFixed(2)}x`;
+    $("fxRot").value = t.rotation || 0;
+    $("fxRotOut").textContent = `${Math.round(t.rotation || 0)}°`;
+    const img = FX.image(name);
+    const n = FX.frames(name);
+    $("fxSpriteInfo").textContent = img
+      ? `${img.width}x${img.height}${n > 1 ? ` · ${n} frames` : ""}`
+      : "missing — assets/images/fx/" + name + ".png";
+    $("fxNote").textContent = FX_CARD[name]
+      ? "Size and rotation ride on top of whatever the engine asks for, and are exported in rigs.json."
+      : "Nothing draws this sheet today; the engine kept its own version. Trim is still exported.";
+  }
+
+  // The sheet on its own: framed, at the trim, cycling if it is a strip.
+  function drawFxSprite(dt) {
+    const cv = $("fxSprite");
+    const c = cv.getContext("2d");
+    c.clearRect(0, 0, cv.width, cv.height);
+    const name = fxState.name;
+    if (!name || !FX) return;
+    fxState.t += dt;
+    const img = FX.image(name);
+    if (!img) {
+      c.fillStyle = "#8f9ab4";
+      c.font = "600 13px system-ui";
+      c.textAlign = "center";
+      c.fillText(`assets/images/fx/${name}.png is not on disk`, cv.width / 2, cv.height / 2);
+      return;
+    }
+    const n = FX.frames(name);
+    const fw = img.width / n;
+    // the sheet is drawn at the same size the roster tile would, times the
+    // trim, so the slider reads as "bigger / smaller than the engine asked"
+    const fit = Math.min(cv.width * 0.7 / fw, cv.height * 0.8 / img.height);
+    const size = fw * fit;
+    FX.draw(c, name, cv.width / 2, cv.height / 2, size, n > 1 ? (fxState.t * 0.8) % 1 : 0);
+    // a faint outline of the untrimmed footprint, so a scale change is legible
+    const base = FX.tune(name).scale || 1;
+    if (Math.abs(base - 1) > 0.001) {
+      const w = size, h = w * (img.height / fw);
+      c.strokeStyle = "rgba(255,255,255,0.22)";
+      c.setLineDash([5, 5]);
+      c.strokeRect(cv.width / 2 - w / 2, cv.height / 2 - h / 2, w, h);
+      c.setLineDash([]);
+    }
+  }
+
+  function setSection(section) {
+    state.section = section === "effects" ? "effects" : "characters";
+    const fx = state.section === "effects";
+    $("fxStage").hidden = !fx;
+    $("fxPanel").hidden = !fx;
+    document.querySelector(".canvasWrap").hidden = fx;
+    $("hint").hidden = fx;
+    // character-only chrome
+    for (const id of ["editBtn", "anchorBtn", "refWrap", "resetChar", "undoBtn", "redoBtn"]) {
+      const el = $(id);
+      if (el) el.hidden = fx;
+    }
+    $("partTabs").hidden = fx || state.mode !== "anchor";
+    $("charLegend").hidden = fx;
+    $("fxLegend").hidden = !fx;
+    const jsonPanel = $("jsonOut") && $("jsonOut").closest(".panel");
+    if (jsonPanel) jsonPanel.hidden = fx;
+    document.querySelectorAll(".inspector .panel")[0].hidden = fx;
+    if (fx) {
+      buildFxRoster();
+      selectFx(fxState.name || fxNames()[0]);
+    } else {
+      if (fxState.sim) { fxState.sim.stop(); fxState.sim = null; }
+      buildRoster();
+      refreshTiles();
+      syncHead();
+      rebuild();
+    }
+    $("rosterMode").value = state.section;
+    writeUrl();
+  }
+
+  $("rosterMode").addEventListener("change", (e) => setSection(e.target.value));
+  liveFxField($("fxScale"), (v) => ({ scale: v }), (v) => `${v.toFixed(2)}x`);
+  liveFxField($("fxRot"), (v) => ({ rotation: v }), (v) => `${Math.round(v)}°`);
+  $("fxReset").addEventListener("click", () => {
+    if (!fxState.name) return;
+    FX.setTune(fxState.name, { ...FX_DEFAULT });
+    fxDirty.delete(fxState.name);
+    syncFxPanel();
+    refreshFxTiles();
+  });
+
+  function liveFxField(input, patch, fmt) {
+    if (!input) return;
+    const out = $(input.id + "Out");
+    input.addEventListener("input", () => {
+      if (!fxState.name) return;
+      const v = Number(input.value);
+      FX.setTune(fxState.name, patch(v));
+      fxDirty.add(fxState.name);
+      if (out) out.textContent = fmt(v);
+      refreshFxTiles();
+    });
+  }
+
+  // Only the sheets that have actually been moved off their defaults.
+  function fxExport() {
+    const out = {};
+    for (const name of fxNames()) {
+      const t = FX.tune(name);
+      const e = {};
+      if (Math.abs((t.scale ?? 1) - 1) > 0.001) e.scale = Number((t.scale).toFixed(3));
+      if (Math.round(t.rotation || 0) !== 0) e.rotation = Math.round(t.rotation);
+      if (Object.keys(e).length) out[name] = e;
+    }
+    return out;
+  }
+
+  if (FX) FX.warm();
+  if (bootQ.get("section") === "effects") {
+    const want = bootQ.get("fx");
+    if (want && fxNames().includes(want)) fxState.name = want;
+    setSection("effects");
+  } else {
+    setSection("characters");
+  }
+  setInterval(() => { if (state.section === "effects") { refreshFxTiles(); syncFxPanel(); } }, 400);
+
 })();

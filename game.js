@@ -6437,16 +6437,9 @@
       }
       if (f.type === "blackhole") {
         const a = clamp(f.life / 3, 0, 1);
-        const hole = fxImage("black-hole");
-        if (hole) {
-          ctx.save();
-          ctx.globalAlpha = a;
-          ctx.translate(f.x, f.y);
-          ctx.rotate(world.time * 1.6);
-          const d = f.r * 1.9;
-          ctx.drawImage(hole, -d / 2, -d / 2, d, d);
-          ctx.restore();
-        }
+        // through the shared sheet drawer, so the workbench's size and spin
+        // trim reaches the match art as well as the preview
+        drawFxSheet("black-hole", f.x, f.y, f.r * 1.9, 0, { rot: world.time * 1.6, alpha: a });
         // debris spiralling inward, so the pull is visible even in empty air
         if (Math.random() < 0.6) {
           const ang = rand(0, Math.PI * 2), rr = f.r * rand(0.45, 0.95);
@@ -6516,10 +6509,7 @@
         ctx.globalAlpha = av;
         ctx.translate(px, ay);
         ctx.scale(scale, scale);
-        const ang = window.ROUNDERS.fxImage && window.ROUNDERS.fxImage("angel");
-        if (ang) {
-          ctx.drawImage(ang, -26, -30, 52, 60);
-        } else {
+        if (!drawFxSheet("angel", 0, 0, 52)) {
           // procedural stand-in until assets/images/fx/angel.png lands
           ctx.fillStyle = "rgba(255,248,214,0.95)";
           ctx.beginPath(); ctx.arc(0, -12, 7, 0, Math.PI * 2); ctx.fill();       // head
@@ -6652,7 +6642,8 @@
       } else if (f.type === "saw") {
         // Drawn at the FULL radius it hurts in, spinning on its own axis and
         // sitting behind the fighter (drawFields runs before drawPlayersAll).
-        window.ROUNDERS.drawSawblade(ctx, f.x, f.y, f.r, world.time * 9, fxImage("sawblade"));
+        window.ROUNDERS.drawSawblade(ctx, f.x, f.y, f.r * (FX.tune("sawblade").scale || 1),
+        world.time * 9 + (FX.tune("sawblade").rotation || 0) * Math.PI / 180, fxImage("sawblade"));
       } else {
         const alpha = clamp(f.life / 0.18, 0, 1);
         ctx.strokeStyle = `rgba(255,255,255,${0.3 * alpha})`;
@@ -7975,40 +7966,15 @@
     }
     return entry.ok ? entry.img : null;
   }
-  const fxImage = name => loadArt("fx", name);
+  // Effect sheets come from the shared module (js/fx.js), so the game, the
+  // card workbench preview and the sprite workbench all paint them from one
+  // table — and a trim dialled in the workbench moves all three at once.
+  const FX = window.ROUNDERS.fx;
+  const fxImage = name => FX.image(name);
   window.ROUNDERS.fxImage = fxImage;
-
-  // Sheets are one strip of equal left-to-right frames; everything else is a
-  // single image, which is just a one-frame sheet.
-  const FX_FRAMES = { explosion: 6, "explosion-big": 6, "shield-break": 5 };
-
-  // Effect art is lazy-loaded on first use, which would mean the first
-  // explosion of a match is the procedural one and the second is painted. A
-  // touch at boot costs nothing and makes the art show from the first shot.
-  const FX_WARM = [
-    "explosion", "explosion-big", "shockwave-ring", "lightning-arc", "storm-nova",
-    "shield-bubble", "shield-break", "stun-stars", "muzzle-flash", "chill-aura",
-    "frost-burst", "black-hole", "poison-cloud", "sawblade", "angel", "lemonade"
-  ];
-  function warmFxArt() { for (const n of FX_WARM) fxImage(n); }
-
-  // Draws one frame of a sheet centred on (x, y), `u` running 0→1 across the
-  // strip. Returns false when the file is missing, which is every caller's cue
-  // to draw the procedural version instead.
+  function warmFxArt() { FX.warm(); }
   function drawFxSheet(name, x, y, size, u = 0, opts = {}) {
-    const img = fxImage(name);
-    if (!img) return false;
-    const frames = FX_FRAMES[name] || 1;
-    const fw = img.width / frames;
-    const frame = clamp(Math.floor(u * frames), 0, frames - 1);
-    const h = size * (img.height / fw);
-    ctx.save();
-    ctx.globalAlpha = clamp(opts.alpha === undefined ? 1 : opts.alpha, 0, 1);
-    ctx.translate(x, y);
-    if (opts.rot) ctx.rotate(opts.rot);
-    ctx.drawImage(img, frame * fw, 0, fw, img.height, -size / 2, -h / 2, size, h);
-    ctx.restore();
-    return true;
+    return FX.draw(ctx, name, x, y, size, u, opts);
   }
 
   // Painted one-shots: art for moments the engine has no lasting field to hang
@@ -8041,7 +8007,7 @@
       const size = s.size * (1 + s.grow * k);
       // a single image fades out; a sheet plays its frames and holds its alpha,
       // because the art itself is what dissipates
-      const alpha = (FX_FRAMES[s.name] || 1) > 1 ? s.alpha : s.alpha * (1 - k);
+      const alpha = FX.frames(s.name) > 1 ? s.alpha : s.alpha * (1 - k);
       drawFxSheet(s.name, s.x, s.y, size, k, { rot: s.rot, alpha });
     }
   }

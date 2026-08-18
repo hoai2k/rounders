@@ -648,6 +648,24 @@ Pillars:
       strong as they did
 - [ ] Art for the six new health cards (`image-requests.md`) — they ship on
       procedural fallbacks until it lands
+- [x] **The preview paints the effects the game paints**: the two drew them
+      from separate code — the game reached for `assets/images/fx/<name>.png`
+      and the card workbench drew its own procedural version — so an Event
+      Horizon in a match was a painted maw and the same card in the workbench
+      was a purple swirl. Both now go through `js/fx.js`, with the per-file
+      trim in `js/fx-art.js`: black hole, explosions, shockwave ring, storm
+      nova, poison cloud, shield bubble, stun stars, chill aura, sawblade and
+      the angel. Each still falls back to its procedural drawing when a file
+      is missing, so art can land piecemeal as before
+- [x] **Sprite workbench: an Effects section**: the roster header is a
+      dropdown (Characters / Effects). Effects lists every sheet in
+      `assets/images/fx/`, dimming the ones with no file; the stage shows the
+      sheet itself over a live card-workbench preview of the card that puts it
+      on screen (Event Horizon for the black hole, Camera Flash for the stun
+      stars, and so on); the inspector carries size and rotation, which write
+      into the same table the game reads, so a slider moves the sheet, the
+      preview and a match at once. `?section=effects&fx=black-hole` deep-links
+      to one. Trim exports in rigs.json under `effects` and imports back
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

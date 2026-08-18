@@ -712,10 +712,11 @@ Pillars:
       short of the next frame's ink, so a blast wider than its nominal cell
       (most of them are) is drawn whole, and still never shows a sliver of its
       neighbour
-- [x] **Effect trim from the workbench baked in**: `explosion` (feather 0.33,
-      six per-frame nudges) and `explosion-big` (feather 0.4, six nudges) from
-      rigs_4/rigs_5, applied in `js/fx-art.js`. The character section of both
-      exports was byte-identical to the rigs on disk, so nothing else moved
+- [x] **Effect trim from rigs_4 / rigs_5 was applied and then withdrawn** at
+      the user's word: `explosion` and `explosion-big` are back to a plain
+      1x / 0deg / no-feather entry. The clipping those exports were partly
+      compensating for is fixed in the cut rule instead, so both strips play
+      whole with no per-frame values at all
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

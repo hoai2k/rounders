@@ -1798,8 +1798,14 @@
     $("fxRotOut").textContent = `${Math.round(t.rotation || 0)}°`;
     const img = FX.image(name);
     const n = FX.frames(name);
+    const cut = n > 1 && FX.boxes(name);
+    // For a strip, say whether the frames were found in the art or fell back
+    // to even cells — an off-grid sheet is the usual cause of a jumpy effect.
+    const cutNote = cut
+      ? ` · frames cut at ${cut.map((b) => Math.round(b.centre)).join(", ")}`
+      : "";
     $("fxSpriteInfo").textContent = img
-      ? `${img.width}x${img.height}${n > 1 ? ` · ${n} frames` : ""}`
+      ? `${img.width}x${img.height}${n > 1 ? ` · ${n} frames${cutNote}` : ""}`
       : "missing — assets/images/fx/" + name + ".png";
     $("fxNote").textContent = FX_CARD[name]
       ? "Size and rotation ride on top of whatever the engine asks for, and are exported in rigs.json."

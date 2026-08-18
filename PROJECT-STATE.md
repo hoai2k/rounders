@@ -666,6 +666,21 @@ Pillars:
       into the same table the game reads, so a slider moves the sheet, the
       preview and a match at once. `?section=effects&fx=black-hole` deep-links
       to one. Trim exports in rigs.json under `effects` and imports back
+- [x] **Sprite strips are cut where the art is, not on a grid**: the frames in
+      `explosion.png` are drawn by eye, not on sixths — the first three blasts
+      sit 36 / 138 / 168px left of their nominal cell centres — so slicing at
+      `width / frames` cut through the artwork and the animation jumped around
+      as it played. `js/fx.js` now finds the frames: the column-alpha profile
+      of the strip gives runs of ink separated by gutters, those runs are
+      reconciled against the declared frame count (close the narrowest gap when
+      there are too many, halve the widest run when frames touch), and each
+      frame is sampled from a box centred on its own middle, reaching no
+      further than halfway to its neighbour so a frame can never show a sliver
+      of the one beside it. A trimmed box is drawn narrower in proportion, so
+      the scale never jumps and an explosion still grows through the strip. A
+      strip the detector cannot make sense of falls back to even cells, and
+      `centres: [...]` in `js/fx-art.js` overrides it outright. The workbench
+      reports where a strip was cut
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

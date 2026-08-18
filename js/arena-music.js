@@ -1,24 +1,27 @@
-// Rounders — which song opens which arena.
+// Rounders — which song a match opens on, chosen by the arena it starts in.
 //
-// EDIT THIS FILE to change the soundtrack pairings. The key is the arena `id`
-// from js/levels.js; the value is a track name from js/music.js (i.e. the mp3
+// EDIT THIS FILE to change the pairings. The key is the arena `id` from
+// js/levels.js; the value is a track name from js/music.js (i.e. the mp3
 // filename in assets/music/ without the extension).
 //
-// How a board's playlist runs (see game.js):
-//   1. the song chosen here starts when the board loads
-//   2. if the round runs long enough for it to end, its PARTNER plays
-//      ("Rounders Tango 2" → "Rounders Tango 1", and vice versa)
-//   3. after that, random tracks from the whole soundtrack, never repeating a
-//      song already played on this board until the pool runs dry
+// Music belongs to the MATCH, not to the round — the song does not change when
+// the next board loads. How a match's playlist runs (see game.js):
+//   1. it opens on the song cast to the arena the match starts in
+//   2. every following track is picked at random BY THEME, and no theme comes
+//      round again until all 14 have played — so a match hears African, Bossa
+//      Nova, Calypso … once each before anything repeats
+//   3. when a theme does come round, it plays the OTHER song of its pair
+//      ("Rounders Tango 2" the first pass → "Rounders Tango 1" the second)
+// Picking a card leaves the song playing, only quieter.
 //
 // House rules kept by the table below (a console warning fires on load if a
 // change breaks one):
 //   • every theme (African, Bossa Nova, Calypso, …) is used at least once
 //   • no two arenas open with the same song — two arenas MAY share a theme, as
 //     long as they take different numbers ("Salsa 1" here, "Salsa 2" there)
-//   • "Rounders Jazz 1" is left free: it is the title/menu theme. It still
-//     turns up in battle as Midnight Library's partner track and in the random
-//     tail, but no board opens on it.
+//   • "Rounders Jazz 1" is left free as the title/menu theme, so no match opens
+//     on it. It is still in the playlist, as the alternate take of the Jazz
+//     theme when Jazz comes round a second time.
 (() => {
   "use strict";
   window.ROUNDERS = window.ROUNDERS || {};

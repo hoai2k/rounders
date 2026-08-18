@@ -193,12 +193,13 @@
     context: "menu", // "menu" (title/lobby/settings) or "battle"
     preload: null,   // { index, el } streamed ahead so a skip starts instantly
     started: false,
-    boardId: null,   // arena whose playlist is running, so a repeat round doesn't restart it
-    pairNext: -1,    // the opening song's partner: what plays when the opener ends
-    boardPlayed: new Set() // tracks already heard on this board (no repeats until dry)
+    matchStarted: false,   // the match playlist is running (it opens on the first arena's song)
+    nextUp: -1,            // the track already chosen (and warmed) to follow this one
+    cycleThemes: new Set(),// themes played so far in this pass through the soundtrack
+    themeLast: new Map()   // theme → the track it last played, so the next pass takes the other one
   };
   // Music volume multipliers. The card screen only steps back a little — the
-  // board's song keeps running under the draft and into the next board.
+  // match's song keeps running under the draft and into the next round.
   const DUCK = { none: 1, draft: 0.55, paused: 0.22 };
 
   // ------------------------------------------------------------------ stats
@@ -686,8 +687,8 @@
       showToast(str("menu.needPlayers"));
       return;
     }
-    // The first board's song starts from resetRound → startArenaMusic below.
-    musicState.boardId = null;
+    // The match playlist opens on the first arena's song (resetRound → startMatchMusic).
+    musicState.matchStarted = false;
     players = lobbySlots.map((slot, i) => {
       const p = makePlayer(i, slot);
       if (slot.type === "bot") p.name = `${p.character.name} (Bot)`;
@@ -753,9 +754,10 @@
   function resetRound() {
     pickNextLevel();
     const level = currentLevel();
-    // New board, new soundtrack — and card picking is over, so back to full volume.
+    // Card picking is over, so back to full volume. Music runs per MATCH, not
+    // per round: only the first board of a match starts the playlist.
     duckMusic(DUCK.none);
-    startArenaMusic(level);
+    if (!musicState.matchStarted) startMatchMusic(level);
     // Arenas vary in playfield size (ROUNDS-style): the whole level is always
     // framed, so a bigger field renders the fighters smaller and opens room
     // for lobbed arcs, while a tight one plays up close.
@@ -906,8 +908,8 @@
   // with only bots drafting never opens the panel at all.
   function beginDraft(losers) {
     world.state = "draft";
-    // The board's song keeps playing under the card screen, just quieter; the
-    // next board's song takes over when the round starts.
+    // The match's song keeps playing under the card screen, just quieter, and
+    // carries on at full volume when the next round starts.
     duckMusic(DUCK.draft);
     const humans = losers.filter(p => !p.bot);
     const bots = losers.filter(p => p.bot);
@@ -7089,11 +7091,11 @@
   }
 
   function warmNextTrack(index) {
-    // In battle the next track is known when a board still owes its partner
-    // song; otherwise warm the next one in list order, which is what the ▶
-    // skip button plays.
-    const next = musicState.context === "battle" && musicState.pairNext >= 0
-      ? musicState.pairNext
+    // In battle the next track is already picked, so warm exactly that;
+    // otherwise warm the next one in list order, which is what the ▶ skip
+    // button plays.
+    const next = musicState.context === "battle" && musicState.nextUp >= 0
+      ? musicState.nextUp
       : wrapTrack(index + 1);
     if (musicState.preload && musicState.preload.index === next) return;
     releasePreload();
@@ -7112,60 +7114,65 @@
 
   function onTrackEnded() {
     if (musicState.context !== "battle") { playTrack(musicState.index, true); return; }
-    // A board plays its chosen song, then that song's partner, then random.
-    if (musicState.pairNext >= 0) {
-      const next = musicState.pairNext;
-      musicState.pairNext = -1;
-      playTrack(next);
-      return;
-    }
-    playTrack(randomBattleTrack());
+    playTrack(musicState.nextUp >= 0 ? musicState.nextUp : chooseNextTrack());
   }
 
-  // Any track except the title theme, and nothing already heard on this board.
-  // When the board has worked through everything, the slate is wiped and only
-  // the track just played is held back.
-  function randomBattleTrack() {
-    let pool = battleCandidates(true);
-    if (!pool.length) {
-      musicState.boardPlayed = new Set([musicState.index]);
-      pool = battleCandidates(true);
-    }
-    if (!pool.length) pool = battleCandidates(false);
-    if (!pool.length) return wrapTrack(MUSIC.titleIndex + 1);
+  // The match playlist walks the soundtrack by THEME: every theme is played
+  // once before any theme comes round again, and when one does come round it
+  // plays the other song of its pair. So a long match hears all 14 flavours,
+  // then all 14 again in their alternate takes, in a fresh random order.
+  function chooseNextTrack() {
+    const current = MUSIC.tracks[musicState.index];
+    let themes = MUSIC.themes.filter(t => !musicState.cycleThemes.has(t));
+    if (!themes.length) themes = MUSIC.themes.slice();
+    // never twice in a row, even across the seam between two passes
+    const others = themes.filter(t => t !== current.theme);
+    if (others.length) themes = others;
+    const theme = themes[Math.floor(Math.random() * themes.length)];
+
+    const pair = tracksOfTheme(theme);
+    const last = musicState.themeLast.get(theme);
+    const alternates = pair.filter(i => i !== last);
+    const pool = alternates.length ? alternates : pair;
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  function battleCandidates(fresh) {
-    const pool = [];
+  function tracksOfTheme(theme) {
+    const list = [];
     for (let i = 0; i < MUSIC.tracks.length; i++) {
-      if (i === MUSIC.titleIndex) continue;
-      if (i === musicState.index) continue;
-      if (fresh && musicState.boardPlayed.has(i)) continue;
-      pool.push(i);
+      if (MUSIC.tracks[i].theme === theme) list.push(i);
     }
-    return pool;
+    return list;
   }
 
-  // The song a board opens on, from the table in js/arena-music.js. An arena
-  // with no entry (or a typo'd track name) just rolls a random battle track.
+  // Remember what the playlist just spent, so the pass knows what is left.
+  // Hearing a theme twice in one pass (a manual skip can do it) starts the
+  // next pass there rather than leaving the old pass half-spent.
+  function noteTrackPlayed(index) {
+    const theme = MUSIC.tracks[index].theme;
+    if (musicState.cycleThemes.has(theme)) musicState.cycleThemes.clear();
+    musicState.cycleThemes.add(theme);
+    musicState.themeLast.set(theme, index);
+    if (musicState.cycleThemes.size >= MUSIC.themes.length) musicState.cycleThemes.clear();
+  }
+
+  // The song a match opens on: the one cast to the arena it starts on, from the
+  // table in js/arena-music.js. An arena with no entry (or a typo'd track name)
+  // just opens on a random track.
   function arenaTrackIndex(level) {
     const name = ARENA_MUSIC[level.id];
     const index = name === undefined ? undefined : MUSIC.indexByName.get(name);
-    return index === undefined ? randomBattleTrack() : index;
+    return index === undefined ? chooseNextTrack() : index;
   }
 
-  // Called as each board loads. Staying on the same arena (a fixed Arena
-  // setting, so every round is the same board) lets its playlist keep running
-  // instead of restarting the opener each round.
-  function startArenaMusic(level) {
+  // Called once per match, as its first board loads. Later rounds keep the
+  // playlist running — the music belongs to the match, not to the board.
+  function startMatchMusic(level) {
+    musicState.matchStarted = true;
     musicState.context = "battle";
-    if (musicState.boardId === level.id && musicState.started) return;
-    musicState.boardId = level.id;
-    const index = arenaTrackIndex(level);
-    musicState.pairNext = MUSIC.partnerOf[index];
-    musicState.boardPlayed = new Set([index]);
-    playTrack(index, true);
+    musicState.cycleThemes.clear();
+    musicState.themeLast.clear();
+    playTrack(arenaTrackIndex(level), true);
   }
 
   function playTrack(index, restart = false) {
@@ -7185,27 +7192,30 @@
       musicAudio.currentTime = 0;
     }
     musicState.started = true;
-    if (musicState.context === "battle") musicState.boardPlayed.add(index);
+    if (musicState.context === "battle") {
+      noteTrackPlayed(index);
+      musicState.nextUp = chooseNextTrack();
+    }
     applyMusicVolume();
     renderNowPlaying();
     if (settings.music) musicAudio.play().catch(() => {});
     warmNextTrack(index);
   }
 
-  // "menu" keeps the title theme; battle music is driven by the arena instead
-  // (see startArenaMusic), so leaving the menu also forgets the last board.
+  // "menu" keeps the title theme; battle music is the match playlist
+  // (see startMatchMusic), so going back to the menu ends that playlist.
   function setMusicContext(context) {
     const changed = musicState.context !== context;
     musicState.context = context;
-    if (context === "menu") musicState.boardId = null;
+    if (context === "menu") musicState.matchStarted = false;
     if (changed || !musicState.started) playTrack(MUSIC.titleIndex);
     else startMusic();
   }
 
-  // Manual skip takes the wheel: the board's partner song is no longer owed.
+  // A manual skip is a real play: it counts against the pass like any other,
+  // and playTrack picks a fresh follow-up from where it lands.
   function skipTrack(step) {
     ensureAudio();
-    musicState.pairNext = -1;
     playTrack(musicState.index + step, true);
     if (!settings.music) showToast("Music is off — press M to turn it on");
   }

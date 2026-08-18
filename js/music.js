@@ -4,9 +4,10 @@
 // selection screens; every other track can turn up in battle.
 //
 // Tracks come in themed pairs — "Rounders Tango 1" / "Rounders Tango 2" — and
-// each track knows its theme and its partner, because a board that outlasts its
-// opening song moves to that song's partner next (js/arena-music.js explains
-// the full order, and holds the per-arena choices).
+// each one knows its theme and which take it is, because a match plays every
+// theme once before repeating one, and takes the other song of the pair when a
+// theme does come round again (js/arena-music.js explains the full order, and
+// holds the per-arena choices).
 (() => {
   "use strict";
   window.ROUNDERS = window.ROUNDERS || {};
@@ -64,15 +65,9 @@
 
   const indexByName = new Map(tracks.map((t, i) => [t.name, i]));
 
-  // partnerOf[i] is the other track of i's pair, or -1 for a lone track.
-  const partnerOf = tracks.map((t, i) => {
-    const j = tracks.findIndex((o, k) => k !== i && o.theme === t.theme);
-    return j;
-  });
-
   const themes = [...new Set(tracks.map(t => t.theme))];
 
   const titleIndex = Math.max(0, names.indexOf(TITLE_TRACK));
 
-  window.ROUNDERS.MUSIC = { tracks, titleIndex, indexByName, partnerOf, themes };
+  window.ROUNDERS.MUSIC = { tracks, titleIndex, indexByName, themes };
 })();

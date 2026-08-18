@@ -539,12 +539,16 @@ Pillars:
 - [x] **Grasshopper is a charged jump**: hold jump on the ground to coil (the
       fighter compresses and bobs), release to launch. A tap is an ordinary
       hop; at `minHold` (0.5s) the wind-up is worth **2x normal jump height**
-      and at `maxHold` (7s) **10x**. Configured in HEIGHT in
-      `GAMEPLAY.chargeJump` and converted to a launch-speed multiplier by
-      square root, since rise goes as the square of speed. Measured in the real
-      game: 873 px/s on a tap, 1353 at 0.8s (2.4x height), 2776 at 7s (9.95x).
-      The arena ceiling clamps the tallest launches, which is harmless —
-      a full charge simply pins them at the top of the board
+      and at `maxHold` (7s) **the whole height of the arena** (`maxBoards: 1`),
+      measured against that arena's own gravity, so a taller board is cleared
+      just as completely. Configured in HEIGHT in `GAMEPLAY.chargeJump` and
+      converted to a launch-speed multiplier by square root, since rise goes as
+      the square of speed. Measured in the real game: 184px on a tap (normal),
+      370px at 0.53s (2.01x) and 899px at 7s against a 900px board. The
+      preview quotes the same numbers against `previewBoard` (900px) rather
+      than the couple of hundred pixels the little scene is tall, so the
+      fighter does leave the top of the preview frame at the apex — the
+      alternative is showing a launch the game never gives you
 - [x] **Camera Flash goes off like a flashbulb**: a hard white wash over the
       victim that blows out into a ring and is gone inside a quarter second,
       and a stunned fighter is now visibly rattled — the body shakes as well as

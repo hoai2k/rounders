@@ -71,8 +71,8 @@
 
     card("grasshopper", "Grasshopper", "common",
       "The floor is merely a suggestion.",
-      "Hold jump on the ground to coil, release to launch. A tap hops as normal, half a second of wind-up doubles your height, and a full seven seconds throws you ten times as high.",
-      ["hold jump to charge (up to 7s)", "0.5s = 2× height, 7s = 10× height", "+8% air control"], ["movement"],
+      "Hold jump on the ground to coil, release to launch. A tap hops as normal, half a second of wind-up doubles your height, and a full seven seconds throws you the whole height of the arena.",
+      ["hold jump to charge (up to 7s)", "0.5s = 2× height, 7s = a full board", "+8% air control"], ["movement"],
       p => { p.stats.chargeJump += 1; p.stats.airAccel *= 1.08; }),
 
     card("brick-wall", "Brick Wall", "common",

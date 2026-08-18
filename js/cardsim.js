@@ -65,13 +65,21 @@
   // back out, pivoting on the feet. Same curve as game.js.
   const SQUISH_TIME = 0.22;
   const CHARGE = () => (window.ROUNDERS.GAMEPLAY && window.ROUNDERS.GAMEPLAY.chargeJump)
-    || { minHold: 0.5, maxHold: 7, minHeight: 2, maxHeight: 10, squash: 0.3, bob: 3.5 };
-  // Grasshopper's wind-up, same curve as game.js
+    || { minHold: 0.5, maxHold: 7, minHeight: 2, maxBoards: 1, previewBoard: 900, squash: 0.3, bob: 3.5 };
+  // Grasshopper's wind-up, same curve as game.js — and quoted against a real
+  // 900px board, NOT the couple of hundred pixels this little scene is tall,
+  // so the preview shows the launch the card actually buys in a match.
   function chargeMul(held) {
     const c = CHARGE();
     if (!held || held < c.minHold) return 1;
+    const GP2 = window.ROUNDERS.GAMEPLAY || {};
+    const g = (GP2.world && GP2.world.gravity) || 2100;
+    const v0 = (GP2.fighter && GP2.fighter.jump) || 880;
+    const board = c.previewBoard || 900;
     const k = Math.min(1, (held - c.minHold) / (c.maxHold - c.minHold));
-    return Math.sqrt(c.minHeight + (c.maxHeight - c.minHeight) * k);
+    const base = (v0 * v0) / (2 * g);
+    const rise = c.minHeight * base + (c.maxBoards * board - c.minHeight * base) * k;
+    return Math.sqrt(2 * g * rise) / v0;
   }
   function squishScale(who, t = 0) {
     const left = who.squish || 0;
@@ -1157,12 +1165,15 @@
         h.vx += (want - h.vx) * Math.max(0, Math.min(1, accel * dt));
         if (!dir && h.grounded) h.vx += (0 - h.vx) * Math.max(0, Math.min(1, h.stats.brake * dt));
         if (h.stats.chargeJump > 0) {
-          // Grasshopper: coil on the spot, then let go. Held for a second —
-          // enough charge to read as a launch and still land inside the frame,
-          // where a full seven-second wind-up would leave the picture entirely.
+          // Grasshopper: coil on the spot, then let go. Held just past the
+          // half-second threshold, so the preview shows the card's HEADLINE
+          // jump — twice normal height, measured against a real 900px board
+          // rather than this little scene. That launch is taller than the
+          // preview frame, so the fighter does leave the top of it: the
+          // alternative is quoting a number the game never gives you.
           if (h.grounded) {
             h.jumpCharge = (h.jumpCharge || 0) + dt;
-            if (h.jumpCharge > 1) {
+            if (h.jumpCharge > 0.6) {
               h.vy = -h.stats.jump * SCALE * chargeMul(h.jumpCharge);
               h.grounded = false;
               h.jumps = h.stats.extraJumps;

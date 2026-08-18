@@ -78,7 +78,9 @@
       minHold: 0.5,      // the wind-up pays from here: below it, an ordinary hop
       maxHold: 7,        // fully wound
       minHeight: 2,      // x normal jump HEIGHT the moment minHold is reached
-      maxHeight: 10,     // ...and when fully wound (10x184px = ~1840px of rise)
+      maxBoards: 1,      // ...and fully wound: this many BOARD HEIGHTS of rise,
+                         // so a taller arena is jumped just as completely
+      previewBoard: 900, // the board the card workbench quotes its example against
       squash: 0.3,       // how far they compress at full charge (fraction)
       bob: 3.5           // px of bob while winding
     },

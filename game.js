@@ -2156,7 +2156,7 @@
             });
           }
         } else if (p.grounded && (p.jumpCharge || 0) > 0) {
-          const mul = chargeMul(p.jumpCharge);
+          const mul = chargeMul(p.jumpCharge, p);
           p.vy = -p.stats.jump * chillJump * mul;
           p.grounded = false;
           p.groundPlatform = null;
@@ -2454,12 +2454,19 @@
   // How much of a launch a wind-up has bought. A tap is worth nothing extra;
   // past minHold it climbs to maxMul at maxHold.
   // Configured in HEIGHT, which is what a player reads off the screen, and
-  // returned as a LAUNCH SPEED multiplier — rise goes as the square of it, so
-  // ten times the height is a shade over three times the speed.
-  function chargeMul(held) {
+  // returned as a LAUNCH SPEED multiplier — rise goes as the square of speed.
+  // The top of the range is the height of the ARENA, measured against the
+  // arena's own gravity, so a taller board is cleared just as completely
+  // rather than the fighter simply pinning himself to a low ceiling.
+  function chargeMul(held, p) {
     if (!held || held < CHARGE.minHold) return 1;
     const k = Math.min(1, (held - CHARGE.minHold) / (CHARGE.maxHold - CHARGE.minHold));
-    return Math.sqrt(CHARGE.minHeight + (CHARGE.maxHeight - CHARGE.minHeight) * k);
+    const g = levelGravity();
+    const v0 = p.stats.jump;
+    const base = (v0 * v0) / (2 * g);                       // their ordinary rise
+    const rise = CHARGE.minHeight * base +
+      (CHARGE.maxBoards * world.height - CHARGE.minHeight * base) * k;
+    return Math.sqrt(2 * g * rise) / v0;
   }
   const WALL_SLIDE_MAX = GP.wall.slideMax;
   function touchWall(p, awayDir) {

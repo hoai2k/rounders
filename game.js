@@ -6926,6 +6926,13 @@
 
   // The real victory screen: the arena dims right down, the winner(s) stand
   // huge in a spotlight of their own colour, and the verdict is unmissable.
+  // The victory salute: the body faces left while the weapon arm goes up to
+  // 1 o'clock — 30 degrees off vertical, up and to the RIGHT — so the raised
+  // arm is the one behind the body. The rig mirrors body and weapon
+  // independently, so the two facings can genuinely disagree.
+  const VICTORY_FACING = -1;
+  const VICTORY_AIM = { x: Math.sin(Math.PI / 6), y: -Math.cos(Math.PI / 6) };
+
   function drawWinner() {
     if (!world.winner) return;
     const winners = world.winners && world.winners.length ? world.winners : [world.winner];
@@ -6992,7 +6999,13 @@
       ctx.fill();
       ctx.save();
       ctx.translate(wx, wy + bob);
-      drawCharacter(ctx, w.character, radius, { t: world.time + i, aimX: i % 2 === 0 ? 1 : -1, aimY: -0.1 });
+      // A crowd of winners all strike the same pose: the body turned one way
+      // and the BACK arm thrust up to 1 o'clock. Alternating aims used to
+      // cross two fighters' weapons where they stood shoulder to shoulder.
+      // A lone winner has nothing to clash with, so they keep the easy stance.
+      drawCharacter(ctx, w.character, radius, n > 1
+        ? { t: world.time + i, facing: VICTORY_FACING, aimX: VICTORY_AIM.x, aimY: VICTORY_AIM.y }
+        : { t: world.time + i, aimX: 1, aimY: -0.1 });
       ctx.restore();
       ctx.fillStyle = "#f5f2ff";
       ctx.font = `800 ${n === 1 ? 30 : 24}px system-ui, sans-serif`;

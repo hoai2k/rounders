@@ -806,6 +806,11 @@ Pillars:
       colour, spaced-out VICTORY kicker, the winner(s) drawn huge on podium
       glows with names beneath, title auto-shrinks to fit, confetti rain in
       the winners' colours, final scores frozen in the margin cards
+- [x] **Victory salute for a shared win**: with more than one winner every
+      fighter poses the same way — body turned left, weapon arm thrown up to
+      1 o'clock, so the raised arm is the one BEHIND the body. Alternating
+      aims used to cross two neighbours' weapons. A lone champion has nothing
+      to clash with and keeps the relaxed default stance
 - [x] Files: `index.html`, `styles.css`
 
 ### 6b. Cooperative Mode (2026-08-18)

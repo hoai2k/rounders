@@ -686,6 +686,17 @@ Pillars:
       strip the detector cannot make sense of falls back to even cells, and
       `centres: [...]` in `js/fx-art.js` overrides it outright. The workbench
       reports where a strip was cut
+- [x] **Effects workbench: edge fade and per-frame alignment**: some sheets are
+      painted to the edge of their frame and end in a hard straight cut, so
+      `feather` fades the outer band of a drawn sprite to nothing over that
+      fraction of its radius (built in a scratch canvas, radial gradient
+      composited `destination-in`) — a "Fade edges" checkbox with a feather
+      slider. And a strip of every frame sits under the sheet viewer: clicking
+      one holds the viewer on it and opens Across / Down nudges (drag on the
+      viewer works too), which move where that frame is DRAWN — never where it
+      is cut, so a nudge can never pull in a neighbouring frame. Both ride in
+      the same table the game reads and both export in rigs.json under
+      `effects` (`feather`, `offsets: [[dx, dy], …]`)
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

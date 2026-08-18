@@ -158,6 +158,42 @@
     return l;
   }
 
+  // ---------------------------------------------------------------- feather
+  // Some sheets are drawn right up to the edge of their frame, so the art ends
+  // in a hard straight cut. `feather` fades the outer band of the drawn sprite
+  // to nothing over that fraction of its radius, which turns the cut into a
+  // soft edge without touching the file. Built in a scratch canvas: the frame
+  // is drawn, then a radial gradient is composited `destination-in` over it.
+  let scratch = null, scratchCtx = null;
+  function feathered(img, box, w, h, feather) {
+    const cw = Math.max(1, Math.ceil(w)), chh = Math.max(1, Math.ceil(h));
+    if (!scratch) {
+      scratch = document.createElement("canvas");
+      scratchCtx = scratch.getContext("2d");
+    }
+    if (scratch.width < cw || scratch.height < chh) {
+      scratch.width = Math.max(scratch.width, cw);
+      scratch.height = Math.max(scratch.height, chh);
+    }
+    const c = scratchCtx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = "source-over";
+    c.clearRect(0, 0, scratch.width, scratch.height);
+    c.drawImage(img, box.sx, 0, box.sw, img.height, 0, 0, w, h);
+    const R = Math.max(w, h) / 2;
+    const inner = Math.max(0, R * (1 - Math.max(0.01, Math.min(0.95, feather))));
+    const g = c.createRadialGradient(w / 2, h / 2, inner, w / 2, h / 2, R);
+    g.addColorStop(0, "rgba(0,0,0,1)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    c.globalCompositeOperation = "destination-in";
+    c.fillStyle = g;
+    // an ellipse rather than a square wipe: the corners of a wide frame should
+    // go too, or the fade leaves them standing
+    c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = "source-over";
+    return { canvas: scratch, w: cw, h: chh };
+  }
+
   // One frame of a sheet, centred on (x, y), `u` running 0→1 across the strip.
   function draw(ctx, name, x, y, size, u = 0, opts = {}) {
     const img = image(name);
@@ -172,12 +208,22 @@
     const k = (size * (t.scale || 1)) / (n > 1 ? cell : img.width);
     const w = box.sw * k;
     const h = img.height * k;
+    // A per-frame nudge, in source pixels, for a strip whose stages are not
+    // drawn about the same point. It moves where the frame LANDS, not where it
+    // is cut from, so it can never pull in a neighbour.
+    const off = (t.offsets && t.offsets[frame]) || null;
     ctx.save();
     ctx.globalAlpha = Math.max(0, Math.min(1, opts.alpha === undefined ? 1 : opts.alpha));
     ctx.translate(x, y);
     const spin = (opts.rot || 0) + (t.rotation || 0) * Math.PI / 180;
     if (spin) ctx.rotate(spin);
-    ctx.drawImage(img, box.sx, 0, box.sw, img.height, -w / 2, -h / 2, w, h);
+    if (off) ctx.translate((off[0] || 0) * k, (off[1] || 0) * k);
+    if (t.feather > 0) {
+      const soft = feathered(img, box, w, h, t.feather);
+      ctx.drawImage(soft.canvas, 0, 0, soft.w, soft.h, -w / 2, -h / 2, w, h);
+    } else {
+      ctx.drawImage(img, box.sx, 0, box.sw, img.height, -w / 2, -h / 2, w, h);
+    }
     ctx.restore();
     return true;
   }

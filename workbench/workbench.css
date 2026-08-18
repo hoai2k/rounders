@@ -237,3 +237,23 @@ button:disabled:hover { border-color: var(--line); }
 .tile.fx canvas { background: repeating-conic-gradient(#1a1d27 0% 25%, #151821 0% 50%) 50% / 14px 14px; }
 .tile.fx .nm { font-size: 10px; }
 .tile.missing { opacity: 0.45; }
+
+.fxFrames { display: flex; flex-wrap: wrap; gap: 6px; }
+.fxFrames button {
+  position: relative;
+  padding: 3px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  line-height: 0;
+}
+.fxFrames button:hover { border-color: var(--accent2); }
+.fxFrames button.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.fxFrames button canvas { display: block; width: 76px; height: 76px; }
+.fxFrames button b {
+  position: absolute; top: 2px; left: 4px;
+  font-size: 9px; line-height: 1; color: var(--muted); font-weight: 700;
+}
+.fxFrames button.moved b { color: var(--accent); }
+.fxFrames .play { align-self: stretch; padding: 0 12px; font-size: 12px; color: var(--ink); line-height: 76px; }

@@ -1715,7 +1715,7 @@
     "lemonade": "lemonade-stand"
   };
 
-  const fxState = { name: null, sim: null, t: 0 };
+  const fxState = { name: null, sim: null, t: 0, frame: -1 };   // frame -1 = play the strip
   const FX_DEFAULT = { scale: 1, rotation: 0 };
   const fxDirty = new Set();
 
@@ -1773,6 +1773,7 @@
   function selectFx(name) {
     if (!name || !fxNames().includes(name)) return;
     fxState.name = name;
+    fxState.frame = -1;
     if (fxState.sim) { fxState.sim.stop(); fxState.sim = null; }
     const cardId = FX_CARD[name];
     const card = cardId && window.ROUNDERS.CARDS.find((c) => c.id === cardId);
@@ -1783,6 +1784,7 @@
     $("charName").textContent = name;
     $("charInfo").textContent = cardId ? `drawn by ${cardId}` : "not drawn by anything today";
     $("fxPreviewInfo").textContent = cardId ? `${cardId} — the preview the card workbench runs` : "no card uses this sheet";
+    buildFxFrames();
     syncFxPanel();
     refreshFxTiles();
     writeUrl();
@@ -1796,8 +1798,24 @@
     $("fxScaleOut").textContent = `${(t.scale ?? 1).toFixed(2)}x`;
     $("fxRot").value = t.rotation || 0;
     $("fxRotOut").textContent = `${Math.round(t.rotation || 0)}°`;
-    const img = FX.image(name);
+    const fade = (t.feather || 0) > 0;
+    $("fxFade").checked = fade;
+    $("fxFeather").disabled = !fade;
+    $("fxFeather").value = fade ? t.feather : 0.2;
+    $("fxFeatherOut").textContent = fade ? `${Math.round(t.feather * 100)}%` : "off";
+    // the frame nudge panel only means anything on a held frame of a strip
     const n = FX.frames(name);
+    const held = n > 1 && fxState.frame >= 0;
+    $("fxFramePanel").hidden = !held;
+    if (held) {
+      const off = (t.offsets && t.offsets[fxState.frame]) || [0, 0];
+      $("fxFrameWhich").textContent = `${fxState.frame + 1} of ${n}`;
+      $("fxFrameX").value = off[0] || 0;
+      $("fxFrameXOut").textContent = `${Math.round(off[0] || 0)}px`;
+      $("fxFrameY").value = off[1] || 0;
+      $("fxFrameYOut").textContent = `${Math.round(off[1] || 0)}px`;
+    }
+    const img = FX.image(name);
     const cut = n > 1 && FX.boxes(name);
     // For a strip, say whether the frames were found in the art or fell back
     // to even cells — an off-grid sheet is the usual cause of a jumpy effect.
@@ -1808,8 +1826,67 @@
       ? `${img.width}x${img.height}${n > 1 ? ` · ${n} frames${cutNote}` : ""}`
       : "missing — assets/images/fx/" + name + ".png";
     $("fxNote").textContent = FX_CARD[name]
-      ? "Size and rotation ride on top of whatever the engine asks for, and are exported in rigs.json."
+      ? "Size, rotation, edge fade and any per-frame nudges ride on top of whatever the engine asks for, and are exported in rigs.json."
       : "Nothing draws this sheet today; the engine kept its own version. Trim is still exported.";
+  }
+
+  // Every frame of a strip, side by side. Clicking one holds the sheet viewer
+  // on it so it can be nudged into line with its neighbours; the first chip
+  // hands the animation back.
+  function buildFxFrames() {
+    const wrap = $("fxFrames");
+    const row = $("fxFramesRow");
+    const name = fxState.name;
+    const n = name && FX ? FX.frames(name) : 1;
+    row.hidden = n < 2;
+    wrap.textContent = "";
+    if (n < 2) return;
+    const play = document.createElement("button");
+    play.className = "play" + (fxState.frame < 0 ? " on" : "");
+    play.textContent = "▶ play";
+    play.addEventListener("click", () => holdFrame(-1));
+    wrap.appendChild(play);
+    for (let f = 0; f < n; f += 1) {
+      const b = document.createElement("button");
+      b.dataset.frame = String(f);
+      const cv = document.createElement("canvas");
+      cv.width = 152; cv.height = 152;
+      const tag = document.createElement("b");
+      tag.textContent = String(f + 1);
+      b.append(cv, tag);
+      b.addEventListener("click", () => holdFrame(f));
+      wrap.appendChild(b);
+    }
+    paintFxFrames();
+  }
+
+  function paintFxFrames() {
+    const name = fxState.name;
+    if (!name || !FX) return;
+    const n = FX.frames(name);
+    if (n < 2) return;
+    const t = FX.tune(name);
+    for (const b of $("fxFrames").querySelectorAll("button[data-frame]")) {
+      const f = Number(b.dataset.frame);
+      const off = (t.offsets && t.offsets[f]) || null;
+      b.classList.toggle("on", f === fxState.frame);
+      b.classList.toggle("moved", Boolean(off && (off[0] || off[1])));
+      const cv = b.querySelector("canvas");
+      const c = cv.getContext("2d");
+      c.clearRect(0, 0, cv.width, cv.height);
+      c.strokeStyle = "rgba(255,255,255,0.12)";
+      c.beginPath(); c.moveTo(cv.width / 2, 0); c.lineTo(cv.width / 2, cv.height); c.stroke();
+      c.beginPath(); c.moveTo(0, cv.height / 2); c.lineTo(cv.width, cv.height / 2); c.stroke();
+      FX.draw(c, name, cv.width / 2, cv.height / 2, cv.width * 0.82, (f + 0.5) / n);
+    }
+    const play = $("fxFrames").querySelector(".play");
+    if (play) play.classList.toggle("on", fxState.frame < 0);
+  }
+
+  function holdFrame(f) {
+    fxState.frame = f;
+    paintFxFrames();
+    syncFxPanel();
   }
 
   // The sheet on its own: framed, at the trim, cycling if it is a strip.
@@ -1834,7 +1911,15 @@
     // trim, so the slider reads as "bigger / smaller than the engine asked"
     const fit = Math.min(cv.width * 0.7 / fw, cv.height * 0.8 / img.height);
     const size = fw * fit;
-    FX.draw(c, name, cv.width / 2, cv.height / 2, size, n > 1 ? (fxState.t * 0.8) % 1 : 0);
+    // a held frame stays put so it can be lined up; otherwise the strip plays
+    const u = n > 1
+      ? (fxState.frame >= 0 ? (fxState.frame + 0.5) / n : (fxState.t * 0.8) % 1)
+      : 0;
+    // crosshair, so a nudge has something to be judged against
+    c.strokeStyle = "rgba(255,255,255,0.14)";
+    c.beginPath(); c.moveTo(cv.width / 2, 0); c.lineTo(cv.width / 2, cv.height); c.stroke();
+    c.beginPath(); c.moveTo(0, cv.height / 2); c.lineTo(cv.width, cv.height / 2); c.stroke();
+    FX.draw(c, name, cv.width / 2, cv.height / 2, size, u);
     // a faint outline of the untrimmed footprint, so a scale change is legible
     const base = FX.tune(name).scale || 1;
     if (Math.abs(base - 1) > 0.001) {
@@ -1881,12 +1966,32 @@
   $("rosterMode").addEventListener("change", (e) => setSection(e.target.value));
   liveFxField($("fxScale"), (v) => ({ scale: v }), (v) => `${v.toFixed(2)}x`);
   liveFxField($("fxRot"), (v) => ({ rotation: v }), (v) => `${Math.round(v)}°`);
+  liveFxField($("fxFeather"), (v) => ({ feather: v }), (v) => `${Math.round(v * 100)}%`);
+  $("fxFade").addEventListener("change", (e) => {
+    if (!fxState.name) return;
+    const on = e.target.checked;
+    FX.setTune(fxState.name, { feather: on ? Number($("fxFeather").value) || 0.2 : 0 });
+    fxDirty.add(fxState.name);
+    syncFxPanel();
+    refreshFxTiles();
+    paintFxFrames();
+  });
   $("fxReset").addEventListener("click", () => {
     if (!fxState.name) return;
-    FX.setTune(fxState.name, { ...FX_DEFAULT });
+    const t = FX.tune(fxState.name);
+    delete t.offsets;
+    FX.setTune(fxState.name, { ...FX_DEFAULT, feather: 0 });
     fxDirty.delete(fxState.name);
     syncFxPanel();
     refreshFxTiles();
+    paintFxFrames();
+  });
+  liveFxFrameField($("fxFrameX"), 0);
+  liveFxFrameField($("fxFrameY"), 1);
+  $("fxFrameReset").addEventListener("click", () => {
+    if (!fxState.name || fxState.frame < 0) return;
+    setFrameOffset(fxState.frame, 0, 0);
+    syncFxPanel();
   });
 
   function liveFxField(input, patch, fmt) {
@@ -1899,7 +2004,67 @@
       fxDirty.add(fxState.name);
       if (out) out.textContent = fmt(v);
       refreshFxTiles();
+      paintFxFrames();
     });
+  }
+
+  // The nudge is stored per frame, as a whole array so a partly-filled one
+  // still exports cleanly.
+  function setFrameOffset(frame, dx, dy) {
+    const name = fxState.name;
+    if (!name) return;
+    const t = FX.tune(name);
+    const n = FX.frames(name);
+    const offsets = (t.offsets || []).slice();
+    while (offsets.length < n) offsets.push([0, 0]);
+    offsets[frame] = [Math.round(dx), Math.round(dy)];
+    FX.setTune(name, { offsets });
+    fxDirty.add(name);
+    refreshFxTiles();
+    paintFxFrames();
+  }
+
+  function liveFxFrameField(input, axis) {
+    if (!input) return;
+    const out = $(input.id + "Out");
+    input.addEventListener("input", () => {
+      if (!fxState.name || fxState.frame < 0) return;
+      const t = FX.tune(fxState.name);
+      const cur = (t.offsets && t.offsets[fxState.frame]) || [0, 0];
+      const v = Number(input.value);
+      setFrameOffset(fxState.frame, axis === 0 ? v : cur[0] || 0, axis === 1 ? v : cur[1] || 0);
+      if (out) out.textContent = `${Math.round(v)}px`;
+    });
+  }
+
+  // Dragging on the sheet viewer nudges the held frame, which is quicker than
+  // the sliders when you are matching one stage to the next.
+  {
+    const cv = $("fxSprite");
+    let drag = null;
+    cv.addEventListener("pointerdown", (e) => {
+      if (!fxState.name || fxState.frame < 0) return;
+      const t = FX.tune(fxState.name);
+      const off = (t.offsets && t.offsets[fxState.frame]) || [0, 0];
+      drag = { x: e.clientX, y: e.clientY, ox: off[0] || 0, oy: off[1] || 0 };
+      cv.setPointerCapture(e.pointerId);
+    });
+    cv.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      // the viewer is drawn at a fit-to-box scale; convert screen px back to
+      // source px so the slider and the drag speak the same units
+      const img = FX.image(fxState.name);
+      const n = FX.frames(fxState.name);
+      const fw = img.width / n;
+      const box = cv.getBoundingClientRect();
+      const shown = Math.min(cv.width * 0.7 / fw, cv.height * 0.8 / img.height) * (box.width / cv.width);
+      const k = shown || 1;
+      setFrameOffset(fxState.frame, drag.ox + (e.clientX - drag.x) / k, drag.oy + (e.clientY - drag.y) / k);
+      syncFxPanel();
+    });
+    const end = () => { drag = null; };
+    cv.addEventListener("pointerup", end);
+    cv.addEventListener("pointercancel", end);
   }
 
   // Only the sheets that have actually been moved off their defaults.
@@ -1910,6 +2075,10 @@
       const e = {};
       if (Math.abs((t.scale ?? 1) - 1) > 0.001) e.scale = Number((t.scale).toFixed(3));
       if (Math.round(t.rotation || 0) !== 0) e.rotation = Math.round(t.rotation);
+      if (t.feather > 0) e.feather = Number(t.feather.toFixed(3));
+      if (t.offsets && t.offsets.some((o) => o && (o[0] || o[1]))) {
+        e.offsets = t.offsets.map((o) => [Math.round((o && o[0]) || 0), Math.round((o && o[1]) || 0)]);
+      }
       if (Object.keys(e).length) out[name] = e;
     }
     return out;

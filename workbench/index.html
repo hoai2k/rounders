@@ -73,6 +73,10 @@
             <h3>The sheet <span id="fxSpriteInfo" class="muted"></span></h3>
             <canvas id="fxSprite" width="520" height="300"></canvas>
           </div>
+          <div class="fxRow" id="fxFramesRow" hidden>
+            <h3>Frames <span class="muted">click one to hold and nudge it</span></h3>
+            <div id="fxFrames" class="fxFrames"></div>
+          </div>
           <div class="fxRow">
             <h3>In play <span id="fxPreviewInfo" class="muted"></span></h3>
             <canvas id="fxPreview" width="720" height="320"></canvas>
@@ -96,8 +100,17 @@
           <h2>Effect</h2>
           <label class="row">Size <input id="fxScale" type="range" min="0.2" max="3" step="0.01" value="1" /><output id="fxScaleOut"></output></label>
           <label class="row">Rotation <input id="fxRot" type="range" min="-180" max="180" step="1" value="0" /><output id="fxRotOut"></output></label>
+          <label class="check"><input id="fxFade" type="checkbox" /> Fade edges</label>
+          <label class="row">Feather <input id="fxFeather" type="range" min="0.02" max="0.8" step="0.01" value="0.2" disabled /><output id="fxFeatherOut"></output></label>
           <button id="fxReset" class="ghost wide">Reset this effect</button>
           <p class="muted" id="fxNote"></p>
+        </div>
+        <div id="fxFramePanel" class="panel" hidden>
+          <h2>Frame <span id="fxFrameWhich" class="muted"></span></h2>
+          <p class="muted">Nudge a single frame so the stages of the animation line up. This moves where the frame is DRAWN — the cut between frames does not change.</p>
+          <label class="row">Across <input id="fxFrameX" type="range" min="-120" max="120" step="1" value="0" /><output id="fxFrameXOut"></output></label>
+          <label class="row">Down <input id="fxFrameY" type="range" min="-120" max="120" step="1" value="0" /><output id="fxFrameYOut"></output></label>
+          <button id="fxFrameReset" class="ghost wide">Centre this frame</button>
         </div>
         <div id="selPanel" class="panel" hidden></div>
         <div class="panel">

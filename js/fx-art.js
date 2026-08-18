@@ -8,6 +8,12 @@
 // scale     1 = draw at the size the engine asked for
 // rotation  degrees, added to whatever spin the engine gives it
 // frames    strip length for a sheet; 1 (the default) is a single image
+// feather   0 = off. Otherwise the fraction of the sprite's radius over which
+//           it fades to nothing at the outer edge — for art that runs to the
+//           edge of its frame and ends in a hard straight cut
+// offsets   per-frame [dx, dy] in SOURCE pixels, nudging where a frame lands
+//           so a strip's stages line up. It moves the drawing, never the cut
+// centres   per-frame x in source pixels, overriding where the strip is cut
 (() => {
   "use strict";
   window.ROUNDERS = window.ROUNDERS || {};

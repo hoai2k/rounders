@@ -252,7 +252,7 @@
       aimX: i % 2 === 0 ? 1 : -1, aimY: 0,
       hp: 100, score: 0, alive: true,
       grounded: false, groundPlatform: null, jumpsLeft: 1,
-      wallDir: 0, wallTimer: 0, wallCooldown: 0,
+      wallDir: 0, wallTimer: 0, wallCooldown: 0, botWallClimb: 0, wallJumps: 0,
       ammo: 3, reloadTimer: 0, fireTimer: 0,
       blockTimer: 0, blockCooldown: 0, echoTimer: 0,
       activeCooldown: 0, teleWasInside: false, rewindLeft: REWIND_MAX,
@@ -1300,6 +1300,30 @@
       input.jump = true;
       p.botJumpLock = 0.35 + Math.random() * 0.25;
     }
+    // --- walls are a staircase, not a dead end -------------------------------
+    // Bots knew how to jump AT a wall but not off one, so a fighter parked on a
+    // ledge was unreachable and a bot knocked into a shaft rode it all the way
+    // down. Touching a wall in mid-air is now a move: kick off it, then steer
+    // straight back into it so the next kick can be chained into a climb.
+    const noFloorBelow = !botGroundAhead(p, 0);
+    const wantsHeight = dy < -60 || noFloorBelow;
+    if (!p.grounded && p.wallTimer > 0 && wantsHeight) {
+      if (p.wallCooldown <= 0 && p.botJumpLock <= 0) {
+        input.jump = true;
+        // a short lock, so a climb can be chained rather than waiting out the
+        // full hop cooldown between kicks
+        p.botJumpLock = 0.16;
+        p.botWallClimb = 0.3;
+      } else {
+        input.move = -p.wallDir || input.move;      // hug it, keep the contact
+      }
+    }
+    // after a kick the wall throws you AWAY from it; steer back for the next one
+    if ((p.botWallClimb || 0) > 0) {
+      p.botWallClimb = Math.max(0, p.botWallClimb - 1 / 60);
+      if (wantsHeight && p.wallDir) input.move = -p.wallDir;
+    }
+
     const aimDot = (dx / distance) * input.aimX + (dy / distance) * input.aimY;
     input.shoot = distance < 980 && aimDot > 0.72 && p.reloadTimer <= 0 && Math.random() < skill.shoot;
     input.block = botThreatened(p) && Math.random() < skill.block;
@@ -2213,6 +2237,7 @@
           // deliberately small enough that air control gets you back in ~0.15s.
           p.vy = -p.stats.jump * 0.92 * chillJump;
           p.vx = p.wallDir * WALL_JUMP_PUSH;
+          p.wallJumps = (p.wallJumps || 0) + 1;
           p.wallTimer = 0;
           p.wallCooldown = 0.14;
           p.grounded = false;

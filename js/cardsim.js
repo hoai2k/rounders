@@ -229,7 +229,7 @@
     };
 
     if (on("holePunch")) { plan.wall = "thin"; watch.push("each impact blows a permanent hole in the pillar — later shots fly through it"); }
-    else if (on("wallPierce")) { plan.wall = "thin"; watch.push("the shot bores clean through the pillar"); }
+    else if (on("wallPierce")) { plan.wall = "thick"; watch.push("the shot bores clean through the pillar, however thick it is"); }
     else if (on("pierce")) { plan.secondTarget = true; watch.push("one bullet passes through the first fighter into the second"); }
     // a skip shot off the floor: reliable to stage, and it reads as a bounce
     // far better than a bank off a floating slab, which lands anywhere
@@ -413,6 +413,9 @@
       const list = [{ x: -40, y: GROUND, w: W + 80, h: 90, ground: true }];
       // Breakthrough's pillar is chunky, so a bored hole is unmistakable
       if (plan.wall === "thin") list.push({ x: 336, y: 118, w: plan.stats.holePunch ? 92 : 26, h: GROUND - 118, holes: pillarHoles });
+      // Drill Rounds get a FAT pillar, since the whole point of the card is
+      // that thickness has stopped mattering
+      if (plan.wall === "thick") list.push({ x: 320, y: 118, w: 84, h: GROUND - 118, holes: pillarHoles });
       if (plan.wall === "bounce") list.push({ x: 360, y: 60, w: 30, h: 120 });
       // a slab BEHIND the target, clear of the flight path, so a chain bolt has
       // something real to earth itself on where you can watch it happen
@@ -772,7 +775,7 @@
           damage: st.damage * (1 + rageMul) * mul * (golden ? (st.pellets > 1 ? 2 : 3) : 1) * (empower ? 1 + 0.75 * empower : 1),
           gravity: (st.helium ? -st.bulletGravity * 0.35 : st.bulletGravity * (st.homing ? 0.4 : 1)) * SCALE,
           life: 3.4, bounces: st.bounces, pierce: st.pierce,
-          wallPierce: st.wallPierce ? 70 + 50 * (st.wallPierce - 1) : 0,
+          wallPierce: st.wallPierce,      // walls it may bore through, any thickness
           holePunch: st.holePunch,
           homing: st.homing, steer: st.steer, grow: st.grow, groundHug: st.groundHug,
           glass: st.glass,
@@ -1415,17 +1418,21 @@
             continue;
           }
           if (b.wallPierce > 0 && !w.ground) {
-            // Drill Rounds: bore straight through, spending thickness
+            // Drill Rounds: straight through, whatever it is made of and
+            // however thick it is, spending one of the round's holes. The
+            // reach comes from the wall itself, so thickness never decides it.
             const mag = Math.hypot(b.vx, b.vy) || 1;
             const dx = b.vx / mag, dy = b.vy / mag;
+            const reach = Math.hypot(w.w, w.h) + b.r * 4 + 40;
             let x = b.x, y = b.y, dist = 0, out = false;
-            while (dist < b.wallPierce) {
+            while (dist < reach) {
               x += dx * 3; y += dy * 3; dist += 3;
               if (!hitRect(x, y, b.r, w)) { out = true; break; }
             }
             if (out) {
               b.x = x + dx * 2; b.y = y + dy * 2;
-              b.wallPierce -= dist;
+              b.vy += (b.gravity || 0) * (dist / mag);   // the drop it missed inside
+              b.wallPierce -= 1;
               puff(b.x, b.y, "#e8e2d4", 6, 130);
               continue;
             }

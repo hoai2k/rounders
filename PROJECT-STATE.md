@@ -607,6 +607,17 @@ Pillars:
       re-anchors the cursor, so buttons that appear are usable at once instead
       of after closing and reopening Settings. Measured cursor path: mode row
       -> All -> None -> Invert -> the grid -> rarity sliders
+- [x] **Drill Rounds go through anything, once**: the drill budget was a
+      THICKNESS in pixels (70px, +50 a stack), so a fat pillar simply ate the
+      round and a breakable panel or a crate was never drillable at all — those
+      materials were handled before the drill check. It is now a COUNT of holes
+      — one per copy of the card — and the walk across a solid is bounded by
+      that solid's own diagonal, so stone, breakable panel and crate all give
+      way regardless of size. The round is handed back the drop it would have
+      taken while crossing, or a thick wall would flatten its arc. Measured
+      through a 130x334 stone tower, a 220x24 breakable shelf and a 54px crate:
+      each drilled through, came out the far side, and left the round with no
+      holes to spare
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

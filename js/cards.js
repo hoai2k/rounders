@@ -243,8 +243,8 @@
 
     card("drill-rounds", "Drill Rounds", "rare",
       "Through, not around.",
-      "Bullets bore through walls and floors and keep flying, so cover stops working.",
-      ["bullets drill through walls", "−12% damage"], ["projectile"],
+      "Bullets bore clean through one piece of terrain — any thickness, any material — and fly on.",
+      ["through 1 wall per shot", "−12% damage"], ["projectile"],
       p => { p.stats.wallPierce += 1; p.stats.damage *= 0.88; }),
 
     card("thorn-jacket", "Thorn Jacket", "rare",

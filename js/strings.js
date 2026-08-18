@@ -38,8 +38,9 @@
       slotBot: "Bot",
       botRemove: "✕ remove",
 
-      // second line on every empty slot except the first
+      // second line on every empty slot except the first (hidden in co-op)
       slotBotPrompt: "(Y to add bot)",
+      slotEvil: "Evil Bot",
 
       // appears once two or more fighters are in
       startMatch: "Start Match",
@@ -76,11 +77,10 @@
       groupFeel: "Feel",
       arena: "Arena",
       arenaRandom: "🎲 Random every round",
-      maxPlayers: "Max Players",
-      scoreLimit: "Score to Win",
+      scoreLimit: "Rounds to Win",
       draftCount: "Cards Per Draft",
       botDifficulty: "Bot Difficulty",
-      hazards: "Arena Hazards",
+      coop: "Cooperative Mode",
       proceduralCharacters: "Use Procedural Characters",
       haptics: "Controller Haptics",
       screenShake: "Screen Shake",
@@ -96,13 +96,10 @@
       difficultyHard: "Hard",
       back: "Back",
 
-      // ---- Choose Cards (card pool mode + the card grid)
-      cardModeDefault: "Default",
-      cardModeEqualize: "Equalize",
-      cardModeChoose: "Choose",
-      cardNoteDefault: "Every card is in, drafted at the rarity rates below.",
-      cardNoteEqualize: "Every card is in and equally likely — rarity rates are ignored.",
-      cardNoteChoose: "Only the cards you leave lit can be drafted, at the rarity rates below.",
+      // ---- Choose Cards (the button row + the card grid window)
+      chooseCards: "Choose Cards…",
+      reset: "Reset",
+      cardsTitle: "Choose Cards",
       cardCount: "{on} of {total} cards enabled",
       cardNoneWarning: "Nothing is enabled — drafts fall back to the full set.",
       cardsAll: "All",
@@ -179,13 +176,20 @@
     round: {
       kicker: "Round {number}",
       winner: "{name} wins the round",
+      winnerTeam: "{team} win the round",
+      teamPlayers: "The Players",
+      teamEvil: "The Evil Bots",
       subSolo: "{name} drafts a new power…",
       subMulti: "The fallen draft new powers…",
       subTwo: "The two furthest behind draft new powers…",
+      subEvil: "The Evil Bots grow stronger…",
       ready: "READY",
       fight: "FIGHT!",
       matchWon: "{name} takes the match! Enter / Start for rematch.",
+      matchWonTeam: "{team} take the match! Enter / Start for rematch.",
+      victory: "VICTORY",
       championName: "{name} WINS",
+      championTeam: "{team} WIN",
       championSub: "Champion of the arena — Enter / Start for a rematch",
       nobodySurvived: "Nobody survived. Rerolling the arena…"
     },

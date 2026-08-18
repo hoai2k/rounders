@@ -281,36 +281,48 @@ button.primary:hover, button.primary.controller-focus {
 .settings-panel .r-mythic { color: var(--mythic); }
 
 /* ------------------------------------------------------------ choose cards */
-/* Default / Equalize / Choose, as a segmented control above the card grid. */
-.card-mode {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 4px 0 10px;
+/* One button opens the card window; Reset beside it relights everything. */
+.settings-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin: 4px 0 8px;
 }
 
-.card-mode button {
-  padding: 11px 10px;
-  font-size: 15px;
+.settings-actions #cardsOpen { flex: 1; }
+
+.reset-btn {
+  padding: 10px 18px;
+  font-size: 13px;
   border-radius: 12px;
 }
 
-.card-mode button.on {
-  background: linear-gradient(120deg, var(--coral), #b45cff);
-  border-color: transparent;
-  box-shadow: 0 6px 20px rgba(255, 61, 132, 0.38);
+button.reset-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
 }
 
-.card-mode button.on.controller-focus { box-shadow: 0 10px 26px rgba(255, 61, 132, 0.55), 0 0 0 2px #fff; }
+/* a group heading with an action riding its right edge */
+.settings-group.group-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-group.group-row .reset-btn {
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--paper);
+}
 
 .card-note {
   margin: 0 0 10px;
   font-size: 13px;
   color: rgba(245, 242, 255, 0.66);
 }
-
-/* The rarity sliders stop mattering in Equalize, so they read as switched off. */
-#rarityGroup.muted { opacity: 0.42; }
 
 .card-picker-bar {
   display: flex;
@@ -1558,3 +1570,24 @@ h1.title-logo .logo-img {
 }
 .cycler:focus-within .cyc-arrow,
 .cycler:hover .cyc-arrow { opacity: 1; color: var(--accent, #ff4d8f); }
+
+/* ------------------------------------------------------ choose cards window */
+.cards-panel { width: min(1120px, calc(100vw - 32px)); }
+
+/* --------------------------------------------------- lobby: editable bots */
+/* A bot slot the menu cursor can land on to re-pick its fighter. */
+.join-slot.bot-editable { cursor: pointer; }
+
+.join-slot.bot-editable.controller-focus {
+  border-color: var(--paper);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55),
+    0 0 34px color-mix(in srgb, var(--pcol) 55%, transparent);
+  transform: translateY(-3px);
+}
+
+/* mid-edit: uncommitted, choosing again */
+.join-slot.editing {
+  border-color: var(--lemon);
+  box-shadow: 0 0 0 3px rgba(255, 216, 77, 0.5),
+    0 0 34px color-mix(in srgb, var(--pcol) 45%, transparent);
+}

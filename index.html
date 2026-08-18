@@ -10,8 +10,8 @@
     <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon/favicon-64.png">
     <link rel="icon" type="image/png" sizes="256x256" href="assets/favicon/favicon-256.png">
     <link rel="apple-touch-icon" sizes="512x512" href="assets/favicon/favicon-512.png">
-<link rel="stylesheet" href="scrollbars.css?v=31">
-    <link rel="stylesheet" href="styles.css?v=31">
+<link rel="stylesheet" href="scrollbars.css?v=32">
+    <link rel="stylesheet" href="styles.css?v=32">
   </head>
   <body>
     <canvas id="game" aria-label="Rounders game canvas"></canvas>
@@ -50,11 +50,6 @@
         </span>
       </label>
       <label>
-        <span data-str="settings.maxPlayers"></span>
-        <input id="playerCount" type="range" min="2" max="4" value="4">
-        <span id="playerCountValue">4</span>
-      </label>
-      <label>
         <span data-str="settings.scoreLimit"></span>
         <input id="scoreLimit" type="range" min="3" max="10" value="5">
         <span id="scoreLimitValue">5</span>
@@ -70,32 +65,20 @@
         <span id="botDifficultyValue">Normal</span>
       </label>
       <label>
-        <span data-str="settings.hazards"></span>
-        <input id="hazards" type="checkbox" checked>
+        <span data-str="settings.coop"></span>
+        <input id="coopMode" type="checkbox">
       </label>
 
       <h3 class="settings-group" data-str="settings.groupCards"></h3>
-      <div class="card-mode" id="cardMode" role="group">
-        <button type="button" data-mode="default" data-str="settings.cardModeDefault"></button>
-        <button type="button" data-mode="equalize" data-str="settings.cardModeEqualize"></button>
-        <button type="button" data-mode="choose" data-str="settings.cardModeChoose"></button>
+      <div class="settings-actions">
+        <button type="button" id="cardsOpen" data-str="settings.chooseCards"></button>
+        <button type="button" id="cardsReset" class="reset-btn" data-str="settings.reset" disabled></button>
       </div>
-      <p class="card-note" id="cardModeNote"></p>
-
-      <div id="cardPicker" class="card-picker hidden">
-        <div class="card-picker-bar">
-          <span class="card-count" id="cardCount"></span>
-          <button type="button" id="cardsAll" data-str="settings.cardsAll"></button>
-          <button type="button" id="cardsNone" data-str="settings.cardsNone"></button>
-          <button type="button" id="cardsInvert" data-str="settings.cardsInvert"></button>
-        </div>
-        <p class="card-hint" data-str-html="settings.cardPickerHintHtml"></p>
-        <div id="cardGrid" class="card-grid"></div>
-        <p class="card-detail" id="cardDetail"></p>
-      </div>
+      <p class="card-note" id="cardsSummary"></p>
 
       <div id="rarityGroup">
-      <h3 class="settings-group" data-str="settings.groupRarity"></h3>
+      <h3 class="settings-group group-row"><span data-str="settings.groupRarity"></span>
+        <button type="button" id="rarityReset" class="reset-btn" data-str="settings.reset" disabled></button></h3>
       <label class="r-common">
         <span data-str="settings.common"></span>
         <input id="commonWeight" type="range" min="0" max="20" value="9">
@@ -151,6 +134,24 @@
 
       <div class="menu-grid">
         <button id="settingsBack" data-str="settings.back"></button>
+      </div>
+    </section>
+
+    <section id="cardsPanel" class="panel cards-panel hidden">
+      <h2 data-str="settings.cardsTitle"></h2>
+      <div id="cardPicker" class="card-picker">
+        <div class="card-picker-bar">
+          <span class="card-count" id="cardCount"></span>
+          <button type="button" id="cardsAll" data-str="settings.cardsAll"></button>
+          <button type="button" id="cardsNone" data-str="settings.cardsNone"></button>
+          <button type="button" id="cardsInvert" data-str="settings.cardsInvert"></button>
+        </div>
+        <p class="card-hint" data-str-html="settings.cardPickerHintHtml"></p>
+        <div id="cardGrid" class="card-grid"></div>
+        <p class="card-detail" id="cardDetail"></p>
+      </div>
+      <div class="menu-grid">
+        <button id="cardsBack" data-str="settings.back"></button>
       </div>
     </section>
 
@@ -329,16 +330,16 @@
       <button id="musicNext" type="button" class="np-btn" title="Next track" aria-label="Next track">▶</button>
     </section>
 
-    <script src="js/strings.js?v=31"></script>
-    <script src="js/gameplay.js?v=31"></script>
-    <script src="js/cards.js?v=31"></script>
-    <script src="js/bullet-art.js?v=31"></script>
-    <script src="js/chroma.js?v=31"></script>
-    <script src="js/rig.js?v=31"></script>
-    <script src="js/characters.js?v=31"></script>
-    <script src="js/levels.js?v=31"></script>
-    <script src="js/music.js?v=31"></script>
-    <script src="js/arena-music.js?v=31"></script>
-    <script src="game.js?v=31"></script>
+    <script src="js/strings.js?v=32"></script>
+    <script src="js/gameplay.js?v=32"></script>
+    <script src="js/cards.js?v=32"></script>
+    <script src="js/bullet-art.js?v=32"></script>
+    <script src="js/chroma.js?v=32"></script>
+    <script src="js/rig.js?v=32"></script>
+    <script src="js/characters.js?v=32"></script>
+    <script src="js/levels.js?v=32"></script>
+    <script src="js/music.js?v=32"></script>
+    <script src="js/arena-music.js?v=32"></script>
+    <script src="game.js?v=32"></script>
   </body>
 </html>

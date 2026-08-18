@@ -788,7 +788,54 @@ Pillars:
 - [x] Full visual redesign: animated gradient menu, glassmorphism panels, rarity-glow
       cards, character-portrait HUD, arena intro banner with theme blurb
 - [x] Restructured settings (grouped sections, arena picker, rarity rates)
+- [x] **Settings pared down** (2026-08-18): Max Players gone (the board always
+      seats four), Arena Hazards gone (part of every arena), "Score to Win" is
+      now "Rounds to Win". Choose Cards is one button opening its own panel
+      (state `cards`, same grid + pad nav) with a Reset beside it that relights
+      everything — disabled when the pool is already whole. Card Rarity Rates
+      heading carries its own Reset, enabled only when a slider is off its
+      default. The Default/Equalize/Choose modes are gone: the pool is simply
+      "everything not switched off", at the rarity rates (equalize = set the
+      sliders equal)
+- [x] **Bot slots are editable from the lobby cursor**: move up from Start
+      Match onto any bot slot (they join `visibleControls()` as `.bot-editable`
+      articles), A uncommits it into choosing mode (lemon ring, ◀ ▶ arrows),
+      left/right walks the roster, A re-commits. Mouse: clicking the Evil Bot
+      cycles its fighter; clicking a plain bot slot still cycles the seat type
+- [x] **Real victory screen**: arena dims to 18%, spotlight in the winner's
+      colour, spaced-out VICTORY kicker, the winner(s) drawn huge on podium
+      glows with names beneath, title auto-shrinks to fit, confetti rain in
+      the winners' colours, final scores frozen in the margin cards
 - [x] Files: `index.html`, `styles.css`
+
+### 6b. Cooperative Mode (2026-08-18)
+- [x] Settings → Cooperative Mode checkbox (under Bot Difficulty). On: manual
+      bots leave the lobby, "(Y to add bot)" hints disappear and Y does
+      nothing, humans cap at 3, and the 4th cell is a pinned **Evil Bot** seat
+      (violet `#a64dff`, virtual `evilSlot`, never in `lobbySlots`) with a
+      random fighter that can be re-picked like any bot slot
+- [x] Start Match appears from 1 human in co-op; `startMatch` spawns one Evil
+      Bot copy per human (same fighter, `p.evil`, all violet), and collapses
+      teams to players=0 vs bots=1 (`p.team`; in FFA every fighter is their
+      own team, so nothing changes there)
+- [x] **Team combat rules**: `allied(a,b)` gates `hurt`/`hurtRaw` (no damage,
+      no shove), bullets/explosions/chain lightning/seekers/saws pass allies
+      by, bots never target or fear teammates. A planted singularity that
+      would chew its owner chews teammates too (`{friendly:true}`)
+- [x] **Team rounds**: round ends when one side remains; the healthiest
+      member carries it and the whole side scores. Splash reads "The
+      Players/Evil Bots win the round". The losing side drafts — every fallen
+      human at once, while the Evil squad is one mind: it draws ONE card and
+      the fling lands it in every copy, so the squad stays identical
+- [x] Round splash kicker counts completed rounds (`world.roundCount`) — team
+      scoring made the old sum-of-scores wrong
+- [x] **Early round call**: the moment every human is down (and none mid-
+      Phoenix-rebirth), the round ends instead of making people watch bots
+      finish — the healthiest bot standing takes it (FFA and co-op alike)
+- [x] Headless suites (scratchpad `coop/t1–t4`): settings shape, card window +
+      both resets, bot-slot editing, co-op lobby/Y/evil seat, 2-human → 2-copy
+      spawn, friendly-fire truth table, early call, shared squad draft, team
+      victory screen, FFA early call + solo victory + rematch
 
 ### 7. Audio & FX polish
 - [x] Kept: synth SFX, rumble

@@ -43,42 +43,38 @@
   const arenaName = document.getElementById("arenaName");
   const arenaTag = document.getElementById("arenaTag");
   const pausePanel = document.getElementById("pausePanel");
+  const cardsPanel = document.getElementById("cardsPanel");
 
   const settings = {
-    playerCount: 4,
+    playerCount: 4,       // the board always seats four
     botDifficulty: 2,
-    scoreLimit: 5,
+    scoreLimit: 5,        // shown as "Rounds to Win"
     draftCount: 4,
     levelChoice: -1, // -1 random
-    hazards: true,
+    hazards: true,        // hazards are part of every arena now
+    // Co-op: everyone who joins is one team against a squad of identical
+    // "Evil Bots" — one copy per human, sharing a character and a build.
+    coop: false,
     proceduralCharacters: false,
     haptics: true,
     shake: true,
     music: true,
     musicVolume: 0.2,
     rarityWeights: Object.fromEntries(Object.entries(RARITIES).map(([k, v]) => [k, v.weight])),
-    // Choose Cards: which cards can be drafted, and how their odds are rolled.
-    //   default  — every card, weighted by the rarity rates below
-    //   equalize — every card, all equally likely (rarity rates ignored)
-    //   choose   — only the cards left enabled in the grid, rarity-weighted
-    cardMode: "default",
-    // Card ids the player has switched off. Kept whatever the mode is, so
-    // flipping to Default to see everything and back to Choose later finds the
-    // same selection waiting.
+    // Choose Cards: ids the player switched off in the card window. Drafts
+    // offer everything else, weighted by the rarity rates.
     disabledCards: new Set()
   };
 
   // Only the Choose Cards state persists — it is the one setting a player builds
   // up over sessions rather than dials in for a match.
   const CARD_PREF_KEY = "rounders.cards.v1";
-  const CARD_MODES = ["default", "equalize", "choose"];
 
   function loadCardPrefs() {
     try {
       const raw = localStorage.getItem(CARD_PREF_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw);
-      if (CARD_MODES.includes(saved.mode)) settings.cardMode = saved.mode;
       if (Array.isArray(saved.disabled)) {
         const known = new Set(CARDS.map(c => c.id));
         // ids from an older card set are dropped, so a renamed card comes back on
@@ -90,7 +86,6 @@
   function saveCardPrefs() {
     try {
       localStorage.setItem(CARD_PREF_KEY, JSON.stringify({
-        mode: settings.cardMode,
         disabled: [...settings.disabledCards]
       }));
     } catch { /* nothing to do but keep the choice for this session */ }
@@ -107,6 +102,9 @@
     musicDuck: 1,     // volume multiplier: 1 normal, DUCK.* while paused/drafting
     lockedThisFrame: false,
     winner: null,
+    winners: null,     // everyone on the winning side, for the victory screen
+    roundCount: 0,     // completed rounds this match, for the splash kicker
+    endedAt: 0,        // world.time when the match ended, for victory easing
     roundWinner: null,
     drafters: [],
     botPicks: [],
@@ -133,6 +131,8 @@
   };
 
   const playerColors = ["#ff5277", "#52d7ff", "#ffe169", "#74f08b"];
+  // the whole Evil Bot squad wears one villainous violet
+  const EVIL_COLOR = "#a64dff";
 
   const keyboardSchemes = [
     { left: "KeyA", right: "KeyD", up: "KeyW", down: "KeyS", jump: "KeyW", shoot: "KeyF", block: "KeyG", special: "KeyH", label: "Keyboard 1 (WASD + F/G)" },
@@ -145,6 +145,20 @@
   const pressed = new Set();
   const lastPadButtons = new Map();
   const lobbySlots = [];
+  // Co-op's Evil Bot seat: virtual, pinned to the 4th cell, never in lobbySlots.
+  let evilSlot = null;             // { charIndex } while settings.coop
+  // A bot slot being re-picked from the menu cursor: {kind:"slot", index} or
+  // {kind:"evil"}. While set, left/right cycles that bot's fighter and A commits.
+  let editingBot = null;
+
+  // Two fighters on the same team can't hurt each other — their shots pass
+  // straight through. In free-for-all every fighter is their own team.
+  function allied(a, b) {
+    return Boolean(a && b && a !== b && a.team !== undefined && a.team === b.team);
+  }
+
+  // Humans join up to here; co-op keeps the last seat for the Evil Bot.
+  function maxHumanSlots() { return settings.coop ? settings.playerCount - 1 : settings.playerCount; }
 
   let players = [];
   let bullets = [];
@@ -248,7 +262,8 @@
       id: i,
       name: ch.name,
       character: ch,
-      color: playerColors[i],
+      team: i,             // startMatch collapses these into two sides in co-op
+      color: playerColors[i % playerColors.length],
       x: 0, y: 0, vx: 0, vy: 0,
       aimX: i % 2 === 0 ? 1 : -1, aimY: 0,
       hp: 100, score: 0, alive: true,
@@ -485,7 +500,7 @@
   }
 
   function addSlot(slot) {
-    if (lobbySlots.length >= settings.playerCount) {
+    if (lobbySlots.length >= maxHumanSlots()) {
       showToast(str("menu.lobbyFull"));
       return null;
     }
@@ -519,10 +534,13 @@
 
   function updateLobby(pads) {
     if (world.state !== "menu") return;
+    // While a bot slot is being re-picked, the lobby's own input (joins, slot
+    // cycling) stands down — updateMenuControls drives the edit.
+    if (editingBot) return;
     // Sampled before the join pass: a pad that is not in the lobby yet is
-    // joining with this press, not asking for a bot.
-    const wantsBot = pressed.has("KeyY") ||
-      pads.some(pad => buttonEdge(pad, 3) && slotJoined("pad", pad.index));
+    // joining with this press, not asking for a bot. Co-op has no manual bots.
+    const wantsBot = !settings.coop && (pressed.has("KeyY") ||
+      pads.some(pad => buttonEdge(pad, 3) && slotJoined("pad", pad.index)));
     // keyboard joins: any of WASD (player 1) or the arrow keys (player 2)
     keyboardSchemes.forEach((scheme, i) => {
       if (slotJoined("keyboard", i)) return;
@@ -538,7 +556,7 @@
       }
     }
     // Y takes an open slot as a bot (needs someone in the lobby first)
-    if (wantsBot && lobbySlots.length >= 1 && lobbySlots.length < settings.playerCount) {
+    if (wantsBot && lobbySlots.length >= 1 && lobbySlots.length < maxHumanSlots()) {
       addBot();
       world.joinedThisFrame = true;
     }
@@ -583,8 +601,24 @@
   }
 
   function renderLobby() {
+    if (settings.coop && !evilSlot) evilSlot = { charIndex: freeCharIndex() };
     const cells = [];
     for (let i = 0; i < settings.playerCount; i += 1) {
+      // co-op pins the Evil Bot to the last seat, whoever else has joined
+      if (settings.coop && i === settings.playerCount - 1) {
+        const ch = CHARACTERS[evilSlot.charIndex];
+        const editing = editingBot && editingBot.kind === "evil";
+        cells.push(`
+          <article class="join-slot joined bot-editable${editing ? " editing" : " locked"}" data-slot="${i}" data-bot="evil" tabindex="-1" style="--pcol:${EVIL_COLOR}">
+            <div class="slot-arrows">${editing ? "◀&nbsp;&nbsp;&nbsp;▶" : ""}</div>
+            <div class="slot-portrait"><canvas data-portrait="${evilSlot.charIndex}" width="96" height="96"></canvas></div>
+            <strong>${ch.name} <em>${ch.title}</em></strong>
+            <span class="slot-blurb">${ch.blurb}</span>
+            <span class="slot-input">${escapeHtml(str("menu.slotEvil"))}</span>
+            <span class="slot-state">${escapeHtml(editing ? str("menu.slotChoosing") : str("menu.slotReady"))}</span>
+          </article>`);
+        continue;
+      }
       const slot = lobbySlots[i];
       if (!slot) {
         cells.push(`
@@ -592,19 +626,22 @@
             <div class="slot-portrait empty-portrait">?</div>
             <strong>${escapeHtml(str("menu.slotOpenTitle"))}</strong>
             <span class="slot-join">${escapeHtml(str("menu.slotJoinPrompt"))}</span>
-            ${i > 0 ? `<span class="slot-bot-hint">${escapeHtml(str("menu.slotBotPrompt"))}</span>` : ""}
+            ${i > 0 && !settings.coop ? `<span class="slot-bot-hint">${escapeHtml(str("menu.slotBotPrompt"))}</span>` : ""}
           </article>`);
         continue;
       }
       const ch = CHARACTERS[slot.charIndex];
+      const isBot = slot.type === "bot";
+      const editing = editingBot && editingBot.kind === "slot" && editingBot.index === i;
+      const choosing = editing || (!slot.locked && !isBot);
       cells.push(`
-        <article class="join-slot joined ${slot.locked ? "locked" : ""}${slot.type === "pad" ? "" : " pickable"}" data-slot="${i}" style="--pcol:${playerColors[i]}">
-          <div class="slot-arrows">${slot.locked || slot.type === "bot" ? "" : "◀&nbsp;&nbsp;&nbsp;▶"}</div>
+        <article class="join-slot joined ${editing ? "editing" : slot.locked ? "locked" : ""}${slot.type === "pad" ? "" : " pickable"}${isBot ? " bot-editable" : ""}" data-slot="${i}"${isBot ? ' data-bot="slot" tabindex="-1"' : ""} style="--pcol:${playerColors[i]}">
+          <div class="slot-arrows">${choosing ? "◀&nbsp;&nbsp;&nbsp;▶" : ""}</div>
           <div class="slot-portrait"><canvas data-portrait="${slot.charIndex}" width="96" height="96"></canvas></div>
           <strong>${ch.name} <em>${ch.title}</em></strong>
           <span class="slot-blurb">${ch.blurb}</span>
-          <span class="slot-input">${slot.type === "bot" ? escapeHtml(str("menu.slotBot")) : escapeHtml(slot.label)}</span>
-          <span class="slot-state">${escapeHtml(slot.locked || slot.type === "bot" ? str("menu.slotReady") : str("menu.slotChoosing"))}</span>
+          <span class="slot-input">${isBot ? escapeHtml(str("menu.slotBot")) : escapeHtml(slot.label)}</span>
+          <span class="slot-state">${escapeHtml(choosing ? str("menu.slotChoosing") : str("menu.slotReady"))}</span>
 
         </article>`);
     }
@@ -625,6 +662,73 @@
     addSlot({ type: "bot", label: str("menu.slotBot") });
   }
 
+  // ------------------------------------------------- editing a bot's fighter
+  // The menu cursor can land on any bot slot (move up from Start Match). A
+  // uncommits it into choosing mode: left/right walks the roster, A commits.
+  function beginBotEdit(el) {
+    editingBot = el.dataset.bot === "evil"
+      ? { kind: "evil" }
+      : { kind: "slot", index: Number(el.dataset.slot) };
+    sfx("jump");
+    renderLobby();
+    focusEditingBot();
+  }
+
+  function cycleEditingBot(dir) {
+    if (!editingBot) return;
+    if (editingBot.kind === "evil") {
+      const taken = new Set(lobbySlots.map(s => s.charIndex));
+      let next = evilSlot.charIndex;
+      for (let i = 0; i < CHARACTERS.length; i += 1) {
+        next = (next + dir + CHARACTERS.length) % CHARACTERS.length;
+        if (!taken.has(next)) break;
+      }
+      evilSlot.charIndex = next;
+      sfx("jump");
+      renderLobby();
+    } else {
+      const slot = lobbySlots[editingBot.index];
+      if (!slot) { editingBot = null; renderLobby(); return; }
+      cycleSlotChar(slot, dir);
+    }
+    focusEditingBot();
+  }
+
+  function commitBotEdit() {
+    const sel = editingBot.kind === "evil" ? '[data-bot="evil"]' : `[data-slot="${editingBot.index}"]`;
+    editingBot = null;
+    sfx("card");
+    renderLobby();
+    focusEditingBot(sel);  // cursor stays on the slot it just committed
+  }
+
+  // renderLobby rebuilds the slot markup, which throws the cursor's highlight
+  // away — put it back on the slot being edited (or just committed).
+  function focusEditingBot(sel = null) {
+    const el = joinSlots.querySelector(sel || (editingBot && editingBot.kind === "evil" ? '[data-bot="evil"]' : editingBot ? `[data-slot="${editingBot.index}"]` : ".join-slot.bot-editable"));
+    if (!el) return;
+    const controls = visibleControls();
+    const i = controls.indexOf(el);
+    if (i >= 0) setMenuIndex(i, controls);
+  }
+
+  // Ticking Cooperative Mode reshapes the lobby: manual bots leave, humans cap
+  // at three, and the Evil Bot takes the last seat with a random fighter.
+  function setCoop(on) {
+    settings.coop = on;
+    editingBot = null;
+    if (on) {
+      for (let i = lobbySlots.length - 1; i >= 0; i -= 1) {
+        if (lobbySlots[i].type === "bot") lobbySlots.splice(i, 1);
+      }
+      while (lobbySlots.length > maxHumanSlots()) lobbySlots.pop();
+      if (!evilSlot) evilSlot = { charIndex: freeCharIndex() };
+    } else {
+      evilSlot = null;
+    }
+    renderLobby();
+  }
+
   // Clicking a slot walks it through the seats a mouse can hand out:
   // keyboard 1 → keyboard 2 → bot → empty, skipping keyboards already taken.
   function cycleSlotByClick(index) {
@@ -633,7 +737,7 @@
     const takenByOther = i => lobbySlots.some(sl => sl !== slot && sl.type === "keyboard" && sl.schemeIndex === i);
     const options = [];
     for (const i of [0, 1]) if (!takenByOther(i)) options.push({ kind: "keyboard", schemeIndex: i });
-    options.push({ kind: "bot" });
+    if (!settings.coop) options.push({ kind: "bot" });   // co-op has no manual bots
     options.push({ kind: "none" });
 
     const currentKind = !slot ? "none" : slot.type === "bot" ? "bot" : "keyboard";
@@ -666,12 +770,13 @@
     renderLobby();
   }
 
-  // Start Match appears once there are two or more fighters.
+  // Start Match appears once there are two or more fighters — in co-op the
+  // Evil Bot squad is the second side, so one human is enough.
   function syncLobbyActions() {
     const start = startBtn();
     if (!start) return;
     const wasHidden = start.classList.contains("hidden");
-    start.classList.toggle("hidden", lobbySlots.length < 2);
+    start.classList.toggle("hidden", lobbySlots.length < (settings.coop ? 1 : 2));
     if (wasHidden && !start.classList.contains("hidden") && world.state === "menu") {
       const controls = visibleControls();
       const i = controls.indexOf(start);
@@ -682,7 +787,8 @@
   // ------------------------------------------------------------------ match
   function startMatch() {
     ensureAudio();
-    if (lobbySlots.length < 2) {
+    editingBot = null;
+    if (lobbySlots.length < (settings.coop ? 1 : 2)) {
       startMusic();
       showToast(str("menu.needPlayers"));
       return;
@@ -694,8 +800,23 @@
       if (slot.type === "bot") p.name = `${p.character.name} (Bot)`;
       return p;
     });
+    if (settings.coop && evilSlot) {
+      // one Evil Bot per human, all the same fighter — a proper squad
+      const humans = players.length;
+      for (let j = 0; j < humans; j += 1) {
+        const p = makePlayer(players.length, { type: "bot", charIndex: evilSlot.charIndex });
+        p.name = `${p.character.name} (Evil Bot)`;
+        p.evil = true;
+        p.color = EVIL_COLOR;
+        players.push(p);
+      }
+      // two sides: everyone human against the squad
+      for (const p of players) p.team = p.bot ? 1 : 0;
+    }
     world.state = "playing";
     world.winner = null;
+    world.winners = null;
+    world.roundCount = 0;
     world.roundWinner = null;
     world.drafters = [];
     world.lastLevelIndex = -1;
@@ -748,7 +869,7 @@
   }
 
   function hideAllPanels() {
-    for (const el of [titleScreen, menu, settingsPanel, howPanel, draftPanel, battleSplash, pausePanel, arenaBanner]) el.classList.add("hidden");
+    for (const el of [titleScreen, menu, settingsPanel, howPanel, cardsPanel, draftPanel, battleSplash, pausePanel, arenaBanner]) el.classList.add("hidden");
   }
 
   function resetRound() {
@@ -778,7 +899,11 @@
     resetProps(level);
     players.forEach((p, i) => {
       const sp = level.spawns[i % level.spawns.length];
-      p.x = sp.x; p.y = sp.y;
+      // a co-op board can seat more fighters than a level has spawn points —
+      // the second lap lands beside the first, nudged toward the middle
+      const lap = Math.floor(i / level.spawns.length);
+      p.x = sp.x + lap * 70 * (sp.x < world.width / 2 ? 1 : -1);
+      p.y = sp.y;
       p.vx = 0; p.vy = 0;
       p.aimX = p.x < world.width / 2 ? 1 : -1; p.aimY = 0;
       p.facing = p.aimX;
@@ -826,28 +951,51 @@
 
   function endRound(winner) {
     if (!winner) return;
-    winner.score += 1;
-    pulse(winner, 0.45, 180);
-    burst(winner.x, winner.y, winner.color, 42, 520);
+    // In co-op the round belongs to a whole side; in free-for-all a "team" is
+    // one player, so this is exactly the old behaviour there.
+    const winners = players.filter(p => p.team === winner.team);
+    const teamGame = settings.coop && players.some(p => p.evil);
+    world.roundCount += 1;
+    for (const w of winners) {
+      w.score += 1;
+      pulse(w, 0.45, 180);
+      burst(w.x, w.y, w.color, 42, 520);
+    }
+    const teamLabel = winner.evil ? str("round.teamEvil") : str("round.teamPlayers");
     if (winner.score >= settings.scoreLimit) {
       world.state = "ended";
       world.winner = winner;
-      showToast(str("round.matchWon", { name: winner.name }));
+      world.winners = winners;
+      world.endedAt = world.time;
+      updateHud(true);   // the frozen margin cards show the final score
+      showToast(teamGame
+        ? str("round.matchWonTeam", { team: teamLabel })
+        : str("round.matchWon", { name: winner.name }));
+      sfx("win");
       return;
     }
     world.state = "round-won";
     world.roundWinner = winner;
-    // ranked worst-first; only the bottom two draft, so a 4-player match never
-    // has more than two hands on screen at once
-    const ranked = players.filter(p => p !== winner).sort((a, b) => a.score - b.score || a.id - b.id);
-    const losers = ranked.slice(0, 2);
-    battleKicker.textContent = str("round.kicker", { number: players.reduce((a, p) => a + p.score, 0) });
-    battleTitle.textContent = str("round.winner", { name: winner.name });
+    let losers;
+    if (teamGame) {
+      // the whole losing side drafts — every fallen player, or the bot squad
+      losers = players.filter(p => p.team !== winner.team);
+    } else {
+      // ranked worst-first; only the bottom two draft, so a 4-player match
+      // never has more than two hands on screen at once
+      const ranked = players.filter(p => p !== winner).sort((a, b) => a.score - b.score || a.id - b.id);
+      losers = ranked.slice(0, 2);
+    }
+    battleKicker.textContent = str("round.kicker", { number: world.roundCount });
+    battleTitle.textContent = teamGame
+      ? str("round.winnerTeam", { team: teamLabel })
+      : str("round.winner", { name: winner.name });
     battleTitle.style.color = winner.color;
     battleSub.textContent =
-      ranked.length > 2 ? str("round.subTwo")
-      : losers.length > 1 ? str("round.subMulti")
-      : str("round.subSolo", { name: losers[0].name });
+      teamGame && losers.every(p => p.bot) ? str("round.subEvil")
+      : !teamGame && players.length - 1 > 2 ? str("round.subTwo")
+      : losers.length === 1 ? str("round.subSolo", { name: losers[0].name })
+      : str("round.subMulti");
     battleSplash.classList.remove("hidden");
     sfx("win");
     setTimeout(() => {
@@ -859,12 +1007,11 @@
   }
 
   // ---------------------------------------------------------------- drafting
-  // The cards a draft is allowed to offer. In Choose mode that is whatever the
-  // player left enabled — unless they switched everything off, which is not a
-  // playable state, so an empty pool falls back to the full set (the settings
-  // panel says as much under the counter).
+  // The cards a draft is allowed to offer: whatever the Choose Cards window
+  // left enabled — unless everything was switched off, which is not a playable
+  // state, so an empty pool falls back to the full set (the card window says
+  // as much under the counter).
   function cardPool() {
-    if (settings.cardMode !== "choose") return CARDS;
     const on = CARDS.filter(c => !settings.disabledCards.has(c.id));
     return on.length ? on : CARDS;
   }
@@ -873,11 +1020,7 @@
     const bag = cardPool().filter(c => !exclude.includes(c));
     const weighted = [];
     for (const c of bag) {
-      // Equalize flattens the rarity ladder: one ticket each, so a Mythic is
-      // exactly as likely as a Common.
-      const n = settings.cardMode === "equalize"
-        ? 1
-        : Math.max(0, Math.round(settings.rarityWeights[c.rarity] ?? 1));
+      const n = Math.max(0, Math.round(settings.rarityWeights[c.rarity] ?? 1));
       for (let i = 0; i < n; i += 1) weighted.push(c);
     }
     // A pool smaller than the hand simply deals a smaller hand. Both draws
@@ -912,7 +1055,10 @@
     // carries on at full volume when the next round starts.
     duckMusic(DUCK.draft);
     const humans = losers.filter(p => !p.bot);
-    const bots = losers.filter(p => p.bot);
+    let bots = losers.filter(p => p.bot);
+    // The Evil Bot squad is one mind in several bodies: it draws ONE card and
+    // every copy gets it, so the squad stays identical build for build.
+    if (settings.coop && bots.length > 1 && bots.every(p => p.evil)) bots = [bots[0]];
     world.drafters = humans.map(p => ({
       player: p,
       options: drawCards(settings.draftCount),
@@ -964,7 +1110,12 @@
       if (show.t < CARD_FLY_TOTAL) running = true;
       if (!show.landed && show.t >= CARD_FLY.rise + CARD_FLY.hold + CARD_FLY.fling * 0.85) {
         show.landed = true;
-        grantCard(show.player, show.card);
+        // an Evil Bot's card lands in every copy of it — one squad, one build
+        const takers = show.player.evil ? players.filter(q => q.evil) : [show.player];
+        for (const taker of takers) {
+          grantCard(taker, show.card);
+          if (taker !== show.player) burst(taker.x, taker.y, RARITIES[show.card.rarity].color, 22, 380);
+        }
         burst(show.player.x, show.player.y, RARITIES[show.card.rarity].color, 34, 460);
         world.shake = Math.max(world.shake, 5);
         sfx("card");
@@ -1334,7 +1485,7 @@
   function nearestBotTarget(bot) {
     let best = null, bestD = Infinity;
     for (const p of players) {
-      if (!p.alive || p === bot) continue;
+      if (!p.alive || p === bot || allied(p, bot)) continue;
       const d = Math.hypot(p.x - bot.x, p.y - bot.y);
       if (d < bestD) { bestD = d; best = p; }
     }
@@ -1380,7 +1531,7 @@
 
   function botThreatened(p) {
     return bullets.some(b => {
-      if (b.owner === p) return false;
+      if (b.owner === p || allied(b.owner, p)) return false;
       const d = Math.hypot(b.x - p.x, b.y - p.y);
       if (d > 165) return false;
       const toward = ((p.x - b.x) * b.vx + (p.y - b.y) * b.vy) > 0;
@@ -1418,7 +1569,7 @@
     if (world.state === "menu") updateLobby(pads);
     applyInputs(pads);
 
-    if (world.state === "menu" || world.state === "settings" || world.state === "how") {
+    if (world.state === "menu" || world.state === "settings" || world.state === "how" || world.state === "cards") {
       updateMenuControls(pads);
       updateWeatherMenu(dt);
       updateParticles(dt);
@@ -1442,6 +1593,18 @@
         rebuildLobbyFromPlayers();
         startMatch();
         return;
+      }
+      // it rains confetti in the winners' colours for as long as they stand there
+      const winners = world.winners && world.winners.length ? world.winners : (world.winner ? [world.winner] : []);
+      if (winners.length && Math.random() < dt * 26) {
+        const palette = [...winners.map(w => w.color), "#ffd84d", "#ffffff"];
+        particles.push({
+          x: Math.random() * world.width, y: -14,
+          vx: rand(-30, 30), vy: rand(40, 120),
+          life: rand(4, 7), maxLife: 7, r: rand(3, 5.5),
+          rot: Math.random() * Math.PI, spin: rand(-4, 4), wob: Math.random() * 7,
+          color: palette[Math.floor(Math.random() * palette.length)], confetti: true
+        });
       }
     }
     if (world.state === "round-won") { updateParticles(dt); return; }
@@ -1531,9 +1694,10 @@
 
   // If controller disconnects shrank the lobby, rebuild it from the match lineup
   function rebuildLobbyFromPlayers() {
-    if (lobbySlots.length >= 2) return;
+    if (lobbySlots.length >= (settings.coop ? 1 : 2)) return;
     lobbySlots.length = 0;
     for (const p of players) {
+      if (p.evil) continue;    // the squad respawns from evilSlot, not the lobby
       if (!p.bot && !p.scheme && (p.gamepadIndex === null || p.gamepadIndex === undefined)) continue;
       lobbySlots.push({
         type: p.bot ? "bot" : p.scheme ? "keyboard" : "pad",
@@ -2890,7 +3054,7 @@
         }
         // it can still clip an enemy on the way back
         for (const p of players) {
-          if (!p.alive || p === b.owner || p.spawnGrace > 0 || b.hitIds.has(p.id)) continue;
+          if (!p.alive || p === b.owner || allied(p, b.owner) || p.spawnGrace > 0 || b.hitIds.has(p.id)) continue;
           if (Math.hypot(p.x - b.x, p.y - b.y) < p.stats.radius + b.r) {
             hurt(p, b.damage * 0.8, b.owner, b.vx, b.vy);
             b.hitIds.add(p.id);
@@ -3208,7 +3372,7 @@
   function chainLightning(b, victim, damage) {
     let best = null, bestD = Infinity;
     for (const q of players) {
-      if (!q.alive || q === victim || q === b.owner || q.spawnGrace > 0) continue;
+      if (!q.alive || q === victim || q === b.owner || allied(q, b.owner) || q.spawnGrace > 0) continue;
       const d = Math.hypot(q.x - victim.x, q.y - victim.y);
       if (d < bestD && d < 520) { bestD = d; best = q; }
     }
@@ -3345,7 +3509,7 @@
       // is felt by whoever it went off against.
       const coreShare = clamp(0.25 + 0.12 * b.explosive, 0, 0.6);
       for (const p of players) {
-        if (!p.alive || p === b.owner) continue;
+        if (!p.alive || p === b.owner || allied(p, b.owner)) continue;
         const direct = b.hitIds.has(p.id);
         const radius = 105 + b.explosive * 12;
         const d = Math.hypot(p.x - b.x, p.y - b.y);
@@ -3574,7 +3738,7 @@
         f.x = o.x;
         f.y = o.y;
         for (const p of players) {
-          if (!p.alive || p === o || p.spawnGrace > 0 || p.sawGrace > 0) continue;
+          if (!p.alive || p === o || allied(p, o) || p.spawnGrace > 0 || p.sawGrace > 0) continue;
           if (Math.hypot(p.x - f.x, p.y - f.y) < p.stats.radius + f.r) {
             hurt(p, f.dmg, o, p.x - o.x, p.y - o.y - 60);
             p.sawGrace = 0.35;
@@ -3644,7 +3808,8 @@
             // careless player is chewed several times over.
             if (d < f.r * 0.3 && p.hazardGrace <= 0) {
               p.hazardGrace = HAZARD_GRACE * 0.55;
-              hurtRaw(p, HAZARD_DAMAGE, f.owner);
+              // a planted singularity chews its own team too — it would chew you
+              hurtRaw(p, HAZARD_DAMAGE, f.owner, { friendly: Boolean(f.singularity) });
               if (p.alive) {
                 const away = Math.hypot(dx, dy) || 1;
                 p.vx = -(dx / away) * 520;
@@ -3655,7 +3820,7 @@
                 sfx("hit");
               }
             } else {
-              hurtRaw(p, f.dps * t * dt, f.owner);
+              hurtRaw(p, f.dps * t * dt, f.owner, { friendly: Boolean(f.singularity) });
             }
             if (Math.random() < dt * 20) puffOne(p.x + rand(-10, 10), p.y + rand(-10, 10), "#b45cff");
           } else {
@@ -3797,6 +3962,8 @@
 
   function hurt(p, amount, attacker, kx, ky) {
     if (!p.alive || p.blockTimer > 0 || p.spawnGrace > 0) return;
+    // teammates cannot hurt each other, with damage or with the shove
+    if (allied(attacker, p)) return;
     // Aegis Bubble eats the hit ENTIRELY — the damage and the shove with it —
     // so it has to be checked before any knockback is applied. A DoT tick is
     // not a "hit" and must not waste the charge, hence the floor.
@@ -3823,8 +3990,12 @@
   }
 
   // direct damage: no knockback, no thorns (used by DoTs, fields, thorns itself)
-  function hurtRaw(p, amount, attacker) {
+  // opts.friendly marks a source that hurts its own owner too (a planted
+  // singularity): those hit teammates as well — "if it would hurt you, it
+  // hurts them" — while everything else passes allies by.
+  function hurtRaw(p, amount, attacker, opts) {
     if (!p.alive || p.spawnGrace > 0) return;
+    if (!(opts && opts.friendly) && allied(attacker, p)) return;
     applyDamage(p, amount, attacker);
   }
 
@@ -3968,17 +4139,33 @@
     // someone rising out of a Phoenix Feather is down, not out — the round
     // must not be called over their smoking crater
     const alive = players.filter(p => p.alive || p.rebirth);
-    if (alive.length === 1 && alive[0].alive) endRound(alive[0]);
-    else if (alive.length === 0) {
+    if (alive.length === 0) {
       showToast(str("round.nobodySurvived"));
       resetRound();
+      return;
+    }
+    const standing = alive.filter(p => p.alive);
+    const byHealth = (a, b) => b.hp / b.stats.maxHp - a.hp / a.stats.maxHp || b.score - a.score || a.id - b.id;
+    // One side left on the board wins the round. In free-for-all every fighter
+    // is their own team, so this is the old last-dot-standing rule; in co-op
+    // the healthiest member carries the round for the side.
+    const teams = new Set(alive.map(p => p.team));
+    if (teams.size === 1) {
+      if (standing.length) endRound([...standing].sort(byHealth)[0]);
+      return;   // everyone left is mid-rebirth: wait for them to rise
+    }
+    // Every human fighter is down and only bots are still trading shots:
+    // nobody wants to sit through the machines finishing it. Call it now —
+    // whichever bot is ahead (healthiest) takes the round on the spot.
+    if (players.some(p => !p.bot) && !alive.some(p => !p.bot) && standing.length) {
+      endRound([...standing].sort(byHealth)[0]);
     }
   }
 
   function nearestEnemy(b) {
     let best = null, bestD = Infinity;
     for (const p of players) {
-      if (!p.alive || p === b.owner || b.hitIds.has(p.id)) continue;
+      if (!p.alive || p === b.owner || allied(p, b.owner) || b.hitIds.has(p.id)) continue;
       const d = Math.hypot(p.x - b.x, p.y - b.y);
       if (d < bestD && d < 900) { bestD = d; best = p; }
     }
@@ -4078,12 +4265,50 @@
     return CARDS.reduce((n, c) => n + (settings.disabledCards.has(c.id) ? 0 : 1), 0);
   }
 
-  function setCardMode(mode) {
-    if (!CARD_MODES.includes(mode) || mode === settings.cardMode) return;
-    settings.cardMode = mode;
-    sfx("card");
-    saveCardPrefs();
+  // ------------------------------------------- the Choose Cards window
+  // Its own panel, opened from the settings row. It sits on top of settings in
+  // the panel stack: closing it lands back there, whatever settings itself
+  // will return to.
+  function openCardsPanel() {
+    settingsPanel.classList.add("hidden");
+    cardsPanel.classList.remove("hidden");
+    world.state = "cards";
+    cardUi.rows = [];        // measured at zero width while the panel was hidden
+    cardUi.layoutW = -1;
     refreshCardPicker();
+    sfx("card");
+    setMenuIndex(0);
+  }
+
+  function closeCardsPanel() {
+    cardsPanel.classList.add("hidden");
+    settingsPanel.classList.remove("hidden");
+    world.state = "settings";
+    refreshCardPicker();     // the settings row's count + Reset state
+    setMenuIndex(0);
+  }
+
+  // ------------------------------------------- rarity rates reset
+  function rarityDefaults() {
+    return Object.fromEntries(Object.entries(RARITIES).map(([k, v]) => [k, v.weight]));
+  }
+
+  function syncRarityReset() {
+    const b = document.getElementById("rarityReset");
+    if (!b) return;
+    b.disabled = Object.entries(rarityDefaults()).every(([k, v]) => Number(settings.rarityWeights[k]) === v);
+  }
+
+  function resetRarityWeights() {
+    for (const [k, v] of Object.entries(rarityDefaults())) {
+      settings.rarityWeights[k] = v;
+      const input = document.getElementById(`${k}Weight`);
+      const label = document.getElementById(`${k}WeightValue`);
+      if (input) input.value = String(v);
+      if (label) label.textContent = String(v);
+    }
+    sfx("card");
+    syncRarityReset();
   }
 
   function toggleCell(cell) {
@@ -4141,27 +4366,15 @@
   }
 
   function refreshCardPicker() {
-    const modeBar = document.getElementById("cardMode");
-    if (!modeBar || !cardUi.picker) return;
-    for (const b of modeBar.querySelectorAll("button[data-mode]")) {
-      const on = b.dataset.mode === settings.cardMode;
-      b.classList.toggle("on", on);
-      b.setAttribute("aria-pressed", String(on));
-    }
-    const mode = settings.cardMode;
-    const note = document.getElementById("cardModeNote");
-    if (note) note.textContent = str(`settings.cardNote${mode[0].toUpperCase()}${mode.slice(1)}`);
-    const rarityGroup = document.getElementById("rarityGroup");
-    // Equalize ignores the rarity ladder, so its sliders read as switched off
-    if (rarityGroup) rarityGroup.classList.toggle("muted", mode === "equalize");
-
-    const choosing = mode === "choose";
-    const wasHidden = cardUi.picker.classList.contains("hidden");
-    cardUi.picker.classList.toggle("hidden", !choosing);
-    if (!choosing) return;
-    if (wasHidden) cardUi.rows = [];   // measured at zero width while hidden
-
+    if (!cardUi.picker) return;
     const on = enabledCardCount();
+    // the settings row: what the pool currently is, and whether Reset has
+    // anything to undo
+    const summary = document.getElementById("cardsSummary");
+    if (summary) summary.textContent = on ? str("settings.cardCount", { on, total: CARDS.length }) : str("settings.cardNoneWarning");
+    const reset = document.getElementById("cardsReset");
+    if (reset) reset.disabled = settings.disabledCards.size === 0;
+
     const count = document.getElementById("cardCount");
     if (count) {
       count.textContent = on ? str("settings.cardCount", { on, total: CARDS.length }) : str("settings.cardNoneWarning");
@@ -4273,14 +4486,14 @@
   }
 
   function cardGridFocused(controls) {
-    if (!cardUi.grid || !cardUi.picker || cardUi.picker.classList.contains("hidden")) return false;
+    if (!cardUi.grid || world.state !== "cards" || cardsPanel.classList.contains("hidden")) return false;
     const el = controls[world.menuIndex];
     return Boolean(el && cardUi.grid.contains(el));
   }
 
   // Runs instead of the panel's generic cursor while the grid holds focus.
   function updateCardGrid(pads, dt) {
-    if (menuBack(pads)) { closePanel(settingsPanel); return; }
+    if (menuBack(pads)) { closeCardsPanel(); return; }
     let jumped = 0;
     for (const pad of pads) {
       if (buttonEdge(pad, 5)) jumped = 1;
@@ -4371,6 +4584,14 @@
 
   // ------------------------------------------------------------------- menus
   function updateMenuControls(pads) {
+    // A bot slot mid-edit swallows the lobby's cursor: left/right walks the
+    // roster, A (or B) commits the pick and hands the cursor back.
+    if (world.state === "menu" && editingBot) {
+      const nav = menuNav(pads);
+      if (nav && nav.x) cycleEditingBot(nav.x);
+      else if (menuConfirm(pads) || menuBack(pads)) commitBotEdit();
+      return;
+    }
     const controls = visibleControls();
     if (!controls.length) return;
     world.menuIndex = clamp(world.menuIndex, 0, controls.length - 1);
@@ -4406,7 +4627,10 @@
     if (menuConfirm(pads)) {
       const target = quickTarget() || controls[world.menuIndex];
       if (target) {
-        if (target.matches("input[type='checkbox']")) {
+        if (target.classList.contains("bot-editable")) {
+          // A on a bot slot: uncommit it into choosing mode
+          beginBotEdit(target);
+        } else if (target.matches("input[type='checkbox']")) {
           target.checked = !target.checked;
           target.dispatchEvent(new Event("change"));
         } else if (target.matches("select")) {
@@ -4422,6 +4646,7 @@
       if (world.quickIndex >= 0) setQuickIndex(-1);
       else if (world.state === "settings") closePanel(settingsPanel);
       else if (world.state === "how") closePanel(howPanel);
+      else if (world.state === "cards") closeCardsPanel();
       else if (world.state === "paused") togglePause(false);
     }
   }
@@ -4491,12 +4716,16 @@
   function scrollPanel(dy) {
     const panel = world.state === "settings" ? settingsPanel
       : world.state === "how" ? howPanel
-        : world.state === "paused" ? pausePanel : menu;
+        : world.state === "cards" ? cardsPanel
+          : world.state === "paused" ? pausePanel : menu;
     if (panel) panel.scrollBy({ top: dy * 90, behavior: "smooth" });
   }
 
   function visibleControls() {
-    const panel = world.state === "settings" ? settingsPanel : world.state === "how" ? howPanel : world.state === "paused" ? pausePanel : menu;
+    const panel = world.state === "settings" ? settingsPanel
+      : world.state === "how" ? howPanel
+        : world.state === "cards" ? cardsPanel
+          : world.state === "paused" ? pausePanel : menu;
     const roots = [panel];
     // the icon row is part of the menu and pause screens
     if (!iconBar.classList.contains("hidden")) roots.push(iconBar);
@@ -4509,6 +4738,13 @@
         // crossing them one press at a time is nobody's idea of comfortable.
         if (el.dataset.cell !== undefined && el !== cardUi.cells[cardUi.cursor]) continue;
         out.push(el);
+      }
+      // Bot slots join the lobby's cursor map so the stick can walk up from
+      // Start Match onto one and re-pick its fighter.
+      if (root === menu && world.state === "menu") {
+        for (const el of root.querySelectorAll(".join-slot.bot-editable")) {
+          if (el.getBoundingClientRect().height > 0) out.push(el);
+        }
       }
     }
     return out;
@@ -4691,6 +4927,8 @@
     world.state = "menu";
     world.panelReturn = "menu";
     world.winner = null;
+    world.winners = null;
+    editingBot = null;
     hideAllPanels();
     menu.classList.remove("hidden");
     renderLobby();
@@ -4718,7 +4956,8 @@
       const pc = el.querySelector("canvas").getContext("2d");
       pc.translate(26, 36);
       drawCharacter(pc, p.character, 17, { t: 0, aimX: 1 });
-      cols[i % 2].appendChild(el);
+      // co-op reads as two sides: your team down the left, the squad down the right
+      cols[p.evil ? 1 : settings.coop ? 0 : i % 2].appendChild(el);
       hudRefs.push({
         p, el,
         score: el.querySelector(".hud-score"),
@@ -4771,7 +5010,7 @@
     resize();
     syncChrome();
     const onMenuScreen = world.state === "title" || world.state === "menu" ||
-      ((world.state === "settings" || world.state === "how") && (world.panelReturn !== "paused" || !players.length));
+      ((world.state === "settings" || world.state === "how" || world.state === "cards") && (world.panelReturn !== "paused" || !players.length));
     const inGame = !onMenuScreen;
     const dpr = canvas.height / innerHeight;
     // the arena always takes the largest 16:9 fit — health and ammo ride on the
@@ -6685,24 +6924,84 @@
     ctx.fillText(str(world.roundFreeze > 0.35 ? "round.ready" : "round.fight"), world.width / 2, 180);
   }
 
+  // The real victory screen: the arena dims right down, the winner(s) stand
+  // huge in a spotlight of their own colour, and the verdict is unmissable.
   function drawWinner() {
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(0, 0, world.width, world.height);
     if (!world.winner) return;
+    const winners = world.winners && world.winners.length ? world.winners : [world.winner];
+    const teamGame = settings.coop && players.some(p => p.evil);
+    const col = world.winner.color;
+    // pop-in: everything eases up from below over the first half second
+    const age = Math.max(0, world.time - world.endedAt);
+    const ease = 1 - Math.pow(1 - clamp(age / 0.55, 0, 1), 3);
+
+    ctx.fillStyle = "rgba(4,4,10,0.82)";
+    ctx.fillRect(0, 0, world.width, world.height);
+
+    const cx = world.width / 2, cy = world.height * 0.44;
+    // a spotlight in the winners' colour behind the podium
+    const spot = ctx.createRadialGradient(cx, cy, 0, cx, cy, world.height * 0.62);
+    spot.addColorStop(0, `${col}44`);
+    spot.addColorStop(0.55, `${col}18`);
+    spot.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = spot;
+    ctx.fillRect(0, 0, world.width, world.height);
+
     ctx.save();
-    ctx.translate(world.width / 2, 330);
-    const bob = Math.sin(world.time * 3) * 8;
-    ctx.save();
-    ctx.translate(0, -90 + bob);
-    drawCharacter(ctx, world.winner.character, 60, { t: world.time, aimX: 1 });
-    ctx.restore();
-    ctx.fillStyle = world.winner.color;
-    ctx.font = "900 84px system-ui, sans-serif";
+    ctx.globalAlpha = ease;
+    ctx.translate(0, (1 - ease) * 60);
     ctx.textAlign = "center";
-    ctx.fillText(str("round.championName", { name: world.winner.name.toUpperCase() }), 0, 120);
-    ctx.fillStyle = "#f5f2ff";
-    ctx.font = "700 28px system-ui, sans-serif";
-    ctx.fillText(str("round.championSub"), 0, 170);
+
+    // the verdict, up top: VICTORY, then who
+    ctx.fillStyle = "#cfe4ff";
+    ctx.font = "800 26px system-ui, sans-serif";
+    const spacedVictory = str("round.victory").split("").join(" ");
+    ctx.fillText(spacedVictory, cx, world.height * 0.14);
+
+    const title = teamGame
+      ? str("round.championTeam", { team: (world.winner.evil ? str("round.teamEvil") : str("round.teamPlayers")).toUpperCase() })
+      : str("round.championName", { name: world.winner.name.toUpperCase() });
+    ctx.save();
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 42;
+    ctx.fillStyle = col;
+    // long team titles shrink to fit rather than running off the board
+    let size = 96;
+    ctx.font = `900 ${size}px system-ui, sans-serif`;
+    while (size > 44 && ctx.measureText(title).width > world.width * 0.86) {
+      size -= 6;
+      ctx.font = `900 ${size}px system-ui, sans-serif`;
+    }
+    ctx.fillText(title, cx, world.height * 0.14 + size + 26);
+    ctx.restore();
+
+    // the winners themselves, big, on a podium glow, names underneath
+    const n = winners.length;
+    const radius = n === 1 ? 104 : n === 2 ? 84 : 66;
+    const gap = Math.min(radius * 3.4, (world.width * 0.7) / Math.max(1, n - 1) || 0);
+    winners.forEach((w, i) => {
+      const wx = cx + (i - (n - 1) / 2) * (n > 1 ? gap : 0);
+      const wy = world.height * 0.58;
+      const bob = Math.sin(world.time * 3 + i * 1.3) * 9;
+      const ground = ctx.createRadialGradient(wx, wy + radius * 1.05, 0, wx, wy + radius * 1.05, radius * 1.5);
+      ground.addColorStop(0, `${w.color}55`);
+      ground.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = ground;
+      ctx.beginPath();
+      ctx.ellipse(wx, wy + radius * 1.05, radius * 1.5, radius * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.save();
+      ctx.translate(wx, wy + bob);
+      drawCharacter(ctx, w.character, radius, { t: world.time + i, aimX: i % 2 === 0 ? 1 : -1, aimY: -0.1 });
+      ctx.restore();
+      ctx.fillStyle = "#f5f2ff";
+      ctx.font = `800 ${n === 1 ? 30 : 24}px system-ui, sans-serif`;
+      ctx.fillText(w.name, wx, wy + radius * 1.45 + 26);
+    });
+
+    ctx.fillStyle = "rgba(245,242,255,0.85)";
+    ctx.font = "700 24px system-ui, sans-serif";
+    ctx.fillText(str("round.championSub"), cx, world.height * 0.92);
     ctx.restore();
   }
 
@@ -6877,6 +7176,13 @@
       else if (p.flame) p.vy -= 130 * dt;
       else if (p.spark) { p.vx *= Math.pow(0.94, dt * 60); p.vy = p.vy * Math.pow(0.94, dt * 60) + 40 * dt; }
       else if (p.chunk) { p.vy += 900 * dt; p.rot += p.spin * dt; }
+      else if (p.confetti) {
+        // falls lazily, swaying, like paper — the victory screen's weather
+        p.vy = Math.min(p.vy + 260 * dt, 150);
+        p.wob = (p.wob || 0) + dt * 5;
+        p.x += Math.sin(p.wob) * 40 * dt;
+        p.rot += p.spin * dt;
+      }
       else if (p.bubble) {
         p.vy -= 34 * dt;                       // buoyant
         p.wob += dt * 7;
@@ -6932,8 +7238,8 @@
         ctx.fill();
         continue;
       }
-      if (p.chunk) {
-        // masonry: an angular shard of the wall, tumbling as it falls
+      if (p.chunk || p.confetti) {
+        // masonry shard or confetti strip: an angular scrap, tumbling
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rot);
@@ -7378,6 +7684,19 @@
     joinSlots.addEventListener("click", e => {
       const cell = e.target.closest("[data-slot]");
       if (!cell || world.state !== "menu") return;
+      // the Evil Bot keeps its seat — a click walks its fighter along instead
+      if (cell.dataset.bot === "evil") {
+        const taken = new Set(lobbySlots.map(s => s.charIndex));
+        let next = evilSlot.charIndex;
+        for (let i = 0; i < CHARACTERS.length; i += 1) {
+          next = (next + 1) % CHARACTERS.length;
+          if (!taken.has(next)) break;
+        }
+        evilSlot.charIndex = next;
+        sfx("jump");
+        renderLobby();
+        return;
+      }
       cycleSlotByClick(Number(cell.dataset.slot));
     });
     document.getElementById("resumeBtn").addEventListener("click", () => togglePause(false));
@@ -7411,35 +7730,33 @@
       if (label) label.textContent = settings.levelChoice < 0 ? "Random" : LEVELS[settings.levelChoice].name;
     });
 
-    bindSetting("playerCount", "playerCountValue", v => {
-      settings.playerCount = Number(v);
-      while (lobbySlots.length > settings.playerCount) lobbySlots.pop();
-      renderLobby();
-    });
     bindSetting("botDifficulty", "botDifficultyValue", v => {
       settings.botDifficulty = Number(v);
       document.getElementById("botDifficultyValue").textContent = botDifficultyLabel(settings.botDifficulty);
     });
     document.getElementById("botDifficultyValue").textContent = botDifficultyLabel(settings.botDifficulty);
+    document.getElementById("coopMode").addEventListener("change", e => setCoop(e.target.checked));
     bindSetting("scoreLimit", "scoreLimitValue", v => settings.scoreLimit = Number(v));
     bindSetting("draftCount", "draftCountValue", v => settings.draftCount = Number(v));
     bindSetting("musicVolume", "musicVolumeValue", setMusicVolume);
     for (const rarity of window.ROUNDERS.RARITY_ORDER) {
-      bindSetting(`${rarity}Weight`, `${rarity}WeightValue`, v => settings.rarityWeights[rarity] = Number(v));
+      bindSetting(`${rarity}Weight`, `${rarity}WeightValue`, v => {
+        settings.rarityWeights[rarity] = Number(v);
+        syncRarityReset();
+      });
     }
+    document.getElementById("rarityReset").addEventListener("click", resetRarityWeights);
     // Choose Cards — the saved selection has to be in before the grid is built
     loadCardPrefs();
     buildCardPicker();
-    document.getElementById("cardMode").addEventListener("click", e => {
-      const b = e.target.closest("button[data-mode]");
-      if (b) setCardMode(b.dataset.mode);
-    });
+    document.getElementById("cardsOpen").addEventListener("click", openCardsPanel);
+    document.getElementById("cardsReset").addEventListener("click", () => setAllCards(true));
+    document.getElementById("cardsBack").addEventListener("click", closeCardsPanel);
     document.getElementById("cardsAll").addEventListener("click", () => setAllCards(true));
     document.getElementById("cardsNone").addEventListener("click", () => setAllCards(false));
     document.getElementById("cardsInvert").addEventListener("click", invertCards);
     refreshCardPicker();
 
-    document.getElementById("hazards").addEventListener("change", e => settings.hazards = e.target.checked);
     document.getElementById("proceduralCharacters").addEventListener("change", e => {
       settings.proceduralCharacters = e.target.checked;
       setProceduralCharacters(e.target.checked);
@@ -7736,6 +8053,10 @@
     fxShot,
     boltVisual,
     fire: p => tryShoot(p),
+    // damage entry points, for exercising the team rules headlessly
+    hurt,
+    hurtRaw,
+    allied,
     // bored terrain, reported at LIVE positions (a mover's base x is not where
     // it currently is, and the hole rides with it)
     holes: () => activePlatforms(currentLevel(), world.time)

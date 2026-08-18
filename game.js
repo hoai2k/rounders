@@ -6348,12 +6348,16 @@
   // is what makes the refund legible.
   function returnAmmo(from, to) {
     if (!to || !to.alive) return;
-    const a = rand(0, Math.PI * 2);
+    const x = from.x + rand(-4, 4), y = from.y + rand(-4, 4);
+    const dx = to.x - x, dy = to.y - y;
+    const d = Math.hypot(dx, dy) || 1;
+    // Straight home and FAST — the whole trip inside a tenth of a second — so
+    // it reads as a round jetting back to the magazine rather than something
+    // flying at the shooter that they might have to dodge.
+    const speed = Math.max(2800, d / 0.08);
     siphons.push({
-      kind: "ammo",
-      x: from.x + Math.cos(a) * rand(4, from.stats.radius * 0.6),
-      y: from.y + Math.sin(a) * rand(4, from.stats.radius * 0.6),
-      vx: Math.cos(a) * rand(70, 150), vy: Math.sin(a) * rand(70, 150) - 90,
+      kind: "ammo", x, y,
+      vx: (dx / d) * speed, vy: (dy / d) * speed,
       to, amount: 0, t: 0, delay: 0
     });
   }
@@ -6414,6 +6418,17 @@
       if (s.delay > 0) { s.delay -= dt; continue; }
       s.t += dt;
       if (!s.to || !s.to.alive) { s.dead = true; continue; }
+      if (s.kind === "ammo") {
+        // dead straight, no correction — it was aimed when it left
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        if (Math.hypot(s.to.x - s.x, s.to.y - s.y) < s.to.stats.radius || s.t > 0.35) {
+          puff(s.to.x, s.to.y, "#ffe169", 5, 140);
+          sfx("pop");
+          s.dead = true;
+        }
+        continue;
+      }
       // the first beat is a loose drift; after that it homes, and hardens its
       // turn the longer it has been travelling so it always gets there
       const dx = s.to.x - s.x, dy = s.to.y - s.y;
@@ -6427,19 +6442,13 @@
       s.x += s.vx * dt;
       s.y += s.vy * dt;
       if (Math.random() < dt * 40) {
-        puffOne(s.x + rand(-3, 3), s.y + rand(-3, 3),
-          s.kind === "ammo" ? "rgba(255,225,105,0.7)" : "rgba(116,240,139,0.7)");
+        puffOne(s.x + rand(-3, 3), s.y + rand(-3, 3), "rgba(116,240,139,0.7)");
       }
       // arrived: this is where the health is actually handed over
       if (d < s.to.stats.radius * 0.7 || s.t > 2.5) {
-        if (s.kind === "ammo") {
-          puff(s.to.x, s.to.y, "#ffe169", 5, 140);
-          sfx("pop");
-        } else {
-          healPlayer(s.to, s.amount);
-          floatText(s.to.x, s.to.y - s.to.stats.radius - 12, `+${Math.max(1, Math.round(s.amount))}`, "#74f08b");
-          burst(s.to.x, s.to.y, "#74f08b", 5, 130);
-        }
+        healPlayer(s.to, s.amount);
+        floatText(s.to.x, s.to.y - s.to.stats.radius - 12, `+${Math.max(1, Math.round(s.amount))}`, "#74f08b");
+        burst(s.to.x, s.to.y, "#74f08b", 5, 130);
         s.dead = true;
       }
     }
@@ -6451,19 +6460,21 @@
     for (const s of siphons) {
       if (s.delay > 0) continue;
       if (s.kind === "ammo") {
-        // a spent round tumbling home, half size so it never reads as a shot
-        const sp = Math.hypot(s.vx, s.vy) || 1;
+        // the ghost of the round, jetting back down its own line with a long
+        // streak behind it — at this speed the streak is most of what you see
         ctx.save();
         ctx.translate(s.x, s.y);
         ctx.rotate(Math.atan2(s.vy, s.vx));
-        ctx.shadowColor = "#ffe169"; ctx.shadowBlur = 8;
-        ctx.fillStyle = "#ffe169";
-        ctx.strokeStyle = "#6b5410"; ctx.lineWidth = 1.4;
-        ctx.beginPath(); ctx.roundRect(-4.5, -2.2, 9, 4.4, 2.2); ctx.fill(); ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = "rgba(255,225,105,0.45)";
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-12, 0); ctx.stroke();
+        ctx.globalAlpha = 0.5;
+        const tail = ctx.createLinearGradient(-46, 0, 0, 0);
+        tail.addColorStop(0, "rgba(255,225,105,0)");
+        tail.addColorStop(1, "rgba(255,238,170,0.75)");
+        ctx.fillStyle = tail;
+        ctx.beginPath(); ctx.moveTo(-46, -1.4); ctx.lineTo(0, -4); ctx.lineTo(0, 4); ctx.lineTo(-46, 1.4);
+        ctx.closePath(); ctx.fill();
+        ctx.shadowColor = "#ffe169"; ctx.shadowBlur = 10;
+        ctx.fillStyle = "rgba(255,240,180,0.75)";
+        ctx.beginPath(); ctx.ellipse(0, 0, 7, 3.6, 0, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
         continue;
       }

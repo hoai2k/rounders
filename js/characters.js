@@ -1321,7 +1321,7 @@
     ctx.save();
     ctx.translate(0, bodyWobble(r, t));
 
-    const ringR = r * 1.42;
+    const ringR = r * 1.3;
     const loops = 2 + Math.min(2, n - 1);
     // the stem: a wavy closed briar, drawn twice so it reads as a rope with a
     // lit side rather than a flat outline
@@ -1336,10 +1336,10 @@
       const steps = 72;
       for (let i = 0; i <= steps; i += 1) {
         const a = (i / steps) * Math.PI * 2;
-        const wob = Math.sin(a * loops * 2 + t * 1.1) * r * 0.11;
+        const wob = Math.sin(a * loops * 2 + t * 1.1) * r * 0.05;
         const rr = ringR + wob + pass.off;
         const x = Math.cos(a + t * 0.35) * rr;
-        const y = Math.sin(a + t * 0.35) * rr * 0.94;
+        const y = Math.sin(a + t * 0.35) * rr;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.closePath();
@@ -1351,8 +1351,8 @@
     const spikes = 10 + (n - 1) * 4;
     for (let i = 0; i < spikes; i += 1) {
       const a = (i / spikes) * Math.PI * 2 + t * 0.35;
-      const rr = ringR + Math.sin(a * loops * 2 + t * 1.1) * r * 0.11;
-      const cx = Math.cos(a) * rr, cy = Math.sin(a) * rr * 0.94;
+      const rr = ringR + Math.sin(a * loops * 2 + t * 1.1) * r * 0.05;
+      const cx = Math.cos(a) * rr, cy = Math.sin(a) * rr;
       const out = a + 0.5;
       ctx.beginPath();
       ctx.moveTo(cx + Math.cos(a + 1.6) * r * 0.06, cy + Math.sin(a + 1.6) * r * 0.06);
@@ -1368,9 +1368,9 @@
     const bloom = 1 + pulse * 1.1;
     for (let i = 0; i < roses; i += 1) {
       const a = (i / roses) * Math.PI * 2 + t * 0.35 + 0.7;
-      const rr = ringR + Math.sin(a * loops * 2 + t * 1.1) * r * 0.11;
-      const cx = Math.cos(a) * rr, cy = Math.sin(a) * rr * 0.94;
-      const rad = r * 0.26 * bloom * (0.9 + 0.1 * Math.sin(t * 2.4 + i));
+      const rr = ringR + Math.sin(a * loops * 2 + t * 1.1) * r * 0.05;
+      const cx = Math.cos(a) * rr, cy = Math.sin(a) * rr;
+      const rad = r * 0.22 * bloom * (0.9 + 0.1 * Math.sin(t * 2.4 + i));
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(a + t * 0.6);

@@ -524,9 +524,10 @@ Pillars:
 - [x] **Hot Streak is worn, not read**: a golden field around the fighter that
       thins as the shield burns down, lasting ~4s instead of 2.5s. Overflow and
       Fresh Coat keep the gold sliver on the bar
-- [x] **Waste Not's refund flies home**: the spent round leaves the wound and
-      lands in the magazine, half size and trailing. The ammo is still credited
-      on the hit, so the card's timing is unchanged
+- [x] **Waste Not's refund flies home**: a semi-transparent ghost of the round
+      jetting dead straight back to the shooter with a long streak behind it,
+      the whole trip inside 0.08s so it could never read as something to dodge.
+      The ammo is still credited on the hit, so the card's timing is unchanged
 - [x] **Permafrost tints its victim** white-blue with rime on the outline,
       under the vapour wreath
 - [x] **Preview fighters aim their guns**: the sim fed the rig a flat aim

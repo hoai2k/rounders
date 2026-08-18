@@ -494,12 +494,14 @@
     // Waste Not: the spent round comes back out of the wound and flies home
     function returnAmmo(from, to) {
       if (!to) return;
-      const ang = rand(0, Math.PI * 2);
+      const x = from.x + rand(-4, 4), y = from.y + rand(-4, 4);
+      const dx = to.x - x, dy = to.y - y;
+      const d = Math.hypot(dx, dy) || 1;
+      // straight home and fast enough that it could never be dodged
+      const speed = Math.max(2800 * SCALE, d / 0.08);
       siphons.push({
-        kind: "ammo",
-        x: from.x + Math.cos(ang) * rand(4, from.stats.radius * 0.6),
-        y: from.y + Math.sin(ang) * rand(4, from.stats.radius * 0.6),
-        vx: Math.cos(ang) * rand(50, 110) * SCALE, vy: (Math.sin(ang) * rand(50, 110) - 70) * SCALE,
+        kind: "ammo", x, y,
+        vx: (dx / d) * speed, vy: (dy / d) * speed,
         to, amount: 0, t: 0, delay: 0
       });
     }
@@ -508,6 +510,15 @@
       for (const s of siphons) {
         if (s.delay > 0) { s.delay -= dt; continue; }
         s.t += dt;
+        if (s.kind === "ammo") {
+          s.x += s.vx * dt; s.y += s.vy * dt;
+          if (Math.hypot(s.to.x - s.x, s.to.y - s.y) < s.to.stats.radius || s.t > 0.35) {
+            puff(s.to.x, s.to.y, "#ffe169", 5, 120);
+            float(s.to.x, s.to.y - s.to.stats.radius - 12, "+1 AMMO", "#ffe169");
+            s.dead = true;
+          }
+          continue;
+        }
         const dx = s.to.x - s.x, dy = s.to.y - s.y;
         const d = Math.hypot(dx, dy) || 1;
         const pull = Math.min(1, s.t * 4) * 5200 * SCALE;
@@ -518,13 +529,8 @@
         if (sp > cap) { s.vx = (s.vx / sp) * cap; s.vy = (s.vy / sp) * cap; }
         s.x += s.vx * dt; s.y += s.vy * dt;
         if (d < s.to.stats.radius * 0.7 || s.t > 2.5) {
-          if (s.kind === "ammo") {
-            puff(s.to.x, s.to.y, "#ffe169", 5, 120);
-            float(s.to.x, s.to.y - s.to.stats.radius - 12, "+1 AMMO", "#ffe169");
-          } else {
-            heal(s.to, s.amount);
-            float(s.to.x, s.to.y - s.to.stats.radius - 12, `+${Math.max(1, Math.round(s.amount))}`, "#74f08b");
-          }
+          heal(s.to, s.amount);
+          float(s.to.x, s.to.y - s.to.stats.radius - 12, `+${Math.max(1, Math.round(s.amount))}`, "#74f08b");
           s.dead = true;
         }
       }
@@ -535,15 +541,19 @@
       for (const s of siphons) {
         if (s.delay > 0) continue;
         if (s.kind === "ammo") {
-          const sp2 = Math.hypot(s.vx, s.vy) || 1;
+          // a ghost of the round, stretched down its own line
           ctx.save();
           ctx.translate(s.x, s.y);
           ctx.rotate(Math.atan2(s.vy, s.vx));
-          ctx.fillStyle = "#ffe169";
-          ctx.strokeStyle = "#6b5410"; ctx.lineWidth = 1.2;
-          ctx.beginPath(); ctx.roundRect(-4, -2, 8, 4, 2); ctx.fill(); ctx.stroke();
-          ctx.strokeStyle = "rgba(255,225,105,0.45)"; ctx.lineWidth = 1.8;
-          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-10, 0); ctx.stroke();
+          ctx.globalAlpha = 0.5;
+          const tail = ctx.createLinearGradient(-34, 0, 0, 0);
+          tail.addColorStop(0, "rgba(255,225,105,0)");
+          tail.addColorStop(1, "rgba(255,238,170,0.75)");
+          ctx.fillStyle = tail;
+          ctx.beginPath(); ctx.moveTo(-34, -1.1); ctx.lineTo(0, -3.2); ctx.lineTo(0, 3.2); ctx.lineTo(-34, 1.1);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = "rgba(255,240,180,0.75)";
+          ctx.beginPath(); ctx.ellipse(0, 0, 5.5, 2.9, 0, 0, Math.PI * 2); ctx.fill();
           ctx.restore();
           continue;
         }
@@ -2258,7 +2268,8 @@
         fields: fields.length, cycle, rewinding: rewind.active, decoys: decoys.length, pillarHoles: pillarHoles.length, holeRects: pillarHoles.map(h => ({ lx: Math.round(h.lx), ly: Math.round(h.ly), w: Math.round(h.w), h: Math.round(h.h) })),
         pos: { ax: Math.round(a.x), ay: Math.round(a.y), bx: Math.round(bb.x), by: Math.round(bb.y) },
         squish: { a: a.squish || 0, b: bb.squish || 0 },
-        crackers: parts.filter(p2 => p2.cracker).length
+        crackers: parts.filter(p2 => p2.cracker).length,
+        ammoBack: siphons.filter(s2 => s2.kind === "ammo").length
       })
     };
   }

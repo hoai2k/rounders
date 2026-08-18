@@ -641,7 +641,7 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
     0 12px 26px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   overflow: hidden;
   cursor: pointer;
   margin: 0 calc(var(--cardw) * -0.055);
@@ -722,7 +722,9 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   display: block;
   flex: none;
   width: 100%;
-  height: 37%;
+  /* the art keeps the top third, trimmed just enough that the rules below it
+     always have room for three lines plus their effect pills */
+  height: 34%;
   border-radius: 10px;
   margin: 2px 0 3px;
   background-image:
@@ -796,7 +798,9 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  /* four lines, which the big draft-hand cards have room for; on the smaller
+     workbench cards the flex box runs out first and bounds it there */
+  -webkit-line-clamp: 4;
 }
 
 /* Cards that only pay off when you press something wear the Xbox button in
@@ -914,12 +918,12 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 
 /* the effect pills are the part you must not lose, so they keep their space
    and the description clamps around them */
-.stat-list { display: flex; flex-wrap: wrap; gap: 4px; flex: none; }
+.stat-list { display: flex; flex-wrap: wrap; gap: 3px; flex: none; }
 
 .stat-list span {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 700;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--rcol) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--rcol) 35%, transparent);

@@ -178,7 +178,7 @@
   const REWIND_MAX = 3;          // seconds of game time that can be undone
   const REWIND_RATE = 0.5;       // history consumed per second of real time
   let history = [];
-  const rewind = { active: false, owner: null, cursor: 0, spent: 0, carry: 0 };
+  const rewind = { active: false, owner: null, cursor: 0, spent: 0, budget: 0, carry: 0 };
   let last = performance.now();
   let toastTimer = 0;
   let audioCtx = null;
@@ -255,7 +255,7 @@
       wallDir: 0, wallTimer: 0, wallCooldown: 0,
       ammo: 3, reloadTimer: 0, fireTimer: 0,
       blockTimer: 0, blockCooldown: 0, echoTimer: 0,
-      activeCooldown: 0, teleWasInside: false,
+      activeCooldown: 0, teleWasInside: false, rewindLeft: REWIND_MAX,
       poisonTimer: 0, poisonDps: 0,
       burnTimer: 0, burnDps: 0,
       chillTimer: 0,
@@ -789,7 +789,7 @@
       p.ammo = p.stats.maxAmmo;
       p.reloadTimer = 0; p.fireTimer = 0;
       p.blockTimer = 0; p.blockCooldown = 0; p.echoTimer = 0;
-      p.activeCooldown = 0; p.teleWasInside = false;
+      p.activeCooldown = 0; p.teleWasInside = false; p.rewindLeft = REWIND_MAX;
       p.poisonTimer = 0; p.burnTimer = 0; p.chillTimer = 0;
       p.teleCooldown = 0;
       p.hazardGrace = 0;
@@ -1433,14 +1433,17 @@
     }
 
     // ---- Chronoshift: hold the button and the whole board runs backwards
+    // enough tape to be worth starting — a few frames' worth, so a nearly
+    // empty reel cannot be machine-gunned for a stutter
     const rewinder = players.find(p =>
-      p.alive && p.stats.active === "chronoshift" && p.activeCooldown <= 0 && p.input.special);
+      p.alive && p.stats.active === "chronoshift" && (p.rewindLeft ?? 0) > 0.15 && p.input.special);
     if (rewinder || rewind.active) {
       if (rewinder && !rewind.active) {
         rewind.active = true;
         rewind.owner = rewinder;
         rewind.cursor = history.length - 1;
         rewind.spent = 0;
+        rewind.budget = rewinder.rewindLeft ?? REWIND_MAX;   // only what is on the reel
         rewind.carry = 0;
         sfx("teleport");
         showToast(str("toast.chronoshift", { name: rewinder.name }));
@@ -1448,13 +1451,13 @@
       const holder = rewind.owner;
       const stillHeld = rewinder && rewinder === holder;
       // consume history at half real time, and never more than the budget
-      const canRewind = stillHeld && rewind.cursor > 0 && rewind.spent < REWIND_MAX;
+      const canRewind = stillHeld && rewind.cursor > 0 && rewind.spent < rewind.budget;
       if (canRewind) {
         // whole frames only, with the remainder carried to the next tick —
         // paying a frame off partially would unwind it at full speed
         let left = dt * REWIND_RATE + rewind.carry;
         let undone = 0;
-        while (rewind.cursor > 0 && rewind.spent < REWIND_MAX) {
+        while (rewind.cursor > 0 && rewind.spent < rewind.budget) {
           const frame = history[rewind.cursor];
           if (left < frame.dt) break;
           left -= frame.dt;
@@ -1462,6 +1465,8 @@
           undone += frame.dt;
           rewind.cursor -= 1;
         }
+        // the reel is charged for exactly what was played back
+        holder.rewindLeft = Math.max(0, (holder.rewindLeft ?? REWIND_MAX) - undone);
         rewind.carry = left;
         restore(history[Math.max(0, rewind.cursor)]);
         history.length = Math.max(1, rewind.cursor + 1);
@@ -1472,10 +1477,10 @@
         updateHud();
         return;                                  // the world does not advance
       }
-      // let go, ran out of tape, or died mid-rewind: hand time back and start
-      // the cooldown from here
+      // let go, ran out of tape, or died mid-rewind: hand time back. There is
+      // no lockout — whatever is left on the reel is usable at once, and the
+      // rest refills at its own pace.
       rewind.active = false;
-      if (holder) holder.activeCooldown = holder.stats.activeCooldown;
       rewind.owner = null;
     }
 
@@ -1938,6 +1943,14 @@
       p.blockCooldown = Math.max(0, p.blockCooldown - dt);
       p.blockTimer = Math.max(0, p.blockTimer - dt);
       p.activeCooldown = Math.max(0, p.activeCooldown - dt);
+      // Chronoshift's tape is a pool, not a switch: it refills at a steady
+      // REWIND_MAX-per-cooldown, so spending two of your three seconds costs
+      // two thirds of the cooldown to earn back, and a sliver of tape is
+      // usable the moment it exists rather than after a fixed lockout.
+      if (p.stats.active === "chronoshift" && !(rewind.active && rewind.owner === p)) {
+        const per = REWIND_MAX / Math.max(0.1, p.stats.activeCooldown);
+        p.rewindLeft = Math.min(REWIND_MAX, (p.rewindLeft ?? REWIND_MAX) + dt * per);
+      }
       p.spawnGrace = Math.max(0, p.spawnGrace - dt);
       p.hazardGrace = Math.max(0, p.hazardGrace - dt);
       p.hitFlash = Math.max(0, (p.hitFlash || 0) - dt);
@@ -4720,7 +4733,8 @@
           (p.cards.length > 3 ? `<span class="more">${escapeHtml(str("hud.more", { count: p.cards.length - 3 }))}</span>` : "") ||
           `<span class="none">${escapeHtml(str("hud.noCards"))}</span>`;
       }
-      const activeReady = p.stats.active && p.activeCooldown <= 0;
+      const activeReady = p.stats.active &&
+        (p.stats.active === "chronoshift" ? (p.rewindLeft ?? 0) > 0.15 : p.activeCooldown <= 0);
       ref.el.classList.toggle("active-ready", Boolean(activeReady));
     }
   }
@@ -5654,14 +5668,17 @@
         drawFxSheet("stun-stars", 0, -r - 64, 74, 0,
           { rot: Math.sin(world.time * 7) * 0.2, alpha: clamp(p.stunTimer / 0.25, 0, 1) });
       }
-      // active ability ready
-      if (p.stats.active && p.activeCooldown <= 0) {
+      // active ability ready. A held active shows how much of its reel is
+      // left as an arc rather than an all-or-nothing ring.
+      const reel = p.stats.active === "chronoshift"
+        ? clamp((p.rewindLeft ?? 0) / REWIND_MAX, 0, 1) : 1;
+      if (p.stats.active && (p.stats.active === "chronoshift" ? reel > 0.05 : p.activeCooldown <= 0)) {
         ctx.strokeStyle = "rgba(255,77,143,0.8)";
         ctx.lineWidth = 3;
         ctx.setLineDash([6, 8]);
         ctx.lineDashOffset = -world.time * 40;
         ctx.beginPath();
-        ctx.arc(0, 0, r + 21, 0, Math.PI * 2);
+        ctx.arc(0, 0, r + 21, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * reel);
         ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -7706,7 +7723,7 @@
       p.hp = p.stats.maxHp;
       p.ammo = p.stats.maxAmmo;
       p.guardianCharges = 0; p.roundRevives = 0; p.hoverLeft = 0; p.freshPool = 0;
-      p.hovering = false; p.rebirth = null; p.activeCooldown = 0;
+      p.hovering = false; p.rebirth = null; p.activeCooldown = 0; p.rewindLeft = REWIND_MAX;
       p.burstQueue = []; p.encoreQueue = [];
       p.decayPool = 0; p.hotShield = 0; p.overShield = 0; p.shield = 0;
       p.alive = true;

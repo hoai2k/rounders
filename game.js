@@ -151,6 +151,10 @@
   let particles = [];
   let fields = [];
   let bolts = []; // lightning polylines {points, life, color}
+  // Lifesteal in flight: a mote of health torn out of whoever was hit, chasing
+  // the shooter down. The heal lands when the mote ARRIVES, not on impact, so
+  // the number you see is the energy you watched come home.
+  let siphons = [];
   // short-lived text that rises off a fighter: heal ticks and the like
   let floats = [];
   function floatText(x, y, text, color) {
@@ -197,6 +201,14 @@
   const DUCK = { none: 1, draft: 0.55, paused: 0.22 };
 
   // ------------------------------------------------------------------ stats
+  // A fighter's REAL trigger and reload timings. Cards multiply these stats
+  // down without limit — four stacked Blood Moneys reach 0.0004s — so the
+  // engine floors them at the point of use (js/gameplay.js gun.minFireDelay /
+  // gun.minReload). The stats themselves are left untouched, so a card still
+  // reports what it does; it simply stops buying speed past the floor.
+  const fireDelayOf = p => Math.max(GP.gun.minFireDelay, p.stats.fireDelay);
+  const reloadOf = p => Math.max(GP.gun.minReload, p.stats.reload);
+
   function defaultStats() {
     // Baselines live in js/gameplay.js — edit numbers there, not here.
     const F = GP.fighter, G = GP.gun, B = GP.block;
@@ -212,7 +224,7 @@
       groundHug: 0, voidPull: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
-      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0, hover: 0,
+      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0, hover: 0, hoard: 0,
       goldenShot: 0, killHeal: false,
       active: null, activeCooldown: 10,
       // gap-audit wave (CARD-GAP-AUDIT.md): offense & bullets
@@ -753,6 +765,7 @@
     fields = [];
     bolts = [];
     fxShots = [];
+    siphons = [];
     floats = [];
     world.weather = [];
     world.lightningTimer = level.lightning ? level.lightning.period : 0;
@@ -1477,6 +1490,7 @@
     updateDecoys(step);
     updateParticles(step);
     updateBolts(step);
+    updateSiphons(step);
     updateHud();
     checkRoundEnd();
   }
@@ -2656,7 +2670,7 @@
 
   function tryShoot(p) {
     if (p.fireTimer > 0 || p.reloadTimer > 0 || p.ammo <= 0) return;
-    p.fireTimer = p.stats.fireDelay;
+    p.fireTimer = fireDelayOf(p);
     // Golden Gun stacks by widening the golden window: one copy gilds the first
     // round of the magazine, two gild the first two, and so on
     const golden = p.stats.goldenShot > 0 && p.ammo > p.stats.maxAmmo - p.stats.goldenShot;
@@ -2679,7 +2693,7 @@
       const rest = p.ammo;
       p.ammo = 0;
       for (let i = 1; i <= rest; i += 1) p.burstQueue.push({ t: i * 0.06, mul: 1 });
-      p.reloadTimer = p.stats.reload;
+      p.reloadTimer = reloadOf(p);
       p.fireTimer = Math.max(p.fireTimer, rest * 0.06 + 0.05);
     }
     // Triple Tap: the echoes follow on their own, aimed wherever you are then
@@ -2698,7 +2712,7 @@
     // Panic Button: the empty click doubles as the block button. Stacking arms
     // it earlier — two copies cover the last two rounds in the magazine.
     if (p.ammo < p.stats.autoBlock) tryBlock(p, true);
-    if (p.ammo <= 0) p.reloadTimer = p.stats.reload;
+    if (p.ammo <= 0) p.reloadTimer = reloadOf(p);
   }
 
   function updateBullets(dt) {
@@ -2971,7 +2985,7 @@
             const damage = b.damage * growBonus;
             hurt(p, damage, b.owner, b.vx, b.vy);
             if (b.owner && b.owner.alive && b.owner.stats.lifesteal) {
-              healPlayer(b.owner, damage * b.owner.stats.lifesteal);
+              siphonHealth(p, b.owner, damage * b.owner.stats.lifesteal);
             }
             if (b.owner && b.owner.alive) {
               const o = b.owner;
@@ -3748,8 +3762,10 @@
         if (attacker) {
           pulse(attacker, 0.35, 130);
           if (attacker.stats.killHeal && attacker.alive) {
-            attacker.hp = attacker.stats.maxHp;
-            burst(attacker.x, attacker.y, "#74f08b", 24, 380);
+            // a kill gives everything back, and you watch it come: the whole
+            // pool leaves the body as a spray of motes
+            siphonHealth(p, attacker, attacker.stats.maxHp - attacker.hp, 7);
+            burst(p.x, p.y, "#74f08b", 26, 420);
           }
         }
       }
@@ -4657,6 +4673,7 @@
       drawParticles();
       drawBoltsAll();
       drawFxShots();
+      drawSiphons();
       drawFloats();
       if (world.lightningFlash > 0) {
         ctx.fillStyle = `rgba(255,244,200,${world.lightningFlash * 1.4})`;
@@ -5347,7 +5364,9 @@
 
       // Juggernaut wears its bulk: a studded iron shell sitting just proud of
       // the body, so the fighter reads as armoured rather than merely large
-      if (p.stats.ironHull > 0) window.ROUNDERS.drawIronHull(ctx, r, p.stats.ironHull);
+      if (p.stats.ironHull > 0) window.ROUNDERS.drawIronHull(ctx, r, p.stats.ironHull, world.time + p.botSeed);
+      // Dragon's Hoard smoulders: curling smoke and gold embers off every side
+      if (p.stats.hoard > 0) window.ROUNDERS.drawHoardAura(ctx, r, p.stats.hoard, world.time + p.botSeed);
       // Hummingbird holding station: wings beating far too fast to resolve
       if (p.hovering) window.ROUNDERS.drawHoverWings(ctx, 0, 0, r, p.wingPhase || 0);
 
@@ -5526,7 +5545,7 @@
     const start = r + 4;                      // first pip sits past the body edge
     const reloading = p.reloadTimer > 0;
     const filled = reloading
-      ? (1 - clamp(p.reloadTimer / Math.max(0.01, p.stats.reload), 0, 1)) * n
+      ? (1 - clamp(p.reloadTimer / Math.max(0.01, reloadOf(p)), 0, 1)) * n
       : p.ammo;
     for (let i = 0; i < n; i += 1) {
       const d = start + i * gap;
@@ -5678,7 +5697,11 @@
         // turn the card's art needs to line its barrel up with that
         const d = r * 3.4;
         ctx.translate(b.x, b.y);
-        ctx.rotate(Math.atan2(b.vy, b.vx) + (look.rotation || 0));
+        // a boomerang tumbles end over end instead of pointing where it is
+        // going — clockwise, which is +ve with the canvas y axis pointing down
+        ctx.rotate(b.boomerang
+          ? world.time * 13 + (look.rotation || 0)
+          : Math.atan2(b.vy, b.vx) + (look.rotation || 0));
         ctx.drawImage(look.art, -d / 2, -d / 2, d, d);
         ctx.restore();
         continue;
@@ -6039,6 +6062,81 @@
       });
     }
     bolts.push({ points, life, maxLife: life, color });
+  }
+
+  // ------------------------------------------------------------- lifesteal
+  // Health torn out of `from` and sent home to `to`. The heal is deliberately
+  // NOT applied here: each mote carries its share and pays out when it lands,
+  // so the health bar fills as the energy arrives rather than the instant the
+  // bullet connects.
+  function siphonHealth(from, to, amount, count = 3) {
+    if (!to || !to.alive || amount <= 0) return;
+    const n = Math.max(1, Math.min(9, Math.round(count)));
+    for (let i = 0; i < n; i += 1) {
+      const a = rand(0, Math.PI * 2);
+      siphons.push({
+        x: from.x + Math.cos(a) * rand(4, from.stats.radius * 0.8),
+        y: from.y + Math.sin(a) * rand(4, from.stats.radius * 0.8),
+        // it drifts out of the wound before turning for home, which is what
+        // makes it read as drawn OUT rather than fired across
+        vx: Math.cos(a) * rand(90, 190), vy: Math.sin(a) * rand(90, 190) - 60,
+        to, amount: amount / n, t: 0, delay: i * 0.05
+      });
+    }
+    puff(from.x, from.y, "#74f08b", 6, 180);
+  }
+
+  function updateSiphons(dt) {
+    for (const s of siphons) {
+      if (s.delay > 0) { s.delay -= dt; continue; }
+      s.t += dt;
+      if (!s.to || !s.to.alive) { s.dead = true; continue; }
+      // the first beat is a loose drift; after that it homes, and hardens its
+      // turn the longer it has been travelling so it always gets there
+      const dx = s.to.x - s.x, dy = s.to.y - s.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const pull = Math.min(1, s.t * 4) * 5200;
+      s.vx += (dx / d) * pull * dt;
+      s.vy += (dy / d) * pull * dt;
+      const sp = Math.hypot(s.vx, s.vy);
+      const cap = 520 + s.t * 2400;
+      if (sp > cap) { s.vx = (s.vx / sp) * cap; s.vy = (s.vy / sp) * cap; }
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      if (Math.random() < dt * 40) {
+        puffOne(s.x + rand(-3, 3), s.y + rand(-3, 3), "rgba(116,240,139,0.7)");
+      }
+      // arrived: this is where the health is actually handed over
+      if (d < s.to.stats.radius * 0.7 || s.t > 2.5) {
+        healPlayer(s.to, s.amount);
+        floatText(s.to.x, s.to.y - s.to.stats.radius - 12, `+${Math.max(1, Math.round(s.amount))}`, "#74f08b");
+        burst(s.to.x, s.to.y, "#74f08b", 5, 130);
+        s.dead = true;
+      }
+    }
+    siphons = siphons.filter(s => !s.dead);
+  }
+
+  function drawSiphons() {
+    ctx.save();
+    for (const s of siphons) {
+      if (s.delay > 0) continue;
+      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 9);
+      g.addColorStop(0, "rgba(198,255,208,0.95)");
+      g.addColorStop(0.45, "rgba(116,240,139,0.75)");
+      g.addColorStop(1, "rgba(116,240,139,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, Math.PI * 2); ctx.fill();
+      // a short wisp behind it, along its own heading
+      const sp = Math.hypot(s.vx, s.vy) || 1;
+      ctx.strokeStyle = "rgba(116,240,139,0.5)";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - (s.vx / sp) * 14, s.y - (s.vy / sp) * 14);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function updateBolts(dt) {

@@ -88,12 +88,17 @@
 
   // Draws the character centered at (0,0) with body radius r.
   // opts: { t (seconds), aimX, aimY, blink (bool), color (override body color) }
+  // The idle bob every fighter breathes with. Exported because anything drawn
+  // AS PART OF the body — Juggernaut's plate, Dragon's Hoard's aura — has to
+  // ride the same wobble, or the fighter visibly bobs in front of it.
+  function bodyWobble(r, t) { return Math.sin(t * 8.5) * r * 0.04; }
+
   function drawCharacter(ctx, ch, r, opts = {}) {
     const t = opts.t || 0;
     const aimX = opts.aimX ?? 1;
     const aimY = opts.aimY ?? 0;
     const body = opts.color || ch.color;
-    const wob = Math.sin(t * 8.5) * r * 0.04;
+    const wob = bodyWobble(r, t);
 
     // 1) composed rig (body + aimable weapon + attached arms) when the parts exist
     const rig = window.ROUNDERS.rig;
@@ -1071,7 +1076,7 @@
   // Juggernaut's shell. Drawn BEHIND the fighter and a little wider than they
   // are, so it reads as their outline thickening into studded iron rather than
   // as a separate object hovering around them. Stacks add plate and rivets.
-  function drawIronHull(ctx, r, stacks = 1) {
+  function drawIronHull(ctx, r, stacks = 1, t = 0) {
     // Armour, not machinery: concentric with the body, sized off the CURRENT
     // radius so any other card that resizes the fighter resizes the plate too,
     // and fixed in place — a rotating ring reads as a gadget, not as plate.
@@ -1079,6 +1084,9 @@
     const outer = r * (1.16 + 0.05 * (n - 1));
     const inner = r;
     ctx.save();
+    // ride the body's bob: this is plate bolted to the fighter, not a hoop
+    // they float around inside
+    ctx.translate(0, bodyWobble(r, t));
     // the ring itself, lit from above like rolled steel
     const g = ctx.createLinearGradient(0, -outer, 0, outer);
     g.addColorStop(0, "#9aa3b4");
@@ -1246,9 +1254,70 @@
     ctx.restore();
   }
 
+  // Dragon's Hoard: a hoard-keeper's aura. Curling smoke rises off the fighter
+  // on every side, lit from within like coals, with a few gold embers turning
+  // in it. Drawn BEHIND the body and riding the same bob, so it reads as
+  // something coming off them rather than a ring they stand in.
+  function drawHoardAura(ctx, r, stacks = 1, t = 0) {
+    const n = Math.max(1, stacks);
+    ctx.save();
+    ctx.translate(0, bodyWobble(r, t));
+
+    // the heat haze the smoke rises out of
+    const glow = ctx.createRadialGradient(0, 0, r * 0.7, 0, 0, r * (1.7 + 0.12 * (n - 1)));
+    glow.addColorStop(0, "rgba(255, 176, 46, 0.42)");
+    glow.addColorStop(0.55, "rgba(214, 104, 22, 0.26)");
+    glow.addColorStop(1, "rgba(120, 40, 10, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * (1.7 + 0.12 * (n - 1)), 0, Math.PI * 2);
+    ctx.fill();
+
+    // curls of smoke, each one a comma of increasing width peeling off the rim
+    const curls = 9 + (n - 1) * 3;
+    for (let i = 0; i < curls; i += 1) {
+      const phase = (i / curls) * Math.PI * 2;
+      // they climb and fade on their own clocks, so the aura never pulses as one
+      const climb = ((t * 0.55 + i / curls) % 1);
+      const a0 = phase + climb * 1.5 + t * 0.25;
+      const reach = r * (1.05 + climb * 1.0);
+      const fade = Math.sin(climb * Math.PI);          // in at the rim, out at the top
+      if (fade <= 0.02) continue;
+      const x0 = Math.cos(a0) * r * 0.92;
+      const y0 = Math.sin(a0) * r * 0.92;
+      const x1 = Math.cos(a0 + 0.5) * reach;
+      const y1 = Math.sin(a0 + 0.5) * reach - climb * r * 0.5;
+      ctx.strokeStyle = `rgba(${210 + Math.round(fade * 45)}, ${120 + Math.round(fade * 60)}, 40, ${0.66 * fade})`;
+      ctx.lineWidth = r * (0.12 + climb * 0.2);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo(
+        Math.cos(a0 + 0.9) * reach * 0.9, Math.sin(a0 + 0.9) * reach * 0.9 - climb * r * 0.3,
+        x1, y1
+      );
+      ctx.stroke();
+    }
+
+    // embers turning in the smoke — the gold the hoard is made of
+    const embers = 4 + (n - 1) * 2;
+    for (let i = 0; i < embers; i += 1) {
+      const a0 = (i / embers) * Math.PI * 2 + t * 0.9;
+      const rr = r * (1.05 + 0.22 * Math.sin(t * 1.7 + i * 2.3));
+      const tw = 0.55 + 0.45 * Math.sin(t * 6 + i * 1.9);
+      ctx.fillStyle = `rgba(255, 214, 104, ${0.92 * tw})`;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a0) * rr, Math.sin(a0) * rr - r * 0.1, r * 0.07 * tw + 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   window.ROUNDERS.CHARACTERS = CHARACTERS;
   window.ROUNDERS.drawCharacter = drawCharacter;
   window.ROUNDERS.drawIronHull = drawIronHull;
+  window.ROUNDERS.bodyWobble = bodyWobble;
+  window.ROUNDERS.drawHoardAura = drawHoardAura;
   window.ROUNDERS.drawSawblade = drawSawblade;
   window.ROUNDERS.drawHoverWings = drawHoverWings;
   window.ROUNDERS.drawLemonade = drawLemonade;

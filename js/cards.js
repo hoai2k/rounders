@@ -461,7 +461,7 @@
       "Never enough. Always more.",
       "A vast magazine, fast reloads, and a damage bonus. Pure greed, no downside.",
       ["+4 ammo", "−25% reload", "+10% damage"], ["ammo"],
-      p => { p.stats.maxAmmo += 4; p.stats.reload *= 0.75; p.stats.damage *= 1.1; }),
+      p => { p.stats.maxAmmo += 4; p.stats.reload *= 0.75; p.stats.damage *= 1.1; p.stats.hoard += 1; }),
 
     // ------------------------------------------------------ LEGENDARY (4)
 
@@ -574,7 +574,7 @@
     wallPierce: 0, holePunch: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0,
     boomerang: 0, helium: 0, encore: 0, burstFire: 0, goldenShot: 0,
     lifesteal: 0, killHeal: false, rage: 0, scavenge: 0, bloodMoney: 0,
-    kbDeal: 0, sugarRush: 0, hotStreak: 0,
+    kbDeal: 0, sugarRush: 0, hotStreak: 0, hoard: 0,
     // aim
     steer: 0,
     // Mythics
@@ -585,13 +585,20 @@
     "blockReload", "healField", "frostBlock", "sawBlock", "empowerBlock",
     "brickBlock", "decoy", "blockRefresh", "autoBlock", "blockCooldown", "blockDuration"];
   const JUMP_KEYS = ["floatTime", "extraJumps", "jumpBlast", "stomp", "hover", "jump"];
-  const SHOOT_KEYS = ["damage", "fireDelay", "reload", "maxAmmo", "bulletSpeed",
-    "bulletGravity", "bulletDrag", "bulletRestitution", "bulletSize", "pellets",
-    "spread", "bounces", "explosive", "homing", "pierce", "poison", "burn",
-    "chill", "chain", "shards", "popcorn", "grow", "groundHug", "voidPull",
-    "wallPierce", "holePunch", "bankShot", "stink", "dazzle", "silence",
-    "boomerang", "helium", "encore", "burstFire", "goldenShot", "lifesteal",
-    "killHeal", "rage", "scavenge", "bloodMoney", "kbDeal", "sugarRush", "hotStreak"];
+  // RT means "pulling the trigger DOES something different", not "your gun has
+  // better numbers". Dragon's Hoard is more ammo, a faster reload and more
+  // damage — you shoot exactly as you always did, so it wears no badge, and
+  // the same goes for Cannonball, Hair Trigger and Speed Loader. Deliberately
+  // absent from this list: damage, fireDelay, reload, maxAmmo, bulletSpeed,
+  // bulletGravity, bulletDrag, bulletRestitution, bulletSize, spread.
+  const SHOOT_KEYS = ["pellets", "bounces", "explosive", "homing", "pierce",
+    "poison", "burn", "chill", "chain", "shards", "popcorn", "grow", "groundHug",
+    "voidPull", "wallPierce", "holePunch", "bankShot", "stink", "dazzle",
+    "silence", "boomerang", "helium", "encore", "burstFire", "goldenShot",
+    "lifesteal", "killHeal", "rage", "scavenge", "bloodMoney", "kbDeal",
+    // `hover` is in both lists on purpose: you press A to hold station and RT
+    // to dump the whole magazine from up there, so Hummingbird names two
+    "sugarRush", "hotStreak", "hover"];
 
   // Which ACTIONS a card pays off from. Purely passive cards — more health,
   // more speed, thicker skin — name no action and wear no badge; everything

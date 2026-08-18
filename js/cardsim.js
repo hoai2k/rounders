@@ -37,6 +37,12 @@
 
   // How this card's round is drawn, from js/bullet-art.js — the same table the
   // game reads, so the preview, the bullet pane and the match all agree.
+  // Same floors the engine applies (js/gameplay.js gun.minFireDelay /
+  // gun.minReload), so the preview never shows a rate the match will not run at
+  const GUN = () => (window.ROUNDERS.GAMEPLAY || { gun: {} }).gun;
+  const fireDelayOf = st => Math.max(GUN().minFireDelay ?? 0, st.fireDelay);
+  const reloadOf = st => Math.max(GUN().minReload ?? 0, st.reload);
+
   function bulletLook(cardId) {
     const k = (window.ROUNDERS.BULLET_ART || {})[cardId] || {};
     return {
@@ -91,7 +97,7 @@
       groundHug: 0, voidPull: 0,
       lifesteal: 0, thorns: 0, regen: 0, rage: 0, adrenaline: 0,
       echoBlock: 0, blockPush: 0, blockDash: 0, warpBlock: 0, stormBlock: 0,
-      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0, hover: 0,
+      guardian: 0, revives: 0, extraJumps: 0, kbResist: 0, shield: 0, ironHull: 0, hover: 0, hoard: 0,
       goldenShot: 0, killHeal: false,
       active: null, activeCooldown: 10,
       kbDeal: 0, bankShot: 0, stink: 0, dazzle: 0, silence: 0, wallPierce: 0, holePunch: 0,
@@ -214,7 +220,13 @@
     if (on("chill") || on("frostBlock") || on("chillAura")) watch.push("the victim turns blue and slows down");
     if (on("dazzle")) watch.push("the victim is stunned stiff for a moment");
     if (on("silence")) watch.push("the victim's block is muted — watch it fail");
-    if (on("lifesteal")) watch.push("the shooter heals from the damage dealt");
+    if (on("lifesteal")) {
+      // start them hurt, or there is no room to heal into and the card looks
+      // like it does nothing
+      plan.wounded = Math.min(plan.wounded ?? 1, 0.45);
+      watch.push("health is torn out of the victim and flies back to the shooter");
+      watch.push("the heal lands when the energy arrives, not when the bullet does");
+    }
     if (on("thorns")) watch.push("the attacker takes damage back on every hit");
     if (on("shield") || on("overflow") || on("hotStreak") || on("freshCoat")) {
       watch.push("a shield bar soaks the hit before health moves");
@@ -298,7 +310,7 @@
     const chA = CH[opts.shooterChar ?? 0] || null;
     const chB = CH[opts.targetChar ?? 3] || null;
 
-    let a, bb, bullets, fields, parts, floaters, decoys, slabs, t, cycle, raf = 0, running = false;
+    let a, bb, bullets, fields, parts, floaters, decoys, slabs, siphons, t, cycle, raf = 0, running = false;
     // Chronoshift runs the whole preview backwards, so the preview keeps the
     // same rolling film of itself the game does: one frame per tick, consumed
     // at half real time, with ghosts of everything retreating along it.
@@ -335,6 +347,7 @@
       a.temp = a.holder ? a.stats.maxHp * a.stats.freshCoat : 0;
       bb.temp = bb.holder ? bb.stats.maxHp * bb.stats.freshCoat : 0;
       bullets = []; fields = []; parts = []; floaters = []; decoys = []; slabs = [];
+      siphons = [];
       history = [];
       rewind.active = false; rewind.cursor = 0; rewind.spent = 0; rewind.carry = 0;
       pillarHoles = [];
@@ -412,6 +425,63 @@
           smoke: true, x: x + rand(-size / 2, size / 2), y: y + rand(-size / 2, size / 2),
           vx: rand(-35, 35), vy: rand(-25, 8), life, max: life, r: rand(3, 8), color: base
         });
+      }
+    }
+
+    // Health torn out of `from` and sent home to `to`, paying out on ARRIVAL —
+    // same rule as the game, so the preview shows the delay too.
+    function siphon(from, to, amount, count = 3) {
+      if (!to || amount <= 0) return;
+      const n = Math.max(1, Math.min(9, Math.round(count)));
+      for (let i = 0; i < n; i += 1) {
+        const ang = rand(0, Math.PI * 2);
+        siphons.push({
+          x: from.x + Math.cos(ang) * rand(4, from.stats.radius * 0.8),
+          y: from.y + Math.sin(ang) * rand(4, from.stats.radius * 0.8),
+          vx: Math.cos(ang) * rand(60, 130) * SCALE, vy: (Math.sin(ang) * rand(60, 130) - 50) * SCALE,
+          to, amount: amount / n, t: 0, delay: i * 0.05
+        });
+      }
+      puff(from.x, from.y, "#74f08b", 6, 150);
+    }
+
+    function updateSiphons(dt) {
+      for (const s of siphons) {
+        if (s.delay > 0) { s.delay -= dt; continue; }
+        s.t += dt;
+        const dx = s.to.x - s.x, dy = s.to.y - s.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const pull = Math.min(1, s.t * 4) * 5200 * SCALE;
+        s.vx += (dx / d) * pull * dt;
+        s.vy += (dy / d) * pull * dt;
+        const sp = Math.hypot(s.vx, s.vy);
+        const cap = (520 + s.t * 2400) * SCALE;
+        if (sp > cap) { s.vx = (s.vx / sp) * cap; s.vy = (s.vy / sp) * cap; }
+        s.x += s.vx * dt; s.y += s.vy * dt;
+        if (d < s.to.stats.radius * 0.7 || s.t > 2.5) {
+          heal(s.to, s.amount);
+          float(s.to.x, s.to.y - s.to.stats.radius - 12, `+${Math.max(1, Math.round(s.amount))}`, "#74f08b");
+          s.dead = true;
+        }
+      }
+      siphons = siphons.filter(s => !s.dead);
+    }
+
+    function drawSiphons() {
+      for (const s of siphons) {
+        if (s.delay > 0) continue;
+        const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 7);
+        g.addColorStop(0, "rgba(198,255,208,0.95)");
+        g.addColorStop(0.45, "rgba(116,240,139,0.75)");
+        g.addColorStop(1, "rgba(116,240,139,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 7, 0, Math.PI * 2); ctx.fill();
+        const sp = Math.hypot(s.vx, s.vy) || 1;
+        ctx.strokeStyle = "rgba(116,240,139,0.5)"; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y);
+        ctx.lineTo(s.x - (s.vx / sp) * 11, s.y - (s.vy / sp) * 11);
+        ctx.stroke();
       }
     }
 
@@ -568,7 +638,7 @@
         const rest = who.ammo;
         who.ammo = 0;
         for (let i = 1; i <= rest; i += 1) who.queue.push({ t: i * 0.06, mul: 1 });
-        who.reloadT = who.stats.reload;
+        who.reloadT = reloadOf(who.stats);
         who.fireT = Math.max(who.fireT, rest * 0.06 + 0.05);
       }
       // Berserker's Blood: how far past hurt the shooter is, 0 at full health
@@ -887,7 +957,7 @@
       if (shooter.fireT <= 0 && shooter.reloadT <= 0 && shooter.ammo > 0 && shooter.stunT <= 0 && t > 0.7 &&
           (!shooter.stats.empowerBlock || shooter.empower > 0)) {
         fire(shooter);
-        shooter.fireT = Math.max(0.55, shooter.stats.fireDelay);
+        shooter.fireT = Math.max(0.55, fireDelayOf(shooter.stats));
       }
       // the receiver blocks incoming fire when blocking is what's on show
       if (plan.blockDemo) {
@@ -1136,7 +1206,8 @@
           const travel = Math.hypot(b.x - b.ox, b.y - b.oy);
           const dmg = b.damage * (b.grow ? 1 + Math.min(1, travel / 420) : 1);
           damage(who, dmg, b.owner, b.vx, b.vy);
-          if (b.owner.stats.lifesteal) { heal(b.owner, dmg * b.owner.stats.lifesteal); float(b.owner.x, b.owner.y - 56, `+${Math.round(dmg * b.owner.stats.lifesteal)}`, "#74f08b"); }
+          // the heal rides home as motes and lands when they arrive
+          if (b.owner.stats.lifesteal) siphon(who, b.owner, dmg * b.owner.stats.lifesteal);
           if (b.owner.stats.hotStreak) b.owner.hotWant = true;
           if (b.owner.stats.scavenge) { b.owner.ammo = Math.min(b.owner.stats.maxAmmo, b.owner.ammo + 1); float(b.owner.x, b.owner.y - 56, "+1 AMMO", "#ffe169"); }
           if (b.owner.stats.sugarRush) b.owner.sugarT = 2.5;
@@ -1269,13 +1340,14 @@
         else p.vy += 400 * dt;
       }
       parts = parts.filter(p => p.life > 0);
+      updateSiphons(dt);
       for (const f of floaters) { f.life -= dt; f.y -= 26 * dt; }
       floaters = floaters.filter(f => f.life > 0);
       for (const d of decoys) if (d.hp <= 0) d.fade = (d.fade ?? 0.6) - dt;
       decoys = decoys.filter(d => d.hp > 0 || (d.fade ?? 0) > 0);
 
       // loop the scene once it has made its point
-      const quiet = !bullets.length && !fields.length;
+      const quiet = !bullets.length && !fields.length && !siphons.length;
       // Breakthrough needs longer: one bite, a second to hole right through, then
       // shots flying through the gap. Cutting at 5s reset the wall every time.
       const soft = plan.stats.holePunch ? 9 : 4.6;
@@ -1366,7 +1438,10 @@
       if (who.stunT > 0) ctx.rotate(Math.sin(t * 40) * 0.07);
       // Juggernaut's studded iron shell, behind the body, same as in game
       if (who.stats.ironHull > 0 && window.ROUNDERS.drawIronHull) {
-        window.ROUNDERS.drawIronHull(ctx, who.stats.radius, who.stats.ironHull);
+        window.ROUNDERS.drawIronHull(ctx, who.stats.radius, who.stats.ironHull, t);
+      }
+      if (who.stats.hoard > 0 && window.ROUNDERS.drawHoardAura) {
+        window.ROUNDERS.drawHoardAura(ctx, who.stats.radius, who.stats.hoard, t);
       }
       // Hummingbird holding station: wings beating too fast to resolve
       if (who.hovering && window.ROUNDERS.drawHoverWings) {
@@ -1414,7 +1489,7 @@
       }
       // ammo pips
       const n = Math.min(10, Math.round(who.stats.maxAmmo));
-      const filled = who.reloadT > 0 ? (1 - who.reloadT / who.stats.reload) * n : who.ammo;
+      const filled = who.reloadT > 0 ? (1 - who.reloadT / reloadOf(who.stats)) * n : who.ammo;
       for (let i = 0; i < n; i += 1) {
         ctx.beginPath();
         ctx.arc(x + 3 + i * 7, y - 10, i < filled ? 2.6 : 1.8, 0, Math.PI * 2);
@@ -1721,7 +1796,8 @@
         const gr = b.grow ? 1 + Math.min(0.7, Math.hypot(b.x - b.ox, b.y - b.oy) / 600) : 1;
         const look = b.cardId ? bulletLook(b.cardId) : { art: null, scale: 1, rotation: 0 };
         ctx.translate(b.x, b.y);
-        ctx.rotate(Math.atan2(b.vy, b.vx));
+        // a boomerang tumbles end over end instead of pointing where it is going
+        ctx.rotate(b.boomerang ? t * 13 : Math.atan2(b.vy, b.vx));
         drawBullet(ctx, {
           r: b.r, color: b.color,
           golden: Boolean(b.golden), empowered: Boolean(b.empowered),
@@ -1787,6 +1863,7 @@
         ctx.restore();
       }
       drawFighter(a); drawFighter(bb);
+      drawSiphons();
       for (const f of floaters) {
         ctx.globalAlpha = Math.min(1, f.life / 0.5);
         ctx.fillStyle = f.color; ctx.font = "800 13px system-ui, sans-serif"; ctx.textAlign = "center";

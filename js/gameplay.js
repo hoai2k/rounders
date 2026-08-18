@@ -44,7 +44,16 @@
       bulletRestitution: 0.72,// bounciness of ricochet shots
       bulletSize: 1,          // visual + hitbox scale
       pellets: 1,
-      spread: 0.04
+      spread: 0.04,
+
+      // Floors, not baselines. Fire-rate cards multiply these down, and four
+      // stacked copies of Blood Money reach a 0.0004s delay — the whole
+      // magazine leaving the barrel inside a single 16ms frame, which turns a
+      // fast gun into an instant clip dump. The engine refuses to go below
+      // these however far the stats are pushed; the stats themselves are left
+      // honest, so a card still reads as doing what it says.
+      minFireDelay: 0.05,     // 20 rounds a second, ~3 frames apart at 60fps
+      minReload: 0.3
     },
 
     // ------------------------------------------------------------- BLOCKING

@@ -468,16 +468,41 @@ Pillars:
       notes; headline: engine is stable across 100 live 12-card builds and
       4000 stat builds with duplicates, but the damage tail one-shots and
       `fireDelay` has no floor
-- [ ] **No floor on `fireDelay` / `reload`** — stacked Blood Money and Hair
-      Trigger reach a 0.0004s fire delay, so the whole magazine leaves the
-      barrel in a single frame. Not a crash (worst frame 33ms) but it turns
-      "fast gun" into "instant clip dump". A floor around 0.05s / 0.3s would
-      keep stacking worthwhile with diminishing returns
+- [x] **Fire-rate floors** (`GAMEPLAY.gun.minFireDelay` 0.05s, `minReload`
+      0.3s). Stacked Blood Money and Hair Trigger reached a 0.0004s delay, so a
+      whole magazine left the barrel inside one frame. The floor is applied at
+      the point of use, not to the stat, so a card still reports what it does —
+      it simply stops buying speed past the floor. Measured: the extreme build
+      now plays at 0.050s and empties 10 rounds over 663ms instead of a single
+      frame; worst sustained DPS across 4000 builds falls 7603 → 3695, and peak
+      rounds in the air in a live 12-card audit falls 329 → 33
 - [ ] **Damage tail one-shots**: baseline volley is 36 vs 100 HP (3 hits, as
       designed). Over 16-card builds the median is 49, p90 109, p99 225 and
       the max 448. Supernova appears in 125% of the hottest 1% of builds (i.e.
       often twice) and Glass Cannon in 108%; damage multipliers compose and
       pellets multiply on top
+- [x] **Lifesteal is visible energy 2026-08-18**: Leech Lunch and Grim Harvest
+      tear health out of whoever was hit as green motes that chase the shooter
+      down, and the heal is applied when a mote ARRIVES rather than on impact —
+      so the health bar fills as the energy comes home. Measured at ~800ms
+      between hit and heal in the preview. A kill under Grim Harvest sprays the
+      whole pool. The preview also stages lifesteal holders at 45% health,
+      without which they were at full and the card looked like it did nothing
+- [x] **Body-attached effects ride the body bob**: `ROUNDERS.bodyWobble` is
+      exported from the character renderer, so Juggernaut's plate no longer
+      sits still while the fighter bobs in front of it — it is plate bolted on,
+      not a hoop they float inside
+- [x] **Dragon's Hoard smoulders**: curling smoke rises off every side, lit
+      from within, with gold embers turning in it, drawn behind the body and on
+      the same bob as Juggernaut's plate
+- [x] **Boomerang tumbles** end over end as it flies instead of pointing along
+      its path
+- [x] **RT means the shot behaves differently**, not that the gun has better
+      numbers. Dragon's Hoard is more ammo, a faster reload and more damage —
+      you shoot exactly as before — so it and Cannonball, Hair Trigger, Speed
+      Loader, Longshot and Bubblegum Rounds now wear no badge. 36 of 77 cards
+      carry RT, down from 47. Hummingbird names both A and RT, since you hold
+      station with one and dump the magazine with the other
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

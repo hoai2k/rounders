@@ -19,6 +19,7 @@ await page.waitForTimeout(1600);
 const out = await page.evaluate(({ N, SIZE }) => {
   const { CARDS, CARD_SIM } = window.ROUNDERS;
   const base = CARD_SIM.baseStats();
+  const GUN = (window.ROUNDERS.GAMEPLAY || { gun: {} }).gun;
   const worst = { volley: null, dps: null, hp: null, ehp: null };
   const blame = {};            // card -> how often it appears in a top-1% build
   const volleys = [];
@@ -32,10 +33,14 @@ const out = await page.evaluate(({ N, SIZE }) => {
     const st = CARD_SIM.baseStats();
     for (const c of build) { try { c.apply({ stats: st }); } catch (e) { return "APPLY THREW: " + c.id + " " + e.message; } }
     const volley = st.damage * st.pellets;
-    const dps = volley / Math.max(st.fireDelay, 0.01);
+    // the rate the match actually RUNS at, not the raw stat: the engine floors
+    // fire delay (js/gameplay.js gun.minFireDelay), so an unclamped number here
+    // would report a DPS nobody can reach
+    const played = Math.max(GUN.minFireDelay ?? 0.01, st.fireDelay);
+    const dps = volley / played;
     const ehp = st.maxHp * (1 + (st.shield || 0) / 100);
     volleys.push(volley);
-    const rec = { build: build.map(c => c.id), volley: Math.round(volley), dps: Math.round(dps), hp: Math.round(st.maxHp), pellets: st.pellets, fireDelay: +st.fireDelay.toFixed(3) };
+    const rec = { build: build.map(c => c.id), volley: Math.round(volley), dps: Math.round(dps), hp: Math.round(st.maxHp), pellets: st.pellets, fireDelay: +st.fireDelay.toFixed(4), playedDelay: +played.toFixed(3) };
     if (!worst.volley || volley > worst.volley.volley) worst.volley = rec;
     if (!worst.dps || dps > worst.dps.dps) worst.dps = { ...rec };
     if (!worst.hp || st.maxHp > worst.hp.hp) worst.hp = { ...rec };

@@ -1942,6 +1942,7 @@
       p.hazardGrace = Math.max(0, p.hazardGrace - dt);
       p.hitFlash = Math.max(0, (p.hitFlash || 0) - dt);
       p.thornPulse = Math.max(0, (p.thornPulse || 0) - dt);
+      p.flashPop = Math.max(0, (p.flashPop || 0) - dt);
       p.squish = Math.max(0, (p.squish || 0) - dt);
       p.teleCooldown = Math.max(0, p.teleCooldown - dt);
       p.wallTimer = Math.max(0, p.wallTimer - dt);
@@ -3104,7 +3105,10 @@
             if (b.dazzle && p.dazzleImmune <= 0) {
               p.stunTimer = Math.max(p.stunTimer, Math.min(0.7, 0.4 * b.dazzle));
               p.dazzleImmune = 2;
+              // it is a camera flash: the bulb goes off all around them
+              p.flashPop = 0.26;
               burst(p.x, p.y - p.stats.radius - 6, "#ffffff", 10, 160);
+              burst(p.x, p.y, "#ffffff", 16, 320);
             }
             if (b.silence) {
               p.silenceTimer = Math.max(p.silenceTimer, 1.5 * b.silence);
@@ -5468,6 +5472,11 @@
       const r = p.stats.radius;
       ctx.save();
       ctx.translate(p.x, p.y);
+      // Camera Flash: a stunned fighter is rattled, not merely stationary
+      if (p.stunTimer > 0) {
+        const k = clamp(p.stunTimer / 0.4, 0, 1);
+        ctx.translate(Math.sin(world.time * 46) * 3.2 * k, Math.cos(world.time * 39) * 1.8 * k);
+      }
       const sq = squishScale(p);
       if (sq) { ctx.translate(0, r + (sq.lift || 0)); ctx.scale(sq.sx, sq.sy); ctx.translate(0, -r); }
 
@@ -5623,6 +5632,23 @@
           ctx.arc(0, 0, r + 9, 0, Math.PI * 2);
           ctx.fill();
         }
+      }
+      // the bulb going off: a hard white wash over the body that blows out
+      // into a ring and is gone inside a quarter second
+      if (p.flashPop > 0) {
+        const k = 1 - clamp(p.flashPop / 0.26, 0, 1);      // 0 at the pop, 1 at the end
+        const rr = r * (1.1 + k * 2.4);
+        ctx.save();
+        const fg2 = ctx.createRadialGradient(0, 0, 0, 0, 0, rr);
+        fg2.addColorStop(0, `rgba(255,255,255,${0.85 * (1 - k)})`);
+        fg2.addColorStop(0.6, `rgba(255,255,255,${0.45 * (1 - k) * (1 - k)})`);
+        fg2.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = fg2;
+        ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - k)})`;
+        ctx.lineWidth = 3 * (1 - k) + 0.5;
+        ctx.beginPath(); ctx.arc(0, 0, rr * 0.92, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
       }
       // Camera Flash leaves its victim seeing stars — before this the only tell
       // a stun had was that they stopped moving. They ride above the health bar

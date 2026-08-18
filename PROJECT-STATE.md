@@ -541,6 +541,15 @@ Pillars:
       hop, `minHold` 0.5s starts the wind-up and 7s reaches 2.15x launch speed
       — an ~850px rise, the height of the board. Tuned in
       `GAMEPLAY.chargeJump`; measured 838 / 922 / 1908 px/s at tap / 0.8s / 7s
+- [x] **Camera Flash goes off like a flashbulb**: a hard white wash over the
+      victim that blows out into a ring and is gone inside a quarter second,
+      and a stunned fighter is now visibly rattled — the body shakes as well as
+      seeing stars, instead of only standing still
+- [x] **Payment Plan drops its floating number**: the amber tail on the health
+      bar already says what is owed; the "-N over time" text only repeated it
+- [x] **Blood Money's preview runs long** (13s hard cut, as Breakthrough does):
+      the trade only reads once the shooter has emptied a magazine or two into
+      it, which now takes them down to ~40% health on screen
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

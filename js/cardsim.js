@@ -636,7 +636,9 @@
         puff(who.x, who.y, "#ffd76e", 8, 200);
       }
       if (amount <= 0) return;
-      if (who.stats.decay && direct) { who.decayPool += amount; float(who.x, who.y - 46, `${Math.round(amount)} over time`, "#c88fff"); return; }
+      // Payment Plan: banked, not floated — the amber tail on the health bar
+      // is the whole story, and a number over their head only repeats it
+      if (who.stats.decay && direct) { who.decayPool += amount; return; }
       const lethal = who.hp - amount <= 0;
       if (lethal && who.guardian > 0) {
         who.guardian -= 1; who.hp = who.maxHp * 0.25;
@@ -907,6 +909,7 @@
         who.blockT = Math.max(0, who.blockT - dt);
         who.blockCd = Math.max(0, who.blockCd - dt);
         who.stunT = Math.max(0, who.stunT - dt);
+        who.flashPop = Math.max(0, (who.flashPop || 0) - dt);
         who.silenceT = Math.max(0, who.silenceT - dt);
         who.chillT = Math.max(0, who.chillT - dt);
         who.thornPulse = Math.max(0, (who.thornPulse || 0) - dt);
@@ -1472,7 +1475,12 @@
           if (b.chill) { who.chillT = 2; puff(who.x, who.y, "#8fd8ff", 8, 180); }
           // a banked round arrives with everything it picked up off the cushions
           if (b.banked) { puff(who.x, who.y, "#ffe169", 16 + b.banked * 6, 300); puff(who.x, who.y, "#ffb03a", 10, 220); }
-          if (b.dazzle) { who.stunT = 0.6; float(who.x, who.y - 60, "STUNNED", "#ffffff"); }
+          if (b.dazzle) {
+            who.stunT = 0.6;
+            who.flashPop = 0.26;
+            puff(who.x, who.y, "#ffffff", 16, 300);
+            float(who.x, who.y - 60, "STUNNED", "#ffffff");
+          }
           if (b.silence) { who.silenceT = 1.5; float(who.x, who.y - 60, "SILENCED", "#b8b8c8"); }
           if (b.chain) {
             const third = [a, bb].find(q => q !== who && q !== b.owner);
@@ -1622,8 +1630,11 @@
       const quiet = !bullets.length && !fields.length && !siphons.length;
       // Breakthrough needs longer: one bite, a second to hole right through, then
       // shots flying through the gap. Cutting at 5s reset the wall every time.
-      const soft = plan.stats.holePunch ? 9 : 4.6;
-      const hard = plan.stats.holePunch ? 12 : 7.5;
+      // Breakthrough needs the long cut, and so does Blood Money: the trade
+      // only reads once the shooter has emptied a magazine or two into it.
+      const long = plan.stats.holePunch || plan.stats.bloodMoney;
+      const soft = long ? 9 : 4.6;
+      const hard = long ? 13 : 7.5;
       if ((t > soft && quiet) || t > hard) { const keep = cycle + 1; reset(); cycle = keep; }
     }
 
@@ -1712,7 +1723,12 @@
       }
       if (who.chillT > 0) { ctx.shadowColor = "#8fd8ff"; ctx.shadowBlur = 16; }
       if (who.burnT > 0) { ctx.shadowColor = "#ff7a26"; ctx.shadowBlur = 18 + Math.sin(t * 22) * 6; }
-      if (who.stunT > 0) ctx.rotate(Math.sin(t * 40) * 0.07);
+      if (who.stunT > 0) {
+        // rattled, not merely standing still
+        const k = Math.max(0, Math.min(1, who.stunT / 0.4));
+        ctx.translate(Math.sin(t * 46) * 3.2 * k, Math.cos(t * 39) * 1.8 * k);
+        ctx.rotate(Math.sin(t * 40) * 0.07);
+      }
       // Juggernaut's studded iron shell, behind the body, same as in game
       if (who.stats.ironHull > 0 && window.ROUNDERS.drawIronHull) {
         window.ROUNDERS.drawIronHull(ctx, who.stats.radius, who.stats.ironHull, t);
@@ -1779,6 +1795,21 @@
           ctx.lineTo(Math.cos(a2) * rr, Math.sin(a2) * rr);
           ctx.stroke();
         }
+      }
+      // the bulb going off, blowing out past the body
+      if (who.flashPop > 0) {
+        const rr0 = who.stats.radius;
+        const k = 1 - Math.max(0, Math.min(1, who.flashPop / 0.26));
+        const rr = rr0 * (1.1 + k * 2.4);
+        const fg2 = ctx.createRadialGradient(0, 0, 0, 0, 0, rr);
+        fg2.addColorStop(0, `rgba(255,255,255,${0.85 * (1 - k)})`);
+        fg2.addColorStop(0.6, `rgba(255,255,255,${0.45 * (1 - k) * (1 - k)})`);
+        fg2.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = fg2;
+        ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - k)})`;
+        ctx.lineWidth = 3 * (1 - k) + 0.5;
+        ctx.beginPath(); ctx.arc(0, 0, rr * 0.92, 0, Math.PI * 2); ctx.stroke();
       }
       ctx.restore();
       // block bubble
@@ -2269,7 +2300,8 @@
         pos: { ax: Math.round(a.x), ay: Math.round(a.y), bx: Math.round(bb.x), by: Math.round(bb.y) },
         squish: { a: a.squish || 0, b: bb.squish || 0 },
         crackers: parts.filter(p2 => p2.cracker).length,
-        ammoBack: siphons.filter(s2 => s2.kind === "ammo").length
+        ammoBack: siphons.filter(s2 => s2.kind === "ammo").length,
+        stun: bb.stunT || 0
       })
     };
   }

@@ -93,6 +93,45 @@
   // ride the same wobble, or the fighter visibly bobs in front of it.
   function bodyWobble(r, t) { return Math.sin(t * 8.5) * r * 0.04; }
 
+  // A tint laid over the fighter's OWN pixels — not a shape in front of them.
+  // The character is redrawn into a scratch canvas with identical options, the
+  // colour is composited `source-atop` so it can only land where the sprite
+  // is, and the result is stamped back at the origin. Because the redraw uses
+  // the same options it also carries the same wobble, aim and facing, so the
+  // tint moves exactly with the body the way Juggernaut's plate does.
+  let tintCv = null, tintCtx = null;
+  function drawTinted(ctx, ch, r, opts, paint) {
+    const size = Math.ceil(r * 6);
+    if (!tintCv) {
+      tintCv = document.createElement("canvas");
+      tintCtx = tintCv.getContext("2d");
+    }
+    if (tintCv.width !== size) { tintCv.width = size; tintCv.height = size; }
+    else tintCtx.clearRect(0, 0, size, size);
+    tintCtx.save();
+    tintCtx.translate(size / 2, size / 2);
+    drawCharacter(tintCtx, ch, r, opts);
+    tintCtx.restore();
+    tintCtx.save();
+    tintCtx.globalCompositeOperation = "source-atop";
+    paint(tintCtx, size);
+    tintCtx.restore();
+    ctx.drawImage(tintCv, -size / 2, -size / 2);
+  }
+
+  // Permafrost: frozen through. White at the crown falling to ice blue, with a
+  // band of hard rime across the middle.
+  function drawFrostTint(ctx, ch, r, opts, strength = 1) {
+    drawTinted(ctx, ch, r, opts, (g, size) => {
+      const grad = g.createLinearGradient(0, size * 0.2, 0, size * 0.8);
+      grad.addColorStop(0, `rgba(244,252,255,${0.66 * strength})`);
+      grad.addColorStop(0.5, `rgba(176,226,255,${0.6 * strength})`);
+      grad.addColorStop(1, `rgba(120,190,250,${0.52 * strength})`);
+      g.fillStyle = grad;
+      g.fillRect(0, 0, size, size);
+    });
+  }
+
   function drawCharacter(ctx, ch, r, opts = {}) {
     const t = opts.t || 0;
     const aimX = opts.aimX ?? 1;
@@ -1408,6 +1447,7 @@
   window.ROUNDERS.bodyWobble = bodyWobble;
   window.ROUNDERS.drawHoardAura = drawHoardAura;
   window.ROUNDERS.drawThornVine = drawThornVine;
+  window.ROUNDERS.drawFrostTint = drawFrostTint;
   window.ROUNDERS.drawSawblade = drawSawblade;
   window.ROUNDERS.drawHoverWings = drawHoverWings;
   window.ROUNDERS.drawLemonade = drawLemonade;

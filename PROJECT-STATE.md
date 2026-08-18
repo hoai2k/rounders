@@ -538,9 +538,13 @@ Pillars:
       Moon Shoes spends its extra jump at the apex; Tailwind hangs on its float
 - [x] **Grasshopper is a charged jump**: hold jump on the ground to coil (the
       fighter compresses and bobs), release to launch. A tap is an ordinary
-      hop, `minHold` 0.5s starts the wind-up and 7s reaches 2.15x launch speed
-      — an ~850px rise, the height of the board. Tuned in
-      `GAMEPLAY.chargeJump`; measured 838 / 922 / 1908 px/s at tap / 0.8s / 7s
+      hop; at `minHold` (0.5s) the wind-up is worth **2x normal jump height**
+      and at `maxHold` (7s) **10x**. Configured in HEIGHT in
+      `GAMEPLAY.chargeJump` and converted to a launch-speed multiplier by
+      square root, since rise goes as the square of speed. Measured in the real
+      game: 873 px/s on a tap, 1353 at 0.8s (2.4x height), 2776 at 7s (9.95x).
+      The arena ceiling clamps the tallest launches, which is harmless —
+      a full charge simply pins them at the top of the board
 - [x] **Camera Flash goes off like a flashbulb**: a hard white wash over the
       victim that blows out into a ring and is gone inside a quarter second,
       and a stunned fighter is now visibly rattled — the body shakes as well as
@@ -550,6 +554,19 @@ Pillars:
 - [x] **Blood Money's preview runs long** (13s hard cut, as Breakthrough does):
       the trade only reads once the shooter has emptied a magazine or two into
       it, which now takes them down to ~40% health on screen
+- [x] **Firecracker Heels grants the air jump it needs**: a baseline fighter
+      has NO mid-air jump, so the card was inert on its own — the blast only
+      fires on an air jump. It now carries `+1 air jump` itself and stacks with
+      Moon Shoes for two (verified 0 / 1 / 2)
+- [x] **Sugar Rush trebles** move speed for its 2.5s instead of doubling it
+- [x] **Body Doubles are solid**, not translucent: the copy is drawn exactly
+      like the fighter, and what gives it away is that its idle clock is frozen
+      at the moment it was made — it neither breathes nor bobs
+- [x] **Permafrost's tint is masked to the sprite**: the fighter is redrawn
+      into a scratch canvas in the same pose and the colour composited
+      `source-atop`, so the frost lands only on their own pixels — hair, weapon
+      and all — and rides the body exactly instead of being a pale disc in
+      front of it (`drawFrostTint` in `js/characters.js`, used by both renderers)
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

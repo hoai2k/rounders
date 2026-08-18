@@ -75,11 +75,12 @@
     // `maxMul` at `maxHold`. 2.15x on the baseline 880 clears ~850px, which is
     // the height of the board.
     chargeJump: {
-      minHold: 0.5,     // seconds before winding up buys anything
-      maxHold: 7,       // fully wound
-      maxMul: 2.15,     // launch speed multiplier when fully wound
-      squash: 0.3,      // how far they compress at full charge (fraction)
-      bob: 3.5          // px of bob while winding
+      minHold: 0.5,      // the wind-up pays from here: below it, an ordinary hop
+      maxHold: 7,        // fully wound
+      minHeight: 2,      // x normal jump HEIGHT the moment minHold is reached
+      maxHeight: 10,     // ...and when fully wound (10x184px = ~1840px of rise)
+      squash: 0.3,       // how far they compress at full charge (fraction)
+      bob: 3.5           // px of bob while winding
     },
 
     // ------------------------------------------------------------ WALL MOVES

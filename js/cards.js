@@ -71,8 +71,8 @@
 
     card("grasshopper", "Grasshopper", "common",
       "The floor is merely a suggestion.",
-      "Hold jump on the ground to coil, release to launch. A tap hops as normal; wind up for seven seconds and you can clear the whole arena.",
-      ["hold jump to charge (up to 7s)", "up to 2.15× launch speed", "+8% air control"], ["movement"],
+      "Hold jump on the ground to coil, release to launch. A tap hops as normal, half a second of wind-up doubles your height, and a full seven seconds throws you ten times as high.",
+      ["hold jump to charge (up to 7s)", "0.5s = 2× height, 7s = 10× height", "+8% air control"], ["movement"],
       p => { p.stats.chargeJump += 1; p.stats.airAccel *= 1.08; }),
 
     card("brick-wall", "Brick Wall", "common",
@@ -115,8 +115,8 @@
 
     card("sugar-rush", "Sugar Rush", "uncommon",
       "Hits taste like candy.",
-      "Landing a hit makes you giddy: double move speed for 2.5 seconds.",
-      ["+100% speed for 2.5s after a hit"], ["movement"],
+      "Landing a hit makes you giddy: triple move speed for 2.5 seconds.",
+      ["+200% speed for 2.5s after a hit"], ["movement"],
       p => { p.stats.sugarRush += 1; }),
 
     card("ricochet-romance", "Ricochet Romance", "uncommon",
@@ -199,9 +199,9 @@
 
     card("firecracker-heels", "Firecracker Heels", "uncommon",
       "Ignition on the second hop.",
-      "Your mid-air jumps detonate a small blast beneath you that damages and shoves enemies.",
-      ["air jumps explode (15 dmg)"], ["movement", "aoe"],
-      p => { p.stats.jumpBlast += 1; }),
+      "Gain a mid-air jump, and every mid-air jump detonates beneath you — damaging and shoving enemies, and kicking lit crackers out of your heels.",
+      ["+1 air jump", "air jumps explode (15 dmg)"], ["movement", "aoe"],
+      p => { p.stats.extraJumps += 1; p.stats.jumpBlast += 1; }),
 
     card("fresh-coat", "Fresh Coat", "uncommon",
       "Still has the sticker on.",

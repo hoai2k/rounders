@@ -65,13 +65,13 @@
   // back out, pivoting on the feet. Same curve as game.js.
   const SQUISH_TIME = 0.22;
   const CHARGE = () => (window.ROUNDERS.GAMEPLAY && window.ROUNDERS.GAMEPLAY.chargeJump)
-    || { minHold: 0.5, maxHold: 7, maxMul: 2.15, squash: 0.3, bob: 3.5 };
+    || { minHold: 0.5, maxHold: 7, minHeight: 2, maxHeight: 10, squash: 0.3, bob: 3.5 };
   // Grasshopper's wind-up, same curve as game.js
   function chargeMul(held) {
     const c = CHARGE();
     if (!held || held < c.minHold) return 1;
     const k = Math.min(1, (held - c.minHold) / (c.maxHold - c.minHold));
-    return 1 + (c.maxMul - 1) * k;
+    return Math.sqrt(c.minHeight + (c.maxHeight - c.minHeight) * k);
   }
   function squishScale(who, t = 0) {
     const left = who.squish || 0;
@@ -844,7 +844,7 @@
           x: who.x, y: who.y,
           hp: 20 * st.decoy, maxHp: 20 * st.decoy,
           character: who.character, color: who.color, owner: who,
-          facing: who.facing || 1, aimX: who.aimX
+          facing: who.facing || 1, aimX: who.aimX, wobble: t
         });
         who.vx -= (who.facing || 1) * 620;
       }
@@ -1150,19 +1150,19 @@
         const h = plan.holder === "target" ? bb : a;
         const phase = (t * 0.9) % 2;
         const dir = phase < 0.75 ? 1 : phase < 1 ? 0 : phase < 1.75 ? -1 : 0;
-        const sugar = h.sugarT > 0 ? 1 + h.stats.sugarRush : 1;
+        const sugar = h.sugarT > 0 ? 1 + 2 * h.stats.sugarRush : 1;
         // a fighter winding up a jump stands their ground rather than sliding
         const want = (h.jumpCharge > 0 ? 0 : dir) * h.stats.speed * SCALE * sugar;
         const accel = h.grounded ? h.stats.accel : h.stats.airAccel;
         h.vx += (want - h.vx) * Math.max(0, Math.min(1, accel * dt));
         if (!dir && h.grounded) h.vx += (0 - h.vx) * Math.max(0, Math.min(1, h.stats.brake * dt));
         if (h.stats.chargeJump > 0) {
-          // Grasshopper: coil on the spot, then let go. Held for two and a half
-          // seconds, which is enough charge to read as a launch and still fit
-          // the preview's loop.
+          // Grasshopper: coil on the spot, then let go. Held for a second —
+          // enough charge to read as a launch and still land inside the frame,
+          // where a full seven-second wind-up would leave the picture entirely.
           if (h.grounded) {
             h.jumpCharge = (h.jumpCharge || 0) + dt;
-            if (h.jumpCharge > 2.5) {
+            if (h.jumpCharge > 1) {
               h.vy = -h.stats.jump * SCALE * chargeMul(h.jumpCharge);
               h.grounded = false;
               h.jumps = h.stats.extraJumps;
@@ -1768,33 +1768,17 @@
       if (who.hovering && window.ROUNDERS.drawHoverWings) {
         window.ROUNDERS.drawHoverWings(ctx, 0, 0, who.stats.radius, who.wingPhase || 0);
       }
+      const pose = { t, aimX: who.aimVX ?? who.aimX, aimY: who.aimVY ?? who.aimY, facing: who.facing };
       if (ch && window.ROUNDERS.drawCharacter) {
-        window.ROUNDERS.drawCharacter(ctx, ch, who.stats.radius, {
-          t, aimX: who.aimVX ?? who.aimX, aimY: who.aimVY ?? who.aimY, facing: who.facing
-        });
+        window.ROUNDERS.drawCharacter(ctx, ch, who.stats.radius, pose);
       } else {
         ctx.fillStyle = who.color;
         ctx.beginPath(); ctx.arc(0, 0, who.stats.radius, 0, Math.PI * 2); ctx.fill();
       }
-      // Permafrost: frozen through — a white-blue tint over the body itself,
-      // brightest at the rim, under the vapour that already wreathes them
-      if (who.chillT > 0) {
-        const rr = who.stats.radius;
-        const fg = ctx.createRadialGradient(0, 0, rr * 0.15, 0, 0, rr * 1.02);
-        fg.addColorStop(0, "rgba(198,238,255,0.22)");
-        fg.addColorStop(0.65, "rgba(150,214,255,0.32)");
-        fg.addColorStop(1, "rgba(236,250,255,0.5)");
-        ctx.fillStyle = fg;
-        ctx.beginPath(); ctx.arc(0, 0, rr * 1.02, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = "rgba(240,252,255,0.8)";
-        ctx.lineWidth = 1.4;
-        for (let i = 0; i < 7; i += 1) {
-          const a2 = (i / 7) * Math.PI * 2 + (who.seed || 0);
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(a2) * rr * 0.72, Math.sin(a2) * rr * 0.72);
-          ctx.lineTo(Math.cos(a2) * rr, Math.sin(a2) * rr);
-          ctx.stroke();
-        }
+      // Permafrost: frozen through, masked to the fighter's own pixels so the
+      // tint rides the body exactly instead of sitting in front of it
+      if (who.chillT > 0 && ch && window.ROUNDERS.drawFrostTint) {
+        window.ROUNDERS.drawFrostTint(ctx, ch, who.stats.radius, pose);
       }
       // the bulb going off, blowing out past the body
       if (who.flashPop > 0) {
@@ -2033,10 +2017,12 @@
       }
       for (const d of decoys) {
         const gone = d.hp <= 0 ? Math.max(0, (d.fade ?? 0) / 0.6) : 1;
-        ctx.save(); ctx.globalAlpha = 0.6 * gone; ctx.translate(d.x, d.y);
+        // solid, not a ghost: the copy looks exactly like the fighter. Its
+        // idle clock is frozen, so it is the stillness that gives it away.
+        ctx.save(); ctx.globalAlpha = gone; ctx.translate(d.x, d.y);
         if (d.hp <= 0) ctx.scale(1 + (1 - gone) * 0.5, 1 + (1 - gone) * 0.5);
         if (d.character && window.ROUNDERS.drawCharacter) {
-          window.ROUNDERS.drawCharacter(ctx, d.character, 24, { t, aimX: d.aimX ?? d.facing ?? 1, aimY: 0, facing: d.facing ?? 1 });
+          window.ROUNDERS.drawCharacter(ctx, d.character, 24, { t: d.wobble || 0, aimX: d.aimX ?? d.facing ?? 1, aimY: 0, facing: d.facing ?? 1 });
         }
         ctx.restore();
         ctx.globalAlpha = gone;

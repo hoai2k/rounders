@@ -2102,7 +2102,7 @@
 
       const chillMul = p.chillTimer > 0 ? 0.55 : 1;
       const adrenalineMul = p.stats.adrenaline > 0 && p.hp / p.stats.maxHp < 0.35 ? 1 + p.stats.adrenaline : 1;
-      const sugarMul = p.sugarTimer > 0 ? 1 + p.stats.sugarRush : 1;
+      const sugarMul = p.sugarTimer > 0 ? 1 + 2 * p.stats.sugarRush : 1;
       let speed = p.stats.speed * chillMul * adrenalineMul * sugarMul * underdogMul(p);
       // syrup zones
       for (const z of level.zones || []) {
@@ -2160,6 +2160,7 @@
           p.vy = -p.stats.jump * chillJump * mul;
           p.grounded = false;
           p.groundPlatform = null;
+          p.jumpsLeft = Math.max(0, p.jumpsLeft - 1);   // same cost as any jump
           p.jumpCharge = 0;
           pulse(p, 0.12 + (mul - 1) * 0.14, 25 + (mul - 1) * 90);
           sfx("jump");
@@ -2452,10 +2453,13 @@
   const CHARGE = GP.chargeJump;
   // How much of a launch a wind-up has bought. A tap is worth nothing extra;
   // past minHold it climbs to maxMul at maxHold.
+  // Configured in HEIGHT, which is what a player reads off the screen, and
+  // returned as a LAUNCH SPEED multiplier — rise goes as the square of it, so
+  // ten times the height is a shade over three times the speed.
   function chargeMul(held) {
     if (!held || held < CHARGE.minHold) return 1;
     const k = Math.min(1, (held - CHARGE.minHold) / (CHARGE.maxHold - CHARGE.minHold));
-    return 1 + (CHARGE.maxMul - 1) * k;
+    return Math.sqrt(CHARGE.minHeight + (CHARGE.maxHeight - CHARGE.minHeight) * k);
   }
   const WALL_SLIDE_MAX = GP.wall.slideMax;
   function touchWall(p, awayDir) {
@@ -5556,32 +5560,18 @@
       // body (the lean is cosmetic, so the gauges below stay upright)
       ctx.save();
       ctx.rotate(clamp(p.vx / 1400, -0.4, 0.4));
-      drawCharacter(ctx, p.character, r, {
+      const pose = {
         t: world.time + p.botSeed,
         aimX: p.aimX, aimY: p.aimY, facing: p.facing,
         blink: p.blinkClock % 4 > 3.8
-      });
+      };
+      drawCharacter(ctx, p.character, r, pose);
       if (p.chillTimer > 0) {
-        // frozen through: a white-blue tint over the whole body, brightest at
-        // the rim where the frost has taken, so the chill reads on the fighter
-        // and not only in the vapour around them
-        const fg = ctx.createRadialGradient(0, 0, r * 0.15, 0, 0, r * 1.02);
-        fg.addColorStop(0, "rgba(198,238,255,0.22)");
-        fg.addColorStop(0.65, "rgba(150,214,255,0.32)");
-        fg.addColorStop(1, "rgba(236,250,255,0.5)");
-        ctx.fillStyle = fg;
-        ctx.beginPath(); ctx.arc(0, 0, r * 1.02, 0, Math.PI * 2); ctx.fill();
-        // rime crystals clinging to the outline
-        ctx.strokeStyle = "rgba(240,252,255,0.8)";
-        ctx.lineWidth = 1.4;
-        for (let i = 0; i < 7; i += 1) {
-          const a2 = (i / 7) * Math.PI * 2 + p.botSeed;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(a2) * r * 0.72, Math.sin(a2) * r * 0.72);
-          ctx.lineTo(Math.cos(a2) * r * 1.0, Math.sin(a2) * r * 1.0);
-          ctx.stroke();
-        }
-        // A wreath of cold vapour around the frozen fighter, over the flat tint.
+        // Frozen through. The tint is masked to the fighter's OWN pixels by
+        // redrawing them in the same pose, so it rides the body exactly —
+        // hair, weapon and all — instead of being a pale disc in front of it.
+        window.ROUNDERS.drawFrostTint(ctx, p.character, r, pose);
+        // A wreath of cold vapour around the frozen fighter, over the tint.
         // The art is a ring with a hollow middle and it is drawn wide enough for
         // that hollow to clear the body — a chilled fighter you cannot see is a
         // fighter you cannot shoot at.
@@ -6309,15 +6299,16 @@
     }
   }
 
-  // Body Doubles: drawn like the player they copy, with a faint shimmer that
-  // an attentive human can clock but seekers can't
+  // Body Doubles: drawn exactly like the player they copy — solid, not a
+  // ghost. What gives them away is that they are perfectly STILL: their idle
+  // clock is frozen at the moment they were made, so they neither breathe nor
+  // bob while the real fighter does.
   function drawDecoys() {
     for (const dcy of decoys) {
       ctx.save();
       ctx.translate(dcy.x, dcy.y + Math.sin(dcy.wobble * 2.2) * 2);
-      ctx.globalAlpha = 0.88;
       drawCharacter(ctx, dcy.character, 27, {
-        t: world.time + dcy.wobble,
+        t: dcy.wobble,
         aimX: dcy.aimX ?? dcy.facing ?? 1, aimY: dcy.aimY ?? 0, facing: dcy.facing ?? 1
       });
       // hp pips

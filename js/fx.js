@@ -129,14 +129,17 @@
       if (Math.abs(centres[i] - (i + 0.5) * cell) > cell * 0.5) return null;
     }
     return centres.map((centre, i) => {
-      const prev = i > 0 ? centres[i - 1] : -Infinity;
-      const next = i < n - 1 ? centres[i + 1] : Infinity;
-      // reach no further than halfway to a neighbour, so a frame can never
-      // show a sliver of the one beside it
+      // Reach as far as the neighbouring frame's INK, not to the midpoint
+      // between centres and not to the cell edge: a frame is entitled to every
+      // pixel of its own art, and the gutter beside it is empty anyway. The
+      // stop is one pixel short of the next frame's ink, so a frame can still
+      // never show a sliver of the one beside it — and a blast wider than its
+      // nominal cell (they often are) is no longer cropped to fit.
+      const prevInk = i > 0 ? runs[i - 1][1] : -Infinity;
+      const nextInk = i < n - 1 ? runs[i + 1][0] : Infinity;
       const half = Math.max(4, Math.min(
-        cell / 2,
-        (centre - prev) / 2,
-        (next - centre) / 2,
+        centre - prevInk - 1,
+        nextInk - centre - 1,
         centre,
         img.width - centre
       ));

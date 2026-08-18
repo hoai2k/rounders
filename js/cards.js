@@ -547,7 +547,7 @@
     card("chronoshift", "Chronoshift", "mythic",
       "You were never there.",
       "ACTIVE (hold Y): run the whole board backwards at half speed, up to 3s of tape.",
-      ["ACTIVE: hold to rewind", "3s of tape, refills in 10s", "+8% speed"], ["active", "clutch"],
+      ["ACTIVE: hold to rewind", "3s of tape, refills in 10s", "1s cooldown · +8% speed"], ["active", "clutch"],
       p => { p.stats.active = "chronoshift"; p.stats.activeCooldown = 10; p.stats.speed *= 1.08; })
   ];
 

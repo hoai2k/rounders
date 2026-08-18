@@ -191,6 +191,7 @@
   // the button for 6 real seconds undoes 3 seconds of the fight.
   const REWIND_MAX = 3;          // seconds of game time that can be undone
   const REWIND_RATE = 0.5;       // history consumed per second of real time
+  const REWIND_LOCKOUT = 1;      // seconds before the reel can be rolled again
   let history = [];
   const rewind = { active: false, owner: null, cursor: 0, spent: 0, budget: 0, carry: 0 };
   let last = performance.now();
@@ -271,7 +272,7 @@
       wallDir: 0, wallTimer: 0, wallCooldown: 0, botWallClimb: 0, wallJumps: 0,
       ammo: 3, reloadTimer: 0, fireTimer: 0,
       blockTimer: 0, blockCooldown: 0, echoTimer: 0,
-      activeCooldown: 0, teleWasInside: false, rewindLeft: REWIND_MAX,
+      activeCooldown: 0, teleWasInside: false, rewindLeft: REWIND_MAX, rewindLock: 0,
       poisonTimer: 0, poisonDps: 0,
       burnTimer: 0, burnDps: 0,
       chillTimer: 0,
@@ -916,7 +917,7 @@
       p.ammo = p.stats.maxAmmo;
       p.reloadTimer = 0; p.fireTimer = 0;
       p.blockTimer = 0; p.blockCooldown = 0; p.echoTimer = 0;
-      p.activeCooldown = 0; p.teleWasInside = false; p.rewindLeft = REWIND_MAX;
+      p.activeCooldown = 0; p.teleWasInside = false; p.rewindLeft = REWIND_MAX; p.rewindLock = 0;
       p.poisonTimer = 0; p.burnTimer = 0; p.chillTimer = 0;
       p.teleCooldown = 0;
       p.hazardGrace = 0;
@@ -1625,7 +1626,8 @@
     // enough tape to be worth starting — a few frames' worth, so a nearly
     // empty reel cannot be machine-gunned for a stutter
     const rewinder = players.find(p =>
-      p.alive && p.stats.active === "chronoshift" && (p.rewindLeft ?? 0) > 0.15 && p.input.special);
+      p.alive && p.stats.active === "chronoshift" && (p.rewindLeft ?? 0) > 0.15 &&
+      (p.rewindLock ?? 0) <= 0 && p.input.special);
     if (rewinder || rewind.active) {
       if (rewinder && !rewind.active) {
         rewind.active = true;
@@ -1666,10 +1668,12 @@
         updateHud();
         return;                                  // the world does not advance
       }
-      // let go, ran out of tape, or died mid-rewind: hand time back. There is
-      // no lockout — whatever is left on the reel is usable at once, and the
-      // rest refills at its own pace.
+      // let go, ran out of tape, or died mid-rewind: hand time back, and take
+      // a second before the reel can be rolled again. The tape itself keeps
+      // refilling through the lockout — the wait is on the trigger, not the
+      // resource.
       rewind.active = false;
+      if (holder) holder.rewindLock = REWIND_LOCKOUT;
       rewind.owner = null;
     }
 
@@ -2140,6 +2144,7 @@
       if (p.stats.active === "chronoshift" && !(rewind.active && rewind.owner === p)) {
         const per = REWIND_MAX / Math.max(0.1, p.stats.activeCooldown);
         p.rewindLeft = Math.min(REWIND_MAX, (p.rewindLeft ?? REWIND_MAX) + dt * per);
+        p.rewindLock = Math.max(0, (p.rewindLock ?? 0) - dt);
       }
       p.spawnGrace = Math.max(0, p.spawnGrace - dt);
       p.hazardGrace = Math.max(0, p.hazardGrace - dt);
@@ -6009,17 +6014,18 @@
         drawFxSheet("stun-stars", 0, -r - 64, 74, 0,
           { rot: Math.sin(world.time * 7) * 0.2, alpha: clamp(p.stunTimer / 0.25, 0, 1) });
       }
-      // active ability ready. A held active shows how much of its reel is
-      // left as an arc rather than an all-or-nothing ring.
-      const reel = p.stats.active === "chronoshift"
-        ? clamp((p.rewindLeft ?? 0) / REWIND_MAX, 0, 1) : 1;
-      if (p.stats.active && (p.stats.active === "chronoshift" ? reel > 0.05 : p.activeCooldown <= 0)) {
+      // Chronoshift carries a resource rather than a switch, so it reads as a
+      // power bar over the health bar instead of the ready ring: how much tape
+      // is on the reel, and whether the trigger will answer.
+      if (p.stats.active === "chronoshift") drawChronoBar(p, r);
+      else if (p.stats.active && p.activeCooldown <= 0) {
+        // active ability ready
         ctx.strokeStyle = "rgba(255,77,143,0.8)";
         ctx.lineWidth = 3;
         ctx.setLineDash([6, 8]);
         ctx.lineDashOffset = -world.time * 40;
         ctx.beginPath();
-        ctx.arc(0, 0, r + 21, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * reel);
+        ctx.arc(0, 0, r + 21, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -6111,6 +6117,49 @@
         }
       }
     }
+    ctx.restore();
+  }
+
+  // Chronoshift's reel, drawn over the health bar. Three states, and they have
+  // to be legible at a glance mid-fight:
+  //   rewinding   white, pulsing, draining as the tape plays back
+  //   cooling     grey, with the second of lockout sweeping across it
+  //   ready       violet, with a soft glow, brighter the fuller the reel
+  function drawChronoBar(p, r) {
+    const frac = clamp((p.rewindLeft ?? 0) / REWIND_MAX, 0, 1);
+    const lock = Math.max(0, p.rewindLock || 0);
+    const live = rewind.active && rewind.owner === p;
+    const w = Math.max(34, Math.min(120, 52 * (p.stats.maxHp / 100)));
+    const x = -w / 2;
+    const y = -r - 30;                       // a rung above the health bar
+    const h = 4.5;
+    ctx.save();
+    ctx.fillStyle = "rgba(10,8,18,0.75)";
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.fill();
+    const pulse = 0.75 + 0.25 * Math.sin(world.time * 12);
+    const fill = live ? `rgba(233,246,255,${pulse})`
+      : lock > 0 ? "rgba(120,126,148,0.85)"
+        : `rgba(180,92,255,${0.7 + 0.3 * frac})`;
+    if (frac > 0) {
+      ctx.fillStyle = fill;
+      if (!live && lock <= 0) { ctx.shadowColor = "rgba(180,92,255,0.9)"; ctx.shadowBlur = 6 + 6 * frac; }
+      ctx.beginPath();
+      ctx.roundRect(x + 0.75, y + 0.75, Math.max(1.5, (w - 1.5) * frac), h - 1.5, (h - 1.5) / 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    // the lockout wipes left to right across the bar as it runs out
+    if (lock > 0) {
+      const k = 1 - lock / REWIND_LOCKOUT;
+      ctx.fillStyle = "rgba(143,216,255,0.5)";
+      ctx.beginPath();
+      ctx.roundRect(x + 0.75, y + 0.75, Math.max(1.5, (w - 1.5) * k), h - 1.5, (h - 1.5) / 2);
+      ctx.fill();
+    }
+    // a tick at the minimum worth spending, so "nearly empty" is readable
+    const min = 0.15 / REWIND_MAX;
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.fillRect(x + w * min, y, 1, h);
     ctx.restore();
   }
 
@@ -8133,7 +8182,7 @@
       p.hp = p.stats.maxHp;
       p.ammo = p.stats.maxAmmo;
       p.guardianCharges = 0; p.roundRevives = 0; p.hoverLeft = 0; p.freshPool = 0;
-      p.hovering = false; p.rebirth = null; p.activeCooldown = 0; p.rewindLeft = REWIND_MAX;
+      p.hovering = false; p.rebirth = null; p.activeCooldown = 0; p.rewindLeft = REWIND_MAX; p.rewindLock = 0;
       p.burstQueue = []; p.encoreQueue = [];
       p.decayPool = 0; p.hotShield = 0; p.overShield = 0; p.shield = 0;
       p.alive = true;

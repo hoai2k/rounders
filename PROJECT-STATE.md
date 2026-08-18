@@ -697,6 +697,25 @@ Pillars:
       is cut, so a nudge can never pull in a neighbouring frame. Both ride in
       the same table the game reads and both export in rigs.json under
       `effects` (`feather`, `offsets: [[dx, dy], …]`)
+- [x] **Chronoshift: a 1s cooldown and a power bar**: letting go now locks the
+      trigger for a second (`REWIND_LOCKOUT`) — the tape keeps refilling
+      through it, so the wait is on the trigger, not the resource. The reel is
+      drawn as a bar over the health bar in three states: violet with a glow
+      when it is ready (brighter the fuller it is), grey with the lockout
+      sweeping across it while it cools, and white and pulsing while the tape
+      is actually playing back. The old dashed ready-ring is kept for the other
+      actives, which are a switch rather than a resource
+- [x] **A frame reaches to its neighbour's ink, not to the midpoint**: the
+      first cut rule stopped each frame halfway to the next frame's centre,
+      which trimmed 17px off both sides of explosion.png's fireball — art that
+      was not clipped in the file. A frame now takes every pixel up to one
+      short of the next frame's ink, so a blast wider than its nominal cell
+      (most of them are) is drawn whole, and still never shows a sliver of its
+      neighbour
+- [x] **Effect trim from the workbench baked in**: `explosion` (feather 0.33,
+      six per-frame nudges) and `explosion-big` (feather 0.4, six nudges) from
+      rigs_4/rigs_5, applied in `js/fx-art.js`. The character section of both
+      exports was byte-identical to the rigs on disk, so nothing else moved
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

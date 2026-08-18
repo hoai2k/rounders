@@ -19,8 +19,12 @@
   window.ROUNDERS = window.ROUNDERS || {};
 
   window.ROUNDERS.FX_ART = {
-    "explosion":       { scale: 1, rotation: 0, frames: 6 },
-    "explosion-big":   { scale: 1, rotation: 0, frames: 6 },
+    "explosion":       { scale: 1, rotation: 0, frames: 6,
+                         feather: 0.33,
+                         offsets: [[-34, -21], [-59, -17], [0, 0], [8, 0], [7, 0], [0, 0]] },
+    "explosion-big":   { scale: 1, rotation: 0, frames: 6,
+                         feather: 0.4,
+                         offsets: [[-2, -24], [0, -11], [0, -11], [0, -8], [0, -13], [0, -9]] },
     "shield-break":    { scale: 1, rotation: 0, frames: 5 },
     "shockwave-ring":  { scale: 1, rotation: 0 },
     "lightning-arc":   { scale: 1, rotation: 0 },

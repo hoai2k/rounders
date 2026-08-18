@@ -42,12 +42,12 @@
     card("cannonball", "Cannonball", "common",
       "Subtlety is for other people.",
       "Your shots hit much harder, but they fly slower and reloading takes longer.",
-      ["+30% damage", "−10% bullet speed", "+0.22s reload"], ["damage"],
+      ["+30% damage", "slower shot & reload"], ["damage"],
       p => { p.stats.damage *= 1.3; p.stats.bulletSpeed *= 0.9; p.stats.reload += 0.22; }),
 
     card("featherweight", "Featherweight", "common",
       "Float like a… you know.",
-      "Move faster everywhere and steer far better in the air, at the cost of a thinner health bar.",
+      "Faster everywhere and far better steering in the air, for a thinner health bar.",
       ["+16% speed", "+20% air control", "−12% health"], ["movement"],
       p => { p.stats.speed *= 1.16; p.stats.airAccel *= 1.2; p.stats.maxHp *= 0.88; }),
 
@@ -59,7 +59,7 @@
 
     card("hair-trigger", "Hair Trigger", "common",
       "Don't even breathe on it.",
-      "Shots come out much sooner after each other, and you carry one extra round to enjoy it.",
+      "Shots come out much sooner after each other, and you carry one extra round.",
       ["−22% fire delay", "+1 ammo"], ["firerate"],
       p => { p.stats.fireDelay *= 0.78; p.stats.maxAmmo += 1; }),
 
@@ -71,20 +71,20 @@
 
     card("grasshopper", "Grasshopper", "common",
       "The floor is merely a suggestion.",
-      "Hold jump on the ground to coil, release to launch. A tap hops as normal, half a second of wind-up doubles your height, and a full seven seconds throws you the whole height of the arena.",
-      ["hold jump to charge (up to 7s)", "0.5s = 2× height, 7s = a full board", "+8% air control"], ["movement"],
+      "Hold jump to coil, then launch: 0.5s doubles your height, 7s clears the board.",
+      ["charge jump (hold, 7s)", "2× at 0.5s, a board at 7s"], ["movement"],
       p => { p.stats.chargeJump += 1; p.stats.airAccel *= 1.08; }),
 
     card("brick-wall", "Brick Wall", "common",
       "You shall not pass. Probably.",
-      "Extra health, and you barely budge when shot — knockback against you drops by 40%.",
+      "Extra health, and you barely budge: knockback against you drops by 40%.",
       ["+15% health", "−40% knockback taken"], ["defense"],
       p => { p.stats.maxHp *= 1.15; p.stats.kbResist += 0.4; }),
 
     card("buckshot-buttons", "Buckshot Buttons", "common",
       "Why fire one when you can fire three?",
       "Each trigger pull fires 2 extra pellets in a cone. Each pellet is weaker.",
-      ["+2 pellets", "−40% damage per pellet", "wide spread"], ["multishot"],
+      ["+2 pellets, wide", "−40% dmg per pellet"], ["multishot"],
       p => { p.stats.pellets += 2; p.stats.damage *= 0.6; p.stats.spread += 0.14; }),
 
     card("moon-shoes", "Moon Shoes", "common",
@@ -109,7 +109,7 @@
 
     card("tailwind", "Tailwind", "uncommon",
       "The sky likes you today.",
-      "Steer far better while airborne, and hold the jump button to hang in the air for up to 2 seconds.",
+      "Steer far better in the air, and hold jump to hang there for up to 2 seconds.",
       ["+50% air control", "hold jump to float (2s)"], ["movement"],
       p => { p.stats.airAccel *= 1.5; p.stats.floatTime += 2; }),
 
@@ -152,24 +152,24 @@
     card("double-dutch", "Double Dutch", "uncommon",
       "Two ropes, two bullets.",
       "Fire a tight twin shot. Each bullet is weaker than a single would be.",
-      ["+1 pellet", "−25% damage per pellet", "slight spread"], ["multishot"],
+      ["+1 pellet, tight", "−25% dmg per pellet"], ["multishot"],
       p => { p.stats.pellets += 1; p.stats.damage *= 0.75; p.stats.spread += 0.05; }),
 
     card("lowrider", "Lowrider", "uncommon",
       "Keeps a low profile.",
-      "Your bullets drop to the nearest floor and skim along it, hugging the terrain over ledges and up to your target's ankles.",
+      "Your bullets drop to the floor and skim along it, up to your target's ankles.",
       ["bullets follow the ground", "−8% damage"], ["projectile"],
       p => { p.stats.groundHug += 1; p.stats.damage *= 0.92; }),
 
     card("waste-not", "Waste Not", "uncommon",
       "Every bullet comes home.",
-      "Bullets that hit a player are refunded to your magazine. Shots come a touch slower.",
+      "Bullets that hit a player are refunded. Shots come a touch slower.",
       ["hits refund ammo", "+0.15s fire delay"], ["ammo"],
       p => { if (p.stats.scavenge) p.stats.reload *= 0.8; p.stats.scavenge += 1; p.stats.fireDelay += 0.15; }),
 
     card("pit-stop", "Pit Stop", "uncommon",
       "Four seconds flat.",
-      "Throwing a block instantly refills your magazine — it does not have to catch anything.",
+      "Throwing a block instantly refills your magazine — it need not catch anything.",
       ["block = full reload", "+0.25s block cooldown"], ["block", "ammo"],
       p => { p.stats.blockReload += 1; p.stats.blockCooldown += 0.25; }),
 
@@ -181,7 +181,7 @@
 
     card("hot-streak", "Hot Streak", "uncommon",
       "Ride the wave.",
-      "Dealing bullet damage wraps you in a 25-point shield that burns off over about four seconds.",
+      "Dealing bullet damage wraps you in a 25 shield that burns off over four seconds.",
       ["hits grant a decaying 25 shield"], ["defense"],
       p => { p.stats.hotStreak += 1; }),
 
@@ -199,13 +199,13 @@
 
     card("firecracker-heels", "Firecracker Heels", "uncommon",
       "Ignition on the second hop.",
-      "Gain a mid-air jump, and every mid-air jump detonates beneath you — damaging and shoving enemies, and kicking lit crackers out of your heels.",
-      ["+1 air jump", "air jumps explode (15 dmg)"], ["movement", "aoe"],
+      "Gain a mid-air jump, and every mid-air jump detonates beneath you.",
+      ["+1 air jump", "air jumps explode (15)"], ["movement", "aoe"],
       p => { p.stats.extraJumps += 1; p.stats.jumpBlast += 1; }),
 
     card("fresh-coat", "Fresh Coat", "uncommon",
       "Still has the sticker on.",
-      "Start each round with a +50% health overcoat. It shatters the first time you're hit.",
+      "Start each round in a +50% health overcoat. It shatters the first time you're hit.",
       ["+50% HP shell until first hit"], ["defense"],
       p => { p.stats.freshCoat += 0.5; }),
 
@@ -213,43 +213,43 @@
 
     card("boxing-glove", "Boxing Glove", "rare",
       "Float like a truck.",
-      "Your shots hit like a haymaker — they send people flying, and a block stops the damage but not the punch. They hit a little softer for it.",
-      ["+300% knockback dealt", "shoves through blocks", "+10% bullet size", "−10% damage"], ["control"],
+      "Huge knockback on every shot, and a block stops the damage but not the punch.",
+      ["+300% knockback", "punches through blocks", "bigger rounds · −10% dmg"], ["control"],
       p => { p.stats.kbDeal += 3; p.stats.bulletSize *= 1.1; p.stats.damage *= 0.9; }),
 
     card("wasp-venom", "Wasp Venom", "rare",
       "The sting is just the beginning.",
-      "Hits inject venom that deals damage over 3 seconds. Sting them again and the doses ADD UP. The sting drifts after its target. Direct damage drops.",
-      ["poison on hit (3s)", "doses stack", "slight homing", "−15% damage"], ["dot", "accuracy"],
+      "Hits inject stacking venom over 3s, and the sting drifts after its target.",
+      ["stacking poison (3s)", "slight homing", "−15% damage"], ["dot", "accuracy"],
       p => { p.stats.poison += 1; p.stats.homing += 0.35; p.stats.damage *= 0.85; }),
 
     card("popcorn-payload", "Popcorn Payload", "rare",
       "Pop pop pop.",
-      "Bullets pop on impact, flinging 10 hot kernels up into the air. They rain back down for more damage, and anything that misses bounces twice more before it gives up.",
-      ["impacts pop into 10 kernels", "kernels rain down & bounce twice", "−10% damage"], ["aoe"],
+      "Bullets pop into 10 kernels that rain down, bounce twice and keep hurting.",
+      ["pops into 10 kernels", "they rain and bounce", "−10% damage"], ["aoe"],
       p => { p.stats.popcorn += 10; p.stats.damage *= 0.9; }),
 
     card("bodyguard", "Bodyguard", "rare",
       "Personal space, enforced.",
-      "Blocking releases a shockwave that shoves nearby opponents away and swats any bullet caught in it off in a random direction. Extra health too.",
-      ["block shockwave", "scatters bullets in range", "+15% health"], ["block"],
+      "Blocking shoves nearby opponents away and swats bullets caught in it aside.",
+      ["block shockwave", "scatters bullets near", "+15% health"], ["block"],
       p => { p.stats.blockPush += 1; p.stats.maxHp *= 1.15; }),
 
     card("panic-button", "Panic Button", "rare",
       "Insurance you fire.",
-      "Firing the last bullet in your magazine automatically triggers your block — and everything attached to it.",
+      "Firing your last bullet triggers your block automatically — and all it carries.",
       ["last bullet auto-blocks", "+0.3s reload"], ["block", "clutch"],
       p => { p.stats.autoBlock += 1; p.stats.reload += 0.3; }),
 
     card("drill-rounds", "Drill Rounds", "rare",
       "Through, not around.",
-      "Your bullets bore straight through walls and floors and keep flying, so cover stops being cover. Stacks drill deeper.",
+      "Bullets bore through walls and floors and keep flying, so cover stops working.",
       ["bullets drill through walls", "−12% damage"], ["projectile"],
       p => { p.stats.wallPierce += 1; p.stats.damage *= 0.88; }),
 
     card("thorn-jacket", "Thorn Jacket", "rare",
       "Hug at your own risk.",
-      "Attackers take 35% of the damage they deal to you, reflected back instantly. Thorns ignore blocks.",
+      "Attackers take 35% of the damage they deal you, straight back through blocks.",
       ["reflect 35% of damage taken", "+15% health"], ["defense"],
       p => { p.stats.thorns += 0.35; p.stats.maxHp *= 1.15; }),
 
@@ -267,8 +267,8 @@
 
     card("comet-trail", "Comet Trail", "rare",
       "Give it room to breathe.",
-      "Bullets grow stronger the farther they travel — up to double damage at long range.",
-      ["damage grows with distance (up to 2×)", "+12% bullet speed"], ["accuracy"],
+      "Bullets grow stronger the farther they fly — up to double damage at range.",
+      ["grows to 2× with range", "+12% bullet speed"], ["accuracy"],
       p => { p.stats.grow += 1; p.stats.bulletSpeed *= 1.12; }),
 
     card("shrapnel-burst", "Shrapnel Burst", "rare",
@@ -285,37 +285,37 @@
 
     card("aegis-bubble", "Aegis Bubble", "rare",
       "Bring your own weather.",
-      "A regenerating energy shield swallows one hit WHOLE — all of its damage and all of its knockback. It comes back 3.5 seconds after it pops.",
+      "A shield swallows one hit WHOLE — damage and knockback — then returns in 3.5s.",
       ["absorbs 1 whole hit", "recharges after 3.5s"], ["defense"],
       p => { p.stats.shield += 1; }),
 
     card("lemonade-stand", "Lemonade Stand", "rare",
       "Fresh squeezed. Slightly radioactive.",
-      "Blocking plants a fizzy zone that heals anyone inside 10 HP a second for 10 seconds — stand in your own.",
-      ["block plants a heal zone (10 HP/s, 10s)"], ["block", "sustain"],
+      "Blocking plants a fizzy zone healing anyone inside 10 HP a second for 10s.",
+      ["block = heal zone", "10 HP/s for 10s"], ["block", "sustain"],
       p => { p.stats.healField += 1; }),
 
     card("sawblade", "Sawblade", "rare",
       "Mind the blade.",
-      "Blocking wraps you in a huge spinning sawblade for 3 seconds, shredding anyone who comes near.",
+      "Blocking wraps you in a spinning sawblade for 3 seconds, shredding anyone near.",
       ["block = spinning saw (3s)"], ["block", "aoe"],
       p => { p.stats.sawBlock += 1; }),
 
     card("bank-shot", "Bank Shot", "rare",
       "Called it. Off two cushions.",
-      "One extra bounce, and after each bounce your bullet veers toward the nearest opponent and hits 30% harder.",
-      ["+1 bounce", "bounces seek & gain +30% damage"], ["projectile"],
+      "One extra bounce, and each bounce sends the round seeking, +30% harder.",
+      ["+1 bounce", "bounces seek, +30% dmg"], ["projectile"],
       p => { p.stats.bankShot += 1; p.stats.bounces += 1; }),
 
     card("stink-bomb", "Stink Bomb", "rare",
       "You'll clear the room.",
-      "When a bullet breaks it bursts into a lingering cloud that poisons and slows anyone inside.",
-      ["impacts leave a toxic cloud (2.5s)", "−10% damage"], ["aoe", "dot"],
+      "A broken bullet bursts into a lingering cloud that poisons and slows.",
+      ["toxic cloud on hit (2.5s)", "−10% damage"], ["aoe", "dot"],
       p => { p.stats.stink += 1; p.stats.damage *= 0.9; }),
 
     card("payment-plan", "Payment Plan", "rare",
       "Suffer now, later.",
-      "Damage you take is paid off over 3 seconds instead of all at once — time enough to turn the fight.",
+      "Damage you take is paid off over 3 seconds instead of all at once.",
       ["damage taken drips over 3s", "+10% health"], ["defense"],
       p => { p.stats.decay += 1; p.stats.maxHp *= 1.1; }),
 
@@ -327,8 +327,8 @@
 
     card("camera-flash", "Camera Flash", "rare",
       "Say cheese.",
-      "Hits briefly stun your victim. Each target shrugs off further flashes for 2 seconds.",
-      ["hits stun 0.4s (then 2s immunity)", "−10% damage"], ["control"],
+      "Hits briefly stun your victim, who then shrugs off further flashes for 2s.",
+      ["stuns 0.4s (2s immunity)", "−10% damage"], ["control"],
       p => { p.stats.dazzle += 1; p.stats.damage *= 0.9; }),
 
     card("second-defence", "Second Defence", "rare",
@@ -339,13 +339,13 @@
 
     card("boomerang", "Boomerang", "rare",
       "It misses you too.",
-      "Bullets that miss fly back to your hand — catching one refunds it. They can still hit on the way back.",
+      "Missed bullets fly back to your hand and refund themselves. They still hit.",
       ["missed shots return & refund ammo"], ["projectile", "ammo"],
       p => { p.stats.boomerang += 1; }),
 
     card("body-double", "Body Double", "rare",
       "You, but expendable.",
-      "Blocking leaves a decoy of you behind. Seeking shots and lightning chase it until it pops.",
+      "Blocking leaves a decoy of you. Seeking shots and lightning chase it till it pops.",
       ["block leaves a 20 HP decoy"], ["block", "defense"],
       p => { p.stats.decoy += 1; }),
 
@@ -359,21 +359,20 @@
 
     card("breakthrough", "Breakthrough", "epic",
       "Make your own door.",
-      "Shots chew a square bite out of whatever terrain they strike — two into a thick wall opens a permanent gap anyone can shoot or climb through. People still just get hit.",
-      ["impacts bite squares out of terrain", "thick walls take 2 hits", "−10% damage"], ["projectile", "control"],
+      "Shots bite squares out of terrain; two into a thick wall opens a permanent gap.",
+      ["shots bite out terrain", "thick walls take 2", "−10% damage"], ["projectile", "control"],
       p => { p.stats.holePunch += 1; p.stats.damage *= 0.9; }),
 
     card("berserkers-blood", "Berserker's Blood", "epic",
       "Pain is a power source.",
-      "The lower your health, the harder you hit — up to +150% damage at death's door, and the rounds swell and drip as you bleed.",
-      ["up to +150% damage at low HP", "wounded rounds grow and drip"], ["damage", "clutch"],
+      "The lower your health the harder you hit: up to +150% damage at death's door.",
+      ["up to +150% dmg hurt", "rounds grow and drip"], ["damage", "clutch"],
       p => { p.stats.rage += 1.5; }),
 
     card("hummingbird", "Hummingbird", "epic",
       "Blink and you'll miss all of it.",
-      "Faster, lighter shots — and tap jump again in mid-air to HOVER on humming wings for 3 seconds. Shoot while hovering and the whole magazine goes at once.",
-      ["jump twice to hover 3s", "hovering: empty the magazine in one burst",
-       "−40% fire delay", "+2 ammo", "−20% damage"], ["firerate", "mobility"],
+      "Faster shots. Tap jump in mid-air to hover 3s; shooting dumps the magazine.",
+      ["jump twice to hover 3s", "hover shot = whole mag", "fast · +2 ammo · −20% dmg"], ["firerate", "mobility"],
       p => {
         p.stats.fireDelay *= 0.6; p.stats.maxAmmo += 2; p.stats.damage *= 0.8;
         p.stats.hover += 3;              // seconds of hover per jump; stacks
@@ -382,7 +381,7 @@
     card("cluster-bomb", "Party Favor", "epic",
       "One explosion is never enough.",
       "Bullets explode on impact AND split into bomblets. Reloads take longer.",
-      ["explosion on hit", "splits into 2 shards", "+0.2s reload"], ["aoe"],
+      ["explodes + 2 shards", "+0.2s reload"], ["aoe"],
       p => { p.stats.explosive += 1; p.stats.shards += 2; p.stats.reload += 0.2; }),
 
     card("black-mamba", "Black Mamba", "epic",
@@ -399,14 +398,14 @@
 
     card("warp-block", "French Exit", "epic",
       "Be somewhere else.",
-      "Blocking teleports you a short distance in your aim direction — through bullets, through walls.",
+      "Blocking teleports you a short way along your aim — through bullets and walls.",
       ["block = teleport", "−10% block cooldown"], ["block", "movement"],
       p => { p.stats.warpBlock += 1; p.stats.blockCooldown *= 0.9; }),
 
     card("railgun", "Railgun", "epic",
       "Physics called. It's impressed.",
-      "Hyper-velocity slugs that pierce 2 players and hit harder — but fire slowly and your magazine shrinks.",
-      ["pierce 2 players", "+55% bullet speed", "+25% damage", "+0.3s fire delay", "−1 ammo"], ["projectile", "damage"],
+      "Hyper-velocity slugs pierce 2 players and hit harder, but fire slowly.",
+      ["pierces 2 players", "+55% speed · +25% dmg", "slow fire · −1 ammo"], ["projectile", "damage"],
       p => { p.stats.pierce += 2; p.stats.bulletSpeed *= 1.55; p.stats.damage *= 1.25; p.stats.fireDelay += 0.3; p.stats.maxAmmo = Math.max(1, p.stats.maxAmmo - 1); }),
 
     card("storm-caller", "Storm Caller", "epic",
@@ -418,13 +417,13 @@
     card("guardian-halo", "Guardian Halo", "epic",
       "Someone up there owes you one.",
       "Once per round, a hit that would kill you leaves you at 25% health instead.",
-      ["survive 1 lethal hit per round (25% HP)", "+10% health"], ["clutch", "defense"],
+      ["survive 1 lethal hit", "left at 25% · +10% HP"], ["clutch", "defense"],
       p => { p.stats.guardian += 1; p.stats.maxHp *= 1.1; }),
 
     card("pocket-void", "Pocket Void", "epic",
       "Litter, but cosmic.",
-      "Every bullet impact tears open a vortex that drags players in, and its heart mauls them like an arena hazard.",
-      ["impacts open a black hole", "core deals hazard damage", "−10% damage"], ["control", "aoe"],
+      "Every impact tears open a vortex that drags players into a mauling core.",
+      ["impacts open a vortex", "mauling core", "−10% damage"], ["control", "aoe"],
       p => { p.stats.voidPull += 1; p.stats.damage *= 0.9; }),
 
     card("bullet-ballet", "Bullet Ballet", "epic",
@@ -435,26 +434,26 @@
 
     card("return-to-sender", "Return to Sender", "epic",
       "Postage due.",
-      "Blocking supercharges your next shot: +75% damage, and your block effects detonate where it lands.",
-      ["block empowers next shot (+75%)", "block effects fire at impact"], ["block", "damage"],
+      "Blocking supercharges your next shot: +75%, and your block fires where it lands.",
+      ["block = next shot +75%", "block fires on impact"], ["block", "damage"],
       p => { p.stats.empowerBlock += 1; }),
 
     card("puppet-strings", "Puppet Strings", "epic",
       "The bullet does what you're thinking.",
-      "After firing, your newest bullet steers toward wherever you aim — walk it around cover.",
-      ["steer your latest bullet", "−30% bullet speed", "−10% damage"], ["projectile", "accuracy"],
+      "After firing, your newest bullet steers wherever you aim — walk it around cover.",
+      ["steer your latest shot", "−30% speed · −10% dmg"], ["projectile", "accuracy"],
       p => { p.stats.steer += 1; p.stats.bulletSpeed *= 0.7; p.stats.damage *= 0.9; }),
 
     card("bricklayer", "Bricklayer", "epic",
       "Permits pending.",
-      "Blocking stands a stone slab on end in front of you — real cover that stops bullets, and heavy enough to topple onto someone.",
+      "Blocking stands a stone slab in front of you — real cover, heavy enough to topple.",
       ["block raises a slab of cover", "+0.3s block cooldown"], ["block", "control"],
       p => { p.stats.brickBlock += 1; p.stats.blockCooldown += 0.3; }),
 
     card("encore", "Encore", "epic",
       "The crowd demands it.",
-      "A second after every shot, a ghostly twin volley fires from the spot you shot from — two rounds, half damage each.",
-      ["twin ghost shot 1s later (50% dmg each)", "fires from where you stood", "+0.1s fire delay"], ["firerate"],
+      "A second later a ghostly twin volley fires from where you stood, half damage.",
+      ["ghost twin volley (1s)", "fires from where you stood", "+0.1s fire delay"], ["firerate"],
       p => { p.stats.encore += 1; p.stats.fireDelay += 0.1; }),
 
     card("dragons-hoard", "Dragon's Hoard", "epic",
@@ -467,8 +466,8 @@
 
     card("supernova", "Supernova", "legendary",
       "Astronomers hate this one trick.",
-      "Fire fat white-hot slugs that detonate in a colossal blast and hit twice as hard. Reloads are slow.",
-      ["colossal explosion on hit", "+100% damage", "+50% bullet size", "+0.3s reload"], ["aoe", "damage"],
+      "Fat white-hot slugs that detonate in a colossal blast and hit twice as hard.",
+      ["colossal explosion", "+100% dmg · slow reload"], ["aoe", "damage"],
       // the biggest bang in the set: it must out-hit epic Party Favor, whose
       // point-blank shards otherwise stack past it
       p => { p.stats.explosive += 2.8; p.stats.damage *= 2; p.stats.bulletSize *= 1.5; p.stats.reload += 0.3; }),
@@ -476,18 +475,18 @@
     card("golden-gun", "Golden Gun", "legendary",
       "The first word is the last word.",
       "The first shot of every magazine deals TRIPLE damage and gleams gold.",
-      ["1st shot per magazine ×3 damage", "+0.15s reload"], ["damage"],
+      ["1st shot each mag ×3", "+0.15s reload"], ["damage"],
       p => { p.stats.goldenShot += 1; p.stats.reload += 0.15; }),
 
     card("grim-harvest", "Grim Harvest", "legendary",
       "Waste nothing.",
-      "Heal for 45% of the bullet damage you deal, and knockouts restore you to full health.",
+      "Heal 45% of the bullet damage you deal; a knockout restores you to full.",
       ["45% lifesteal", "kills fully heal you"], ["sustain"],
       p => { p.stats.lifesteal += 0.45; p.stats.killHeal = true; }),
 
     card("crown-of-storms", "Crown of Storms", "legendary",
       "Heavy is the head that conducts.",
-      "Blocking unleashes a lightning nova that damages and hurls away everyone nearby.",
+      "Blocking fires a lightning nova that hurts and hurls away everyone nearby.",
       ["block = lightning nova", "block shockwave"], ["block", "aoe"],
       p => { p.stats.stormBlock += 1; p.stats.blockPush += 1; }),
 
@@ -495,8 +494,8 @@
 
     card("starfall-protocol", "Starfall Protocol", "mythic",
       "The sky picks a side.",
-      "ACTIVE (Y / LB): call a volley of 5 meteors crashing down toward your aim point. 12s cooldown. Passive: +10% damage.",
-      ["ACTIVE: meteor volley", "12s cooldown", "+10% damage"], ["active", "aoe"],
+      "ACTIVE (Y): call 5 meteors down onto your aim point. 12s cooldown.",
+      ["ACTIVE: meteor volley", "12s cooldown · +10% dmg"], ["active", "aoe"],
       // STACKING: a second Mythic cannot grant a second ability, so it sharpens
       // this one — the cooldown drops and the passive stacks as usual.
       p => { p.stats.active = "starfall"; p.stats.activeStacks = (p.stats.activeStacks || 0) + 1;
@@ -504,15 +503,15 @@
 
     card("event-horizon", "Event Horizon", "mythic",
       "Everything falls. Eventually.",
-      "ACTIVE (Y): hurl a singularity that plants itself wherever it lands. For 7 seconds it drags in players, crates and loose slabs — you included, if you stand too close — and mauls anything that reaches its heart. 14s cooldown. Passive: +10% health.",
-      ["ACTIVE: thrown black hole (7s)", "drags players AND objects", "hazard damage at its core", "14s cooldown", "+10% health"], ["active", "control"],
+      "ACTIVE (Y): hurl a black hole that drags in everyone and everything for 7s.",
+      ["ACTIVE: thrown black hole", "drags players & objects", "14s cooldown · +10% HP"], ["active", "control"],
       p => { p.stats.active = "eventHorizon"; p.stats.activeStacks = (p.stats.activeStacks || 0) + 1;
              p.stats.activeCooldown = 14 / p.stats.activeStacks; p.stats.maxHp *= 1.1; }),
 
     card("chronoshift", "Chronoshift", "mythic",
       "You were never there.",
-      "ACTIVE (hold Y): run the whole board backwards at half speed — every fighter, every bullet — for up to 3 seconds of the fight. Let go and time restarts from there. 10s cooldown, counted from release. Passive: +8% speed.",
-      ["ACTIVE: hold to rewind the world", "up to 3s of the fight, at half speed", "10s cooldown from release", "+8% speed"], ["active", "clutch"],
+      "ACTIVE (hold Y): run the whole board backwards at half speed, up to 3s of tape.",
+      ["ACTIVE: hold to rewind", "3s of tape, refills in 10s", "+8% speed"], ["active", "clutch"],
       p => { p.stats.active = "chronoshift"; p.stats.activeCooldown = 10; p.stats.speed *= 1.08; })
   ];
 

@@ -571,6 +571,20 @@ Pillars:
       `source-atop`, so the frost lands only on their own pixels — hair, weapon
       and all — and rides the body exactly instead of being a pale disc in
       front of it (`drawFrostTint` in `js/characters.js`, used by both renderers)
+- [x] **Card text fits the card**: 48 descriptions were long enough to be
+      clipped or squeezed out of the draft card entirely — Grasshopper showed
+      NO description at all, because tall stacks of effect pills were eating
+      the space the rules needed. Descriptions are now cut to three lines at
+      card width, the wordiest effect pills merged (`+55% speed · +25% dmg`
+      rather than one pill each), the art trimmed 37% -> 34%, the card gap 5px
+      -> 4px and the pill type a half point smaller. Measured across all 77:
+      every description now shows in full, with pills at two rows or fewer
+- [x] **Chronoshift's tape is a pool, not a switch**: spending two of your
+      three seconds costs two thirds of the cooldown to earn back, at a steady
+      3s-of-tape-per-10s, and any sliver on the reel is usable the moment it
+      exists instead of waiting out a fixed lockout. The ready ring became an
+      arc showing how much reel is left. Measured: a 2s hold spent 0.9s of tape
+      and took 3.06s to refill
 - [ ] Balance pass on the newer cards once they've been played for real
 
 ### 3. Arena system — 25 levels with themes & personality

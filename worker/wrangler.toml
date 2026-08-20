@@ -1,0 +1,19 @@
+name = "rounders-stats"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Created with:  npx wrangler d1 create rounders-stats
+# Paste the database_id the command prints in below.
+[[d1_databases]]
+binding = "DB"
+database_name = "rounders-stats"
+database_id = "PASTE_DATABASE_ID_HERE"
+
+[vars]
+# Origins allowed to POST beacons and read /stats. Add the local server too
+# so the dashboard works while developing.
+ALLOWED_ORIGINS = "https://hoai2k.github.io,http://127.0.0.1:4173,http://localhost:4173"
+
+# STATS_TOKEN and HASH_SALT are secrets, not vars:
+#   npx wrangler secret put STATS_TOKEN
+#   npx wrangler secret put HASH_SALT

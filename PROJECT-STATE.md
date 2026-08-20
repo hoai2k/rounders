@@ -1024,6 +1024,20 @@ Pillars:
 - [x] Deploy live: **https://hoai2k.github.io/rounders/** (GitHub Pages via
       `.github/workflows/deploy-pages.yml`, redeploys on every push to `main`)
 
+### 10. Visitor stats (2026-08-20)
+- [x] `/stats/` dashboard (`stats/`): totals, traffic-by-day chart, countries,
+      cities, first-seen places (tagged **new**), referrers, browsers,
+      pages/events, and the last 100 visits — token-gated, styled like the game
+- [x] Cookieless beacon (`js/telemetry.js`): one page view per load plus a
+      `match_start` event; honours DNT and a local opt-out; **inert** until
+      `js/stats-config.js` names an endpoint, so a clone sends nothing
+- [x] Collector (`worker/`): Cloudflare Worker + D1. Location comes from the
+      edge (`request.cf`), so no IP is stored — only a daily re-salted hash for
+      unique counts. Bots dropped, rows purged after 400 days
+- [x] `STATS.md` — what is recorded, the ten-minute setup, how to read the board
+- [ ] **Owner step:** deploy the worker and paste its URL into
+      `js/stats-config.js` (nothing is collected until then)
+
 ---
 
 ## Descoped (deliberate)

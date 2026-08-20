@@ -797,6 +797,7 @@
       showToast(str("menu.needPlayers"));
       return;
     }
+    window.roundersStats?.event("match_start");
     // The match playlist opens on the first arena's song (resetRound → startMatchMusic).
     musicState.matchStarted = false;
     players = lobbySlots.map((slot, i) => {

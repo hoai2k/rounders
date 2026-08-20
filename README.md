@@ -20,6 +20,12 @@ The live site redeploys automatically on every push to `main`
 (`.github/workflows/deploy-pages.yml`), so dropping generated art into
 `assets/images/` and pushing is all it takes to see it online.
 
+### Stats
+
+`/stats/` is a visitor dashboard — countries, cities, referrers and how many
+people actually started a match. It stays dark and sends nothing until a
+collector is configured; see [`STATS.md`](STATS.md).
+
 ### Controls
 
 | | Move | Jump | Shoot | Block / Active |
@@ -98,6 +104,7 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 - `image-requests-history.md` — the same for art already generated and in the repo
 - `intake/README.md` — how to bring delivered art into the game
 - `AUDIT.md` — variety/balance audit findings
+- `STATS.md` — how the visitor dashboard at `/stats/` works and how to switch it on
 - `CLAUDE.md` — repo policies
 
 ## Code layout
@@ -118,3 +125,6 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 | `workbench/` | Sprite workbench (preview / edit handles / anchors → `rigs.json`) and art intake page |
 | `index.html`, `styles.css` | UI |
 | `server.mjs` | Zero-dependency static server |
+| `js/telemetry.js`, `js/stats-config.js` | One cookieless page-view beacon; inert until an endpoint is set |
+| `stats/` | The `/stats/` dashboard: who is playing and where from |
+| `worker/` | Cloudflare Worker + D1 schema behind the dashboard (see `STATS.md`) |

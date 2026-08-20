@@ -45,23 +45,23 @@ the end of the URL.)
 
 ## Setup (about five minutes, free, no card)
 
-1. **Create a site** at <https://www.goatcounter.com/signup>. Pick a code — say
-   `rounders` — and your dashboard is `https://rounders.goatcounter.com`.
+1. ~~**Create a site**~~ — done: the code is `hoai`, so the dashboard lives at
+   <https://hoai.goatcounter.com>.
 
-2. **Point the game at it** — one line in `js/stats-config.js`:
+2. ~~**Point the game at it**~~ — done, in `js/stats-config.js`:
 
    ```js
    window.ROUNDERS_STATS = {
-     site: "rounders"
+     site: "hoai"
    };
    ```
 
-   Commit and push to `main`; Pages redeploys and counting starts.
+   Counting starts as soon as this is live on `main`.
 
 3. **Let this site frame the dashboard.** In GoatCounter, go to
    **Settings → Sites that can embed GoatCounter** and add `hoai2k.github.io`.
    Without this the frame at `/stats/` stays blank (the dashboard still works
-   at `rounders.goatcounter.com`).
+   at <https://hoai.goatcounter.com>).
 
 4. **Decide who may read the stats.** Under **Settings → Dashboard viewable
    by**:
@@ -71,8 +71,12 @@ the end of the URL.)
      `/stats/` once. It is stored in that browser's localStorage only, never in
      the repository, so it is asked for once per device.
 
-5. **Open `/stats/`**, enter the site code (and token, if you set one), and the
-   dashboard appears.
+   As of writing, `hoai.goatcounter.com` redirects to a login page, so it is on
+   the second setting: `/stats/` needs a token pasted in once per device, or
+   flip it to public.
+
+5. **Open `/stats/`** — the site code is already filled in, so it is only the
+   token (if any) that is asked for.
 
 ## Known limits
 

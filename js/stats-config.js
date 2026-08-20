@@ -1,14 +1,13 @@
 /**
- * Visitor stats settings. One line to fill in after creating a free
- * GoatCounter site — see STATS.md.
+ * Visitor stats settings — see STATS.md.
  *
- * Left empty, the game loads no analytics script and sends nothing at all,
- * and the dashboard at /stats/ explains how to switch it on, so a fresh
- * clone stays offline by default.
+ * Counting runs through GoatCounter, cookieless and free. Emptying `site`
+ * switches it off completely: no analytics script is loaded and no request is
+ * made, which is what a fork of this repository should do.
  */
 window.ROUNDERS_STATS = {
-  // Your GoatCounter site code: "rounders" for rounders.goatcounter.com.
-  site: "",
+  // The GoatCounter site code — the dashboard is hoai.goatcounter.com.
+  site: "hoai",
 
   // Only for a self-hosted GoatCounter: its base URL, e.g.
   // "https://stats.example.com". Leave empty for the hosted service.

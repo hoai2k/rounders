@@ -1037,9 +1037,13 @@ Pillars:
       access token kept in the browser, never in the repository
 - [x] `STATS.md` — what is recorded, the five-minute setup, the known limits
       (content blockers; country/region, no city)
-- [ ] **Owner step:** create the GoatCounter site, put its code in
-      `js/stats-config.js`, and allowlist `hoai2k.github.io` under
-      *Sites that can embed GoatCounter* (nothing is counted until then)
+- [x] Wired to the live GoatCounter site: code `hoai`
+      (`hoai.goatcounter.com`), so counting starts with this deploy
+- [ ] **Owner step:** in GoatCounter settings, add `hoai2k.github.io` under
+      *Sites that can embed GoatCounter* — until then `/stats/` frames a blank
+      box and the dashboard has to be opened directly. The dashboard is not
+      public, so `/stats/` also wants an access token pasted in once per device
+      (or set *Dashboard viewable by* to public)
 - [~] Superseded: the first pass used a Cloudflare Worker + D1 collector (city
       level, own storage). Dropped to avoid needing a Cloudflare account; it is
       still in git history at `worker/` if city detail is ever wanted

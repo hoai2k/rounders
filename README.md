@@ -22,9 +22,10 @@ The live site redeploys automatically on every push to `main`
 
 ### Stats
 
-`/stats/` is a visitor dashboard — countries, cities, referrers and how many
-people actually started a match. It stays dark and sends nothing until a
-collector is configured; see [`STATS.md`](STATS.md).
+`/stats/` is a visitor dashboard — countries, regions, referrers and how many
+people actually started a match — backed by a free
+[GoatCounter](https://www.goatcounter.com) site. It loads no analytics script
+and sends nothing until a site code is configured; see [`STATS.md`](STATS.md).
 
 ### Controls
 
@@ -125,6 +126,5 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 | `workbench/` | Sprite workbench (preview / edit handles / anchors → `rigs.json`) and art intake page |
 | `index.html`, `styles.css` | UI |
 | `server.mjs` | Zero-dependency static server |
-| `js/telemetry.js`, `js/stats-config.js` | One cookieless page-view beacon; inert until an endpoint is set |
+| `js/telemetry.js`, `js/stats-config.js` | Cookieless GoatCounter counting; inert until a site code is set |
 | `stats/` | The `/stats/` dashboard: who is playing and where from |
-| `worker/` | Cloudflare Worker + D1 schema behind the dashboard (see `STATS.md`) |

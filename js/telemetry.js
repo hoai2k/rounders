@@ -1,60 +1,59 @@
 /**
- * A one-beacon-per-visit ping to the stats collector.
+ * Counts a visit with GoatCounter — a cookieless, privacy-first analytics
+ * service that never sees more than a country, a region and a browser family.
  *
- * No cookies, no identifiers, no third-party script: a single fire-and-forget
- * POST with the page, the referring host and the screen size. Everything about
- * where the player is comes from the edge (see worker/worker.js), never from
- * the browser, and the game never reads anything back — if the collector is
- * unset, down or blocked, this file does nothing observable.
+ * The script is only fetched when `js/stats-config.js` names a site, so an
+ * unconfigured clone makes no network requests. GoatCounter itself skips
+ * localhost, file:// and framed pages, so `npm start` never pollutes the real
+ * numbers.
  */
 (function () {
   var config = window.ROUNDERS_STATS || {};
-  var endpoint = String(config.endpoint || "").replace(/\/+$/, "");
-  var sent = false;
+  var site = String(config.site || "").trim().replace(/\.goatcounter\.com$/, "");
+  var selfHosted = String(config.url || "").trim().replace(/\/+$/, "");
+  var base = selfHosted || (site ? "https://" + site + ".goatcounter.com" : "");
 
-  function send(event) {
-    if (!endpoint) return;
-    var payload = {
-      p: location.pathname,
-      r: document.referrer || "",
-      s: window.screen ? screen.width + "x" + screen.height : "",
-      l: navigator.language || ""
-    };
-    if (event) payload.e = String(event).slice(0, 40);
-    var body = JSON.stringify(payload);
-    try {
-      // sendBeacon survives the page being closed mid-flight; fetch is the
-      // fallback for browsers that refuse a beacon (some content blockers).
-      if (!navigator.sendBeacon || !navigator.sendBeacon(endpoint + "/collect", body)) {
-        fetch(endpoint + "/collect", {
-          method: "POST",
-          body: body,
-          keepalive: true,
-          mode: "cors"
-        }).catch(function () {});
-      }
-    } catch (err) { /* stats must never break the game */ }
-  }
-
-  function view() {
-    if (sent) return;
-    sent = true;
-    send(null);
-  }
-
-  // Do-Not-Track is honoured, and so is a local opt-out for the developer's
-  // own browser: localStorage.setItem("rounders.stats.optout", "1").
+  // Do-Not-Track is honoured, and so is a local opt-out for your own browser:
+  // localStorage.setItem("rounders.stats.optout", "1").
   var optedOut = navigator.doNotTrack === "1" || window.doNotTrack === "1";
   try { optedOut = optedOut || localStorage.getItem("rounders.stats.optout") === "1"; } catch (err) {}
 
+  var pending = [];
+
+  function count(vars) {
+    if (window.goatcounter && window.goatcounter.count) window.goatcounter.count(vars);
+    else pending.push(vars);
+  }
+
   window.roundersStats = {
-    event: function (name) { if (!optedOut) send(name); },
+    // roundersStats.event("match_start") shows up as an event in the dashboard,
+    // which is how "someone played" is told apart from "someone looked".
+    event: function (name) {
+      if (optedOut || !base) return;
+      var label = String(name).slice(0, 60);
+      count({ path: label, title: label, event: true });
+    },
     optOut: function () {
-      try { localStorage.setItem("rounders.stats.optout", "1"); } catch (err) {}
+      try {
+        localStorage.setItem("rounders.stats.optout", "1");
+        localStorage.setItem("skipgc", "t"); // GoatCounter's own opt-out flag
+      } catch (err) {}
     }
   };
 
-  if (optedOut || !endpoint) return;
-  if (document.readyState === "complete") view();
-  else window.addEventListener("load", view, { once: true });
+  if (optedOut || !base) return;
+
+  var script = document.createElement("script");
+  script.async = true;
+  script.src = selfHosted ? selfHosted + "/count.js" : "https://gc.zgo.at/count.js";
+  // count.js reads the endpoint off this attribute, so it must be set before
+  // the script is appended.
+  script.setAttribute("data-goatcounter", base + "/count");
+  script.addEventListener("load", function () {
+    var queued = pending;
+    pending = [];
+    queued.forEach(count);
+  });
+  script.addEventListener("error", function () { pending = []; });
+  document.head.appendChild(script);
 })();

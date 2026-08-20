@@ -7,7 +7,7 @@
     <title>Rounders — Stats</title>
     <link rel="icon" href="../assets/favicon/favicon.ico" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon/favicon-32.png">
-    <link rel="stylesheet" href="stats.css?v=1">
+    <link rel="stylesheet" href="stats.css?v=2">
   </head>
   <body>
     <header class="top">
@@ -16,106 +16,59 @@
         <h1>Who is playing</h1>
       </div>
       <div class="top-actions">
-        <label class="range">
-          <span>Range</span>
-          <select id="range">
-            <option value="7">7 days</option>
-            <option value="30" selected>30 days</option>
-            <option value="90">90 days</option>
-            <option value="365">1 year</option>
-          </select>
-        </label>
-        <button id="refresh" type="button">Refresh</button>
-        <button id="signout" type="button" class="ghost hidden">Sign out</button>
+        <a id="openTab" class="button hidden" target="_blank" rel="noopener">Open full dashboard ↗</a>
+        <button id="change" type="button" class="ghost hidden">Change site</button>
       </div>
     </header>
 
     <section id="gate" class="panel gate hidden">
-      <h2>Unlock the dashboard</h2>
+      <h2>Connect the dashboard</h2>
       <p id="gateNote" class="muted"></p>
       <label>
-        <span>Collector URL</span>
-        <input id="endpoint" type="url" placeholder="https://rounders-stats.you.workers.dev" autocomplete="off">
+        <span>GoatCounter site code</span>
+        <input id="site" type="text" placeholder="rounders" autocomplete="off" spellcheck="false">
+        <small class="muted">The part before <code>.goatcounter.com</code>.</small>
       </label>
       <label>
-        <span>Read token</span>
-        <input id="token" type="password" placeholder="STATS_TOKEN" autocomplete="off">
+        <span>Access token <em>(only if the dashboard is not public)</em></span>
+        <input id="token" type="password" placeholder="leave empty for a public dashboard" autocomplete="off">
       </label>
       <button id="unlock" type="button" class="primary">Show stats</button>
       <p class="muted small">
-        Stored in this browser only (localStorage). Setup instructions live in
-        <code>STATS.md</code> in the repository.
+        Both are kept in this browser only (localStorage) — nothing is committed to
+        the repository. Setup lives in <code>STATS.md</code>.
       </p>
     </section>
 
-    <p id="error" class="error hidden"></p>
-
-    <main id="board" class="board hidden">
-      <section class="tiles">
-        <div class="tile"><b id="tViews">—</b><span>page views</span></div>
-        <div class="tile"><b id="tVisitors">—</b><span>unique visitors</span></div>
-        <div class="tile"><b id="tCountries">—</b><span>countries</span></div>
-        <div class="tile"><b id="tPlaces">—</b><span>new places in range</span></div>
+    <main id="board" class="hidden">
+      <section class="panel frame-panel">
+        <iframe id="frame" title="GoatCounter dashboard" referrerpolicy="no-referrer"></iframe>
       </section>
-
-      <section class="panel">
-        <h2>Traffic by day</h2>
-        <div id="chart" class="chart"></div>
-        <p class="legend"><i class="key key-views"></i> views <i class="key key-visitors"></i> visitors</p>
-      </section>
-
-      <section class="panel">
-        <h2>Where from</h2>
-        <div id="countries" class="rows"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Towns and cities</h2>
-        <div id="cities" class="rows"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Places seen for the first time</h2>
-        <p class="muted small">A city appearing here for the first time is somebody
-        who had never loaded the game before.</p>
-        <div id="places" class="rows"></div>
-      </section>
-
-      <div class="split">
-        <section class="panel">
-          <h2>Arrived from</h2>
-          <div id="referrers" class="rows"></div>
-        </section>
-        <section class="panel">
-          <h2>Browsers</h2>
-          <div id="browsers" class="rows"></div>
-        </section>
-      </div>
-
-      <section class="panel">
-        <h2>Pages and events</h2>
-        <div id="paths" class="rows"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Latest visits</h2>
-        <div class="scroller">
-          <table id="recent">
-            <thead>
-              <tr><th>When</th><th>Where</th><th>Page</th><th>Browser</th><th>From</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
-
+      <details class="panel tips">
+        <summary>Blank frame, or no numbers?</summary>
+        <ul>
+          <li>GoatCounter only allows framing from allowlisted sites: add
+            <code id="thisHost">this site</code> under
+            <b>Settings → Sites that can embed GoatCounter</b>, then reload.</li>
+          <li>If the dashboard is not public, paste an access token
+            (<b>Settings → Dashboard viewable by</b> → logged in users or with secret token).</li>
+          <li>Content blockers hide GoatCounter from some visitors, so real traffic
+            is a little higher than what is shown here.</li>
+          <li>Locations are <b>country and region</b> — GoatCounter deliberately does
+            not resolve cities.</li>
+        </ul>
+      </details>
       <p class="muted small foot">
-        No cookies and no stored IP addresses: location comes from the edge network
-        and visitors are counted by a hash that is re-salted every day.
+        Cookieless and no stored IP addresses: GoatCounter keeps a country, a region,
+        a browser and a screen size, and nothing that identifies a person. Visits from
+        localhost are never counted. The <code>match_start</code> event tells the people
+        who played apart from the people who only looked.
       </p>
     </main>
 
-    <script src="../js/stats-config.js?v=32"></script>
-    <script src="stats.js?v=1"></script>
+    <p id="error" class="error hidden"></p>
+
+    <script src="../js/stats-config.js?v=33"></script>
+    <script src="stats.js?v=2"></script>
   </body>
 </html>

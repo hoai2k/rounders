@@ -1025,18 +1025,24 @@ Pillars:
       `.github/workflows/deploy-pages.yml`, redeploys on every push to `main`)
 
 ### 10. Visitor stats (2026-08-20)
-- [x] `/stats/` dashboard (`stats/`): totals, traffic-by-day chart, countries,
-      cities, first-seen places (tagged **new**), referrers, browsers,
-      pages/events, and the last 100 visits — token-gated, styled like the game
-- [x] Cookieless beacon (`js/telemetry.js`): one page view per load plus a
-      `match_start` event; honours DNT and a local opt-out; **inert** until
-      `js/stats-config.js` names an endpoint, so a clone sends nothing
-- [x] Collector (`worker/`): Cloudflare Worker + D1. Location comes from the
-      edge (`request.cf`), so no IP is stored — only a daily re-salted hash for
-      unique counts. Bots dropped, rows purged after 400 days
-- [x] `STATS.md` — what is recorded, the ten-minute setup, how to read the board
-- [ ] **Owner step:** deploy the worker and paste its URL into
-      `js/stats-config.js` (nothing is collected until then)
+- [x] Counting via **GoatCounter** (free, cookieless, no card, no cloud account):
+      `js/telemetry.js` loads `count.js` only when `js/stats-config.js` names a
+      site, so an unconfigured clone makes no requests at all
+- [x] `match_start` event, so the people who played are told apart from the
+      people who only looked
+- [x] Honours DNT and a local opt-out; GoatCounter itself skips localhost and
+      framed pages, so `npm start` never pollutes the numbers
+- [x] `/stats/` (`stats/`) frames the GoatCounter dashboard — countries and
+      regions, referrers, browsers, pages/events — with the site code and any
+      access token kept in the browser, never in the repository
+- [x] `STATS.md` — what is recorded, the five-minute setup, the known limits
+      (content blockers; country/region, no city)
+- [ ] **Owner step:** create the GoatCounter site, put its code in
+      `js/stats-config.js`, and allowlist `hoai2k.github.io` under
+      *Sites that can embed GoatCounter* (nothing is counted until then)
+- [~] Superseded: the first pass used a Cloudflare Worker + D1 collector (city
+      level, own storage). Dropped to avoid needing a Cloudflare account; it is
+      still in git history at `worker/` if city detail is ever wanted
 
 ---
 

@@ -18,14 +18,14 @@
 
     // ---------------------------------------------------------------- TITLE
     title: {
-      eyebrow: "1–4 player arena brawler",
+      eyebrow: "1–8 player arena brawler",
       tagline: "Round shooters. Power cards. Arenas with attitude.",
       pressStart: "PRESS START"
     },
 
     // ------------------------------------------------------- CHARACTER SELECT
     menu: {
-      eyebrow: "1–4 player arena brawler",
+      eyebrow: "1–8 player arena brawler",
       tagline: "Losers power-up, winners sweat. Last dot standing takes the round.",
 
       // shown inside an empty slot
@@ -46,6 +46,7 @@
       startMatch: "Start Match",
 
       lobbyFull: "Lobby is full",
+      seatsExpanded: "Expanded to {count} players",
       needPlayers: "Need at least 2 fighters — join up or add a bot"
     },
 
@@ -77,6 +78,7 @@
       groupFeel: "Feel",
       arena: "Arena",
       arenaRandom: "🎲 Random every round",
+      playerCount: "Num Players",
       scoreLimit: "Rounds to Win",
       draftCount: "Cards Per Draft",
       botDifficulty: "Bot Difficulty",

@@ -171,10 +171,19 @@ button.primary:hover, button.primary.controller-focus {
 /* ------------------------------------------------------------ lobby slots */
 .join-slots {
   display: grid;
+  /* Never wider than four across, so 5-8 seats wrap into a second row instead
+     of squeezing every portrait down to a stripe. */
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  max-width: calc(4 * 190px + 3 * 14px);
+  margin-inline: auto;
   gap: 14px;
   margin-top: 24px;
 }
+
+/* Five or more seats: tighter cards so two rows still fit on one screen. */
+.join-slots.crowded { gap: 10px; }
+.join-slots.crowded .join-slot { min-height: 178px; padding: 12px 10px 10px; gap: 3px; }
+.join-slots.crowded .slot-blurb { display: none; }
 
 .join-slot {
   position: relative;
@@ -1184,6 +1193,12 @@ input.controller-focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); border-
 
 .hud-col.left { left: var(--hud-inset, 10px); }
 .hud-col.right { right: var(--hud-inset, 10px); }
+
+/* Four cards to a column once the board seats more than four. */
+.hud.crowded .hud-cards { display: none; }
+.hud.crowded .hud-card { padding: 5px 8px; border-radius: 12px; }
+.hud.crowded .hud-portrait, .hud.crowded .hud-portrait canvas { width: 32px; height: 32px; }
+.hud.crowded .hud-col { gap: 6px; }
 
 .hud.tight .hud-col { width: 190px; }
 .hud.tight .hud-card { background: rgba(14, 11, 24, 0.55); }

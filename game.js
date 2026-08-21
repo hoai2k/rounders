@@ -48,7 +48,7 @@
   const cardsPanel = document.getElementById("cardsPanel");
 
   const settings = {
-    playerCount: 4,       // the board always seats four
+    playerCount: 4,       // seats on the character-select board; 2-8, see setPlayerCount
     botDifficulty: 2,
     scoreLimit: 5,        // shown as "Rounds to Win"
     draftCount: 4,
@@ -133,7 +133,11 @@
     weather: []
   };
 
-  const playerColors = ["#ff5277", "#52d7ff", "#ffe169", "#74f08b"];
+  // Eight seats, eight colours — the first four are the classic board.
+  const playerColors = ["#ff5277", "#52d7ff", "#ffe169", "#74f08b",
+    "#ff9f45", "#c68bff", "#59f0d8", "#ff7ee0"];
+  const MIN_PLAYERS = 2;
+  const MAX_PLAYERS = 8;
   // the whole Evil Bot squad wears one villainous violet
   const EVIL_COLOR = "#a64dff";
 
@@ -162,6 +166,34 @@
 
   // Humans join up to here; co-op keeps the last seat for the Evil Bot.
   function maxHumanSlots() { return settings.coop ? settings.playerCount - 1 : settings.playerCount; }
+
+  // The single way the seat count moves: clamps to 2-8, drops any lobby slot
+  // that no longer has a seat, and keeps the settings slider showing the truth.
+  function setPlayerCount(n) {
+    const next = Math.max(MIN_PLAYERS, Math.min(MAX_PLAYERS, Math.round(Number(n) || 0)));
+    if (next === settings.playerCount) return false;
+    settings.playerCount = next;
+    while (lobbySlots.length > maxHumanSlots()) lobbySlots.pop();
+    syncPlayerCountUI();
+    if (world.state === "menu") renderLobby();
+    return true;
+  }
+
+  function syncPlayerCountUI() {
+    const input = document.getElementById("playerCount");
+    const value = document.getElementById("playerCountValue");
+    if (input) input.value = String(settings.playerCount);
+    if (value) value.textContent = String(settings.playerCount);
+  }
+
+  // Controllers outrank the slider: plug in a 5th pad and the board grows to
+  // seat it. It only ever grows — unplugging never takes a seat away, and a
+  // player who deliberately set a bigger count keeps it.
+  function growSeatsForPads(pads) {
+    const wanted = pads.length + (settings.coop ? 1 : 0);
+    if (wanted <= settings.playerCount) return;
+    if (setPlayerCount(wanted)) showToast(str("menu.seatsExpanded", { count: settings.playerCount }));
+  }
 
   let players = [];
   let bullets = [];
@@ -538,6 +570,9 @@
 
   function updateLobby(pads) {
     if (world.state !== "menu") return;
+    // Seats first: a pad that just showed up needs somewhere to sit before the
+    // join pass below tries to seat it.
+    growSeatsForPads(pads);
     // While a bot slot is being re-picked, the lobby's own input (joins, slot
     // cycling) stands down — updateMenuControls drives the edit.
     if (editingBot) return;
@@ -606,6 +641,7 @@
 
   function renderLobby() {
     if (settings.coop && !evilSlot) evilSlot = { charIndex: freeCharIndex() };
+    joinSlots.classList.toggle("crowded", settings.playerCount > 4);
     const cells = [];
     for (let i = 0; i < settings.playerCount; i += 1) {
       // co-op pins the Evil Bot to the last seat, whoever else has joined
@@ -639,7 +675,7 @@
       const editing = editingBot && editingBot.kind === "slot" && editingBot.index === i;
       const choosing = editing || (!slot.locked && !isBot);
       cells.push(`
-        <article class="join-slot joined ${editing ? "editing" : slot.locked ? "locked" : ""}${slot.type === "pad" ? "" : " pickable"}${isBot ? " bot-editable" : ""}" data-slot="${i}"${isBot ? ' data-bot="slot" tabindex="-1"' : ""} style="--pcol:${playerColors[i]}">
+        <article class="join-slot joined ${editing ? "editing" : slot.locked ? "locked" : ""}${slot.type === "pad" ? "" : " pickable"}${isBot ? " bot-editable" : ""}" data-slot="${i}"${isBot ? ' data-bot="slot" tabindex="-1"' : ""} style="--pcol:${playerColors[i % playerColors.length]}">
           <div class="slot-arrows">${choosing ? "◀&nbsp;&nbsp;&nbsp;▶" : ""}</div>
           <div class="slot-portrait"><canvas data-portrait="${slot.charIndex}" width="96" height="96"></canvas></div>
           <strong>${ch.name} <em>${ch.title}</em></strong>
@@ -725,6 +761,9 @@
       for (let i = lobbySlots.length - 1; i >= 0; i -= 1) {
         if (lobbySlots[i].type === "bot") lobbySlots.splice(i, 1);
       }
+      // The Evil Bot's seat comes out of the board, so grow it if there is room
+      // rather than bumping someone who has already joined.
+      if (lobbySlots.length > maxHumanSlots()) setPlayerCount(settings.playerCount + 1);
       while (lobbySlots.length > maxHumanSlots()) lobbySlots.pop();
       if (!evilSlot) evilSlot = { charIndex: freeCharIndex() };
     } else {
@@ -5165,6 +5204,7 @@
 
   // -------------------------------------------------------------------- HUD
   function buildHud() {
+    hud.classList.toggle("crowded", players.length > 4);
     hud.innerHTML = '<div class="hud-col left"></div><div class="hud-col right"></div>';
     const cols = [hud.querySelector(".hud-col.left"), hud.querySelector(".hud-col.right")];
     hudRefs = [];
@@ -8020,6 +8060,11 @@
     });
     document.getElementById("botDifficultyValue").textContent = botDifficultyLabel(settings.botDifficulty);
     document.getElementById("coopMode").addEventListener("change", e => setCoop(e.target.checked));
+    bindSetting("playerCount", "playerCountValue", v => {
+      setPlayerCount(v);
+      syncPlayerCountUI();   // a clamped value has to be reflected back to the slider
+    });
+    syncPlayerCountUI();
     bindSetting("scoreLimit", "scoreLimitValue", v => settings.scoreLimit = Number(v));
     bindSetting("draftCount", "draftCountValue", v => settings.draftCount = Number(v));
     bindSetting("musicVolume", "musicVolumeValue", setMusicVolume);

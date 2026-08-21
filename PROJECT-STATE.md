@@ -9,7 +9,7 @@ so work can resume cleanly if interrupted. Update the status boxes as work lands
 
 ## Vision
 
-A colorful, dynamic, professionally polished 1–4 player arena brawler in the spirit
+A colorful, dynamic, professionally polished 1–8 player arena brawler in the spirit
 of ROUNDS: short physics duels, loser-drafts-a-card comebacks, huge build variety.
 Everything is being redesigned from scratch — cards, arenas, characters, UI — using
 the old codebase only as an engine framework.
@@ -937,6 +937,13 @@ Pillars:
 - [x] Full visual redesign: animated gradient menu, glassmorphism panels, rarity-glow
       cards, character-portrait HUD, arena intro banner with theme blurb
 - [x] Restructured settings (grouped sections, arena picker, rarity rates)
+- [x] **Num Players** (2026-08-21): a Match slider seats 2–8 (default 4), driving
+      the character-select grid, `maxHumanSlots()` and every downstream system
+      (8 player colours, second-lap spawns, four HUD cards per column via
+      `.hud.crowded`, a `.join-slots.crowded` 4×2 lobby grid). Controllers
+      outrank the slider: `growSeatsForPads()` grows the board the moment a 5th
+      pad appears (co-op asks for one seat more, for the Evil Bot) and never
+      shrinks it, so unplugging a pad leaves the seats where they are.
 - [x] **Settings pared down** (2026-08-18): Max Players gone (the board always
       seats four), Arena Hazards gone (part of every arena), "Score to Win" is
       now "Rounds to Win". Choose Cards is one button opening its own panel

@@ -1,6 +1,6 @@
 # Rounders
 
-**Rounders** is a colorful 1–4 player local arena brawler in the spirit of ROUNDS:
+**Rounders** is a colorful 1–8 player local arena brawler in the spirit of ROUNDS:
 short physics duels between round little fighters, where everyone who loses a round
 drafts a power card — all at the same time — and comes back angrier.
 

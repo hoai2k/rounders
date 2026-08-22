@@ -937,13 +937,19 @@ Pillars:
 - [x] Full visual redesign: animated gradient menu, glassmorphism panels, rarity-glow
       cards, character-portrait HUD, arena intro banner with theme blurb
 - [x] Restructured settings (grouped sections, arena picker, rarity rates)
-- [x] **Num Players** (2026-08-21): a Match slider seats 2–8 (default 4), driving
-      the character-select grid, `maxHumanSlots()` and every downstream system
-      (8 player colours, second-lap spawns, four HUD cards per column via
-      `.hud.crowded`, a `.join-slots.crowded` 4×2 lobby grid). Controllers
-      outrank the slider: `growSeatsForPads()` grows the board the moment a 5th
-      pad appears (co-op asks for one seat more, for the Evil Bot) and never
-      shrinks it, so unplugging a pad leaves the seats where they are.
+- [x] **Elastic lobby, up to eight** (2026-08-21): the character-select board
+      has no fixed size and no setting. `visibleSeats()` derives it —
+      `clamp(joined + 1, 2, 8)`, plus one more in co-op for the Evil Bot — so a
+      single empty seat always trails whoever has joined. Join a pad or add a
+      bot and a fresh empty appears behind it; leave, or click a bot off, and
+      the trailing empty collapses. At eight the empty is squeezed out and the
+      board is full. Nothing reserves a seat in advance: a pad that is plugged
+      in but has not joined occupies nothing, and can always join because the
+      trailing empty is there until the board is full. Eight is supported
+      throughout — 8 player colours, second-lap spawns, four HUD cards per
+      column via `.hud.crowded`, a `.join-slots.crowded` 4×2 grid. The
+      "(Y to add bot)" hint now appears only once someone has joined, matching
+      the rule `updateLobby` actually enforces.
 - [x] **Settings pared down** (2026-08-18): Max Players gone (the board always
       seats four), Arena Hazards gone (part of every arena), "Score to Win" is
       now "Rounds to Win". Choose Cards is one button opening its own panel

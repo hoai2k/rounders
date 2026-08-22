@@ -48,7 +48,6 @@
   const cardsPanel = document.getElementById("cardsPanel");
 
   const settings = {
-    playerCount: 4,       // seats on the character-select board; 2-8, see setPlayerCount
     botDifficulty: 2,
     scoreLimit: 5,        // shown as "Rounds to Win"
     draftCount: 4,
@@ -136,7 +135,7 @@
   // Eight seats, eight colours — the first four are the classic board.
   const playerColors = ["#ff5277", "#52d7ff", "#ffe169", "#74f08b",
     "#ff9f45", "#c68bff", "#59f0d8", "#ff7ee0"];
-  const MIN_PLAYERS = 2;
+  const MIN_SEATS = 2;    // an empty lobby still shows a pair of open seats
   const MAX_PLAYERS = 8;
   // the whole Evil Bot squad wears one villainous violet
   const EVIL_COLOR = "#a64dff";
@@ -165,34 +164,18 @@
   }
 
   // Humans join up to here; co-op keeps the last seat for the Evil Bot.
-  function maxHumanSlots() { return settings.coop ? settings.playerCount - 1 : settings.playerCount; }
+  function maxHumanSlots() { return settings.coop ? MAX_PLAYERS - 1 : MAX_PLAYERS; }
 
-  // The single way the seat count moves: clamps to 2-8, drops any lobby slot
-  // that no longer has a seat, and keeps the settings slider showing the truth.
-  function setPlayerCount(n) {
-    const next = Math.max(MIN_PLAYERS, Math.min(MAX_PLAYERS, Math.round(Number(n) || 0)));
-    if (next === settings.playerCount) return false;
-    settings.playerCount = next;
-    while (lobbySlots.length > maxHumanSlots()) lobbySlots.pop();
-    syncPlayerCountUI();
-    if (world.state === "menu") renderLobby();
-    return true;
-  }
-
-  function syncPlayerCountUI() {
-    const input = document.getElementById("playerCount");
-    const value = document.getElementById("playerCountValue");
-    if (input) input.value = String(settings.playerCount);
-    if (value) value.textContent = String(settings.playerCount);
-  }
-
-  // Controllers outrank the slider: plug in a 5th pad and the board grows to
-  // seat it. It only ever grows — unplugging never takes a seat away, and a
-  // player who deliberately set a bigger count keeps it.
-  function growSeatsForPads(pads) {
-    const wanted = pads.length + (settings.coop ? 1 : 0);
-    if (wanted <= settings.playerCount) return;
-    if (setPlayerCount(wanted)) showToast(str("menu.seatsExpanded", { count: settings.playerCount }));
+  // The board is elastic: one empty seat always trails whoever has joined, so
+  // there is somewhere obvious to sit and nothing but dead cells beyond it.
+  // Two seats minimum (an empty lobby still reads as a lobby), eight maximum —
+  // at which point the trailing empty is squeezed out and the board is full.
+  // Nothing reserves a seat in advance: a controller that is plugged in but
+  // has not joined is not occupying anything, and it can always join because
+  // the trailing empty is there until the board is full.
+  function visibleSeats() {
+    const extra = settings.coop ? 2 : 1;   // the trailing empty, plus the Evil Bot's own seat
+    return Math.max(MIN_SEATS, Math.min(MAX_PLAYERS, lobbySlots.length + extra));
   }
 
   let players = [];
@@ -570,9 +553,6 @@
 
   function updateLobby(pads) {
     if (world.state !== "menu") return;
-    // Seats first: a pad that just showed up needs somewhere to sit before the
-    // join pass below tries to seat it.
-    growSeatsForPads(pads);
     // While a bot slot is being re-picked, the lobby's own input (joins, slot
     // cycling) stands down — updateMenuControls drives the edit.
     if (editingBot) return;
@@ -641,11 +621,12 @@
 
   function renderLobby() {
     if (settings.coop && !evilSlot) evilSlot = { charIndex: freeCharIndex() };
-    joinSlots.classList.toggle("crowded", settings.playerCount > 4);
+    const seats = visibleSeats();
+    joinSlots.classList.toggle("crowded", seats > 4);
     const cells = [];
-    for (let i = 0; i < settings.playerCount; i += 1) {
+    for (let i = 0; i < seats; i += 1) {
       // co-op pins the Evil Bot to the last seat, whoever else has joined
-      if (settings.coop && i === settings.playerCount - 1) {
+      if (settings.coop && i === seats - 1) {
         const ch = CHARACTERS[evilSlot.charIndex];
         const editing = editingBot && editingBot.kind === "evil";
         cells.push(`
@@ -666,7 +647,7 @@
             <div class="slot-portrait empty-portrait">?</div>
             <strong>${escapeHtml(str("menu.slotOpenTitle"))}</strong>
             <span class="slot-join">${escapeHtml(str("menu.slotJoinPrompt"))}</span>
-            ${i > 0 && !settings.coop ? `<span class="slot-bot-hint">${escapeHtml(str("menu.slotBotPrompt"))}</span>` : ""}
+            ${lobbySlots.length > 0 && !settings.coop ? `<span class="slot-bot-hint">${escapeHtml(str("menu.slotBotPrompt"))}</span>` : ""}
           </article>`);
         continue;
       }
@@ -761,9 +742,6 @@
       for (let i = lobbySlots.length - 1; i >= 0; i -= 1) {
         if (lobbySlots[i].type === "bot") lobbySlots.splice(i, 1);
       }
-      // The Evil Bot's seat comes out of the board, so grow it if there is room
-      // rather than bumping someone who has already joined.
-      if (lobbySlots.length > maxHumanSlots()) setPlayerCount(settings.playerCount + 1);
       while (lobbySlots.length > maxHumanSlots()) lobbySlots.pop();
       if (!evilSlot) evilSlot = { charIndex: freeCharIndex() };
     } else {
@@ -793,7 +771,7 @@
       return;
     }
     if (!slot) {
-      if (lobbySlots.length >= settings.playerCount) { showToast(str("menu.lobbyFull")); return; }
+      if (lobbySlots.length >= maxHumanSlots()) { showToast(str("menu.lobbyFull")); return; }
       if (next.kind === "bot") addBot();
       else addSlot({ type: "keyboard", schemeIndex: next.schemeIndex, label: keyboardSchemes[next.schemeIndex].label });
       return;
@@ -8060,11 +8038,6 @@
     });
     document.getElementById("botDifficultyValue").textContent = botDifficultyLabel(settings.botDifficulty);
     document.getElementById("coopMode").addEventListener("change", e => setCoop(e.target.checked));
-    bindSetting("playerCount", "playerCountValue", v => {
-      setPlayerCount(v);
-      syncPlayerCountUI();   // a clamped value has to be reflected back to the slider
-    });
-    syncPlayerCountUI();
     bindSetting("scoreLimit", "scoreLimitValue", v => settings.scoreLimit = Number(v));
     bindSetting("draftCount", "draftCountValue", v => settings.draftCount = Number(v));
     bindSetting("musicVolume", "musicVolumeValue", setMusicVolume);

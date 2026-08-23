@@ -937,6 +937,13 @@ Pillars:
 - [x] Full visual redesign: animated gradient menu, glassmorphism panels, rarity-glow
       cards, character-portrait HUD, arena intro banner with theme blurb
 - [x] Restructured settings (grouped sections, arena picker, rarity rates)
+- [x] **Lobby portraits hold still** (2026-08-21): lobby portraits are stills,
+      repainted only when `renderLobby()` rebuilds the markup, but they were
+      posed at the live `world.time` — so every rebuild caught each fighter's
+      idle wobble at a new phase and one player cycling their character nudged
+      everyone else's portrait. They now pose at a fixed `t: 0`, as the HUD
+      portraits already did. (The draft panel passes `world.time` too but is
+      built once per draft, never on a pick, so it never showed the jump.)
 - [x] **Elastic lobby, up to eight** (2026-08-21): the character-select board
       has no fixed size and no setting. `visibleSeats()` derives it —
       `clamp(joined + 1, 2, 8)`, plus one more in co-op for the Evil Bot — so a

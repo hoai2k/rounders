@@ -668,13 +668,18 @@
     }
     joinSlots.innerHTML = cells.join("");
     syncLobbyActions();
+    // Portraits are stills, not animations — they are only repainted when the
+    // lobby markup is rebuilt. Posing them at the live world.time meant every
+    // rebuild caught the idle wobble at a new phase, so one player cycling
+    // their fighter visibly nudged everyone else's portrait. Pose them at a
+    // fixed t instead, the way the HUD portraits already do.
     for (const cv of joinSlots.querySelectorAll("canvas[data-portrait]")) {
       const ch = CHARACTERS[Number(cv.dataset.portrait)];
       const c2 = cv.getContext("2d");
       c2.clearRect(0, 0, 96, 96);
       c2.save();
       c2.translate(40, 52);
-      drawCharacter(c2, ch, 24, { t: world.time, aimX: 1, aimY: 0 });
+      drawCharacter(c2, ch, 24, { t: 0, aimX: 1, aimY: 0 });
       c2.restore();
     }
   }

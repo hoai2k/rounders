@@ -467,23 +467,61 @@
       : h.lx <= 2 && h.lx + h.w >= platform.w - 2;     // a wall: a tunnel side to side
   }
 
+  // A hole that goes clean through leaves the slab in two: the material before
+  // the opening and the material after it. Splitting the collision box that way
+  // is what turns a bored hole into a doorway — the lips still hold you up and
+  // still stop your head, but the gap itself is empty space you can walk or
+  // fall through, exactly as it is drawn.
+  //
+  // Returns the solid sub-slabs, or null when nothing here is holed right
+  // through (a half-finished niche is still solid wall).
+  const HOLE_SLACK = 5;      // a little forgiveness squeezing through the gap
+  function holePieces(platform) {
+    const list = platform.holes;
+    if (!list || !list.length) return null;
+    const floor = platform.w >= platform.h;
+    const start = floor ? platform.x : platform.y;
+    const end = start + (floor ? platform.w : platform.h);
+    const gaps = [];
+    for (const h of list) {
+      if (!holeSpans(platform, h)) continue;
+      const a = (floor ? platform.x + h.lx : platform.y + h.ly) + HOLE_SLACK;
+      const b = a + (floor ? h.w : h.h) - HOLE_SLACK * 2;
+      if (b > a) gaps.push([a, b]);
+    }
+    if (!gaps.length) return null;
+    gaps.sort((g1, g2) => g1[0] - g2[0]);
+    const solid = [];
+    let cut = start;
+    for (const [a, b] of gaps) {
+      if (a > cut) solid.push([cut, Math.min(a, end)]);
+      cut = Math.max(cut, b);
+    }
+    if (cut < end) solid.push([cut, end]);
+    return solid
+      .filter(([a, b]) => b - a > 1)
+      .map(([a, b]) => (floor
+        ? { ...platform, x: a, w: b - a, holes: null }
+        : { ...platform, y: a, h: b - a, holes: null }));
+  }
+
   // Is (wx, wy) inside removed material?
   //
   // Bullets travel through ANY excavation, including a half-finished niche —
   // that is how a second shot reaches the back of the bite and holes right
-  // through. Players only pass an opening that spans the slab, so nobody can
-  // sink into a pocket and fall out of the world.
-  function inHole(platform, wx, wy, rad = 0, requireSpan = false) {
+  // through. Fighters do not use this: they collide against the pieces a
+  // through-hole leaves of the slab (see holePieces), so a niche stays solid
+  // wall and nobody can sink into a pocket and fall out of the world.
+  function inHole(platform, wx, wy, rad = 0) {
     const list = platform.holes;
     if (!list || !list.length) return false;
     for (const h of list) {
-      if (requireSpan && !holeSpans(platform, h)) continue;
       const x0 = platform.x + h.lx, y0 = platform.y + h.ly;
       const pad = rad * 0.62;
       if (wx > x0 + pad && wx < x0 + h.w - pad && wy > y0 + pad && wy < y0 + h.h - pad) return true;
       // an opening narrower than the body still lets it through along the
       // thickness, so only the long axis is measured against the body
-      if (!requireSpan && wx > x0 && wx < x0 + h.w && wy > y0 && wy < y0 + h.h) return true;
+      if (wx > x0 && wx < x0 + h.w && wy > y0 && wy < y0 + h.h) return true;
     }
     return false;
   }
@@ -2802,41 +2840,53 @@
     if (p.x > world.width - r) { p.x = world.width - r; p.vx = -Math.abs(p.vx) * 0.46; touchWall(p, -1); }
     if (p.y < r) { p.y = r; p.vy = Math.abs(p.vy) * 0.42; }
     for (const platform of plats) {
-      const overlap = playerPlatformOverlap(p, platform);
-      if (!overlap) continue;
-      // a bored-out gap is a way through, for people as well as bullets
-      if (platform.holes && inHole(platform, p.x, p.y, r, true)) continue;
-      if (overlap.side === "top") {
-        p.y -= overlap.amount;
-        p.vy = Math.min(0, p.vy);
-        p.grounded = true;
-        p.groundPlatform = platform;
-        p.jumpsLeft = 1 + p.stats.extraJumps;
-        p.floatLeft = p.stats.floatTime;
-      } else if (overlap.side === "bottom") {
-        p.y += overlap.amount;
-        p.vy = Math.max(0, p.vy) * 0.24;
-      } else if (overlap.side === "left") {
-        if (platform.isCrate) {
-          // shoulder the crate along instead of stopping dead
-          platform.crateRef.x += overlap.amount * 0.55;
-          platform.crateRef.vx = Math.max(platform.crateRef.vx, p.vx * 0.9);
-          p.x -= overlap.amount * 0.45;
-        } else {
-          p.x -= overlap.amount;
-          p.vx = Math.min(0, p.vx) * 0.22;
-          touchWall(p, -1);
-        }
-      } else if (overlap.side === "right") {
-        if (platform.isCrate) {
-          platform.crateRef.x -= overlap.amount * 0.55;
-          platform.crateRef.vx = Math.min(platform.crateRef.vx, p.vx * 0.9);
-          p.x += overlap.amount * 0.45;
-        } else {
-          p.x += overlap.amount;
-          p.vx = Math.max(0, p.vx) * 0.22;
-          touchWall(p, 1);
-        }
+      // A bored-out gap is a way through, for people as well as bullets: the
+      // slab then collides as the material either side of the opening, so you
+      // can walk into a tunnel and stand on its floor, or drop down a shaft.
+      const pieces = platform.holes ? holePieces(platform) : null;
+      if (pieces) {
+        for (const piece of pieces) collidePlayerSlab(p, piece, r);
+        continue;
+      }
+      collidePlayerSlab(p, platform, r);
+    }
+  }
+
+  // Resolve one fighter against one solid slab (a whole platform, or one of the
+  // pieces a Breakthrough hole has left of it).
+  function collidePlayerSlab(p, platform, r) {
+    const overlap = playerPlatformOverlap(p, platform);
+    if (!overlap) return;
+    if (overlap.side === "top") {
+      p.y -= overlap.amount;
+      p.vy = Math.min(0, p.vy);
+      p.grounded = true;
+      p.groundPlatform = platform;
+      p.jumpsLeft = 1 + p.stats.extraJumps;
+      p.floatLeft = p.stats.floatTime;
+    } else if (overlap.side === "bottom") {
+      p.y += overlap.amount;
+      p.vy = Math.max(0, p.vy) * 0.24;
+    } else if (overlap.side === "left") {
+      if (platform.isCrate) {
+        // shoulder the crate along instead of stopping dead
+        platform.crateRef.x += overlap.amount * 0.55;
+        platform.crateRef.vx = Math.max(platform.crateRef.vx, p.vx * 0.9);
+        p.x -= overlap.amount * 0.45;
+      } else {
+        p.x -= overlap.amount;
+        p.vx = Math.min(0, p.vx) * 0.22;
+        touchWall(p, -1);
+      }
+    } else if (overlap.side === "right") {
+      if (platform.isCrate) {
+        platform.crateRef.x -= overlap.amount * 0.55;
+        platform.crateRef.vx = Math.min(platform.crateRef.vx, p.vx * 0.9);
+        p.x += overlap.amount * 0.45;
+      } else {
+        p.x += overlap.amount;
+        p.vx = Math.max(0, p.vx) * 0.22;
+        touchWall(p, 1);
       }
     }
   }
@@ -8400,7 +8450,18 @@
     }),
     probe: (px, py, rad = 27) => activePlatforms(currentLevel(), world.time)
       .filter(pl => pl.holes && pl.holes.length)
-      .map(pl => ({ box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, hasHoles: pl.holes.length, inHole: inHole(pl, px, py, rad) })),
+      .map(pl => {
+        // `clear` is the doorway test: does a body of this size stand in empty
+        // space here, i.e. clear of every piece the holes have left of the slab
+        const pieces = holePieces(pl) || [pl];
+        return {
+          box: { x: pl.x, y: pl.y, w: pl.w, h: pl.h },
+          hasHoles: pl.holes.length,
+          inHole: inHole(pl, px, py, rad),
+          clear: !pieces.some(pc => px + rad > pc.x && px - rad < pc.x + pc.w &&
+                                    py + rad > pc.y && py - rad < pc.y + pc.h)
+        };
+      }),
     // every solid the level currently has, for tests that need to shoot at one
     platforms: () => activePlatforms(currentLevel(), world.time)
       .map(pl => ({ x: pl.x, y: pl.y, w: pl.w, h: pl.h,

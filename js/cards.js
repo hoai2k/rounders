@@ -395,8 +395,8 @@
 
     card("breakthrough", "Breakthrough", "epic",
       "Make your own door.",
-      "Shots bite squares out of terrain; two into a thick wall opens a permanent gap.",
-      ["shots bite out terrain", "thick walls take 2", "−10% damage"], ["projectile", "control"],
+      "Shots bite squares out of terrain; two into a thick wall opens a permanent gap — and anyone can walk through it.",
+      ["shots bite doors in terrain", "thick walls take 2", "−10% damage"], ["projectile", "control"],
       p => { p.stats.holePunch += 1; p.stats.damage *= 0.9; }),
 
     card("berserkers-blood", "Berserker's Blood", "epic",

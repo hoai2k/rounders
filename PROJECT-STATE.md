@@ -231,6 +231,17 @@ Pillars:
       A borer walks through what is already cut before biting, since collision
       fires at the slab's face and every shot would otherwise re-cut the same
       first bite
+- [x] **A Breakthrough hole is a door you can walk through 2026-08-24**: a
+      fighter now collides against the material a through-hole leaves *either
+      side* of the opening (`holePieces()` splits the slab, `collidePlayerSlab()`
+      resolves each piece), instead of the old point-in-hole test that only
+      let a body pass if its centre cleared the gap padded by its own radius —
+      which no bite ever could across a slab's thickness, so a tunnel bored
+      clean through a wall still stopped you dead. Walk through a wall tunnel,
+      stand on its lower lip, drop down a shaft in a deck; a half-finished
+      niche is still solid wall, and the deck beside a shaft still holds you.
+      Guarded by `npm run audit-holes` (live match, every arena with the
+      geometry for it)
 - [x] **Workbench**: the duplicate card face above the preview is gone, and
       card art is drawn with real `<img>` elements (scene → emblem → a plain
       "no art yet" badge), so a missing file is visible instead of silently

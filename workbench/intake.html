@@ -9,6 +9,14 @@
     <link rel="stylesheet" href="intake.css" />
   </head>
   <body>
+    <!-- The door, as a curtain: this page loads behind it. Nothing links
+         here, and the veil is what a passer-by meets. Off on localhost —
+         see the gate module for why and for `?gatetest=1`. -->
+    <script type="module">
+      import { openGate } from "../js/gate/gate.js";
+      openGate({ title: "Rounders — intake", blurb: "This game is for friends of Hoai Nguyen. Use your invite link, or enter your code below.", game: "rounders-intake" });
+    </script>
+
     <header class="bar">
       <h1>Art Intake</h1>
       <label class="ghost file">Add images<input id="pick" type="file" accept="image/*" multiple hidden /></label>

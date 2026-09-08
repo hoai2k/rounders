@@ -10,6 +10,14 @@
     <link rel="stylesheet" href="stats.css?v=2">
   </head>
   <body>
+    <!-- The door, as a curtain: this page loads behind it. Nothing links
+         here, and the veil is what a passer-by meets. Off on localhost —
+         see the gate module for why and for `?gatetest=1`. -->
+    <script type="module">
+      import { openGate } from "../js/gate/gate.js";
+      openGate({ title: "Rounders — stats", blurb: "This game is for friends of Hoai Nguyen. Use your invite link, or enter your code below.", game: "rounders-stats" });
+    </script>
+
     <header class="top">
       <div>
         <p class="eyebrow">Rounders</p>

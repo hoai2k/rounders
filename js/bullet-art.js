@@ -12,6 +12,10 @@
 //   scale       size multiplier for the sprite, dialled in the workbench
 //   rotation    degrees to turn the sprite so its barrel points along flight
 //   procedural  ignore the sprite; the hand-drawn round reads better
+//   plain       this card changes nothing about how the round looks — no
+//               sprite, no trail colour. For a card whose whole effect is in
+//               the number of rounds, not the round (Double Dutch fires two of
+//               whatever you were already firing)
 //
 // Cards absent from this table fall back to the player's colour and an
 // untransformed sprite, so a new bullet PNG works without an entry.
@@ -33,7 +37,7 @@
     "cinder-shot": { color: "#ff9014", scale: 1.05 },
     "cluster-bomb": { color: "#ff831d" },
     "comet-trail": { color: "#1facff", rotation: 2 },
-    "double-dutch": { color: "#ff8210", scale: 1.05 },
+    "double-dutch": { plain: true },
     "drill-rounds": { color: "#ff8b11" },
     "golden-gun": { color: "#ff910e" },
     "helium-rounds": { color: "#ff724d", scale: 1.05, rotation: 20 },

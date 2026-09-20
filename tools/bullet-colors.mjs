@@ -28,6 +28,10 @@ for (const m of prev.matchAll(/"([\w-]+)":\s*\{([^}]*)\}/g)) {
 // any sprite could at the size it is drawn
 const PROCEDURAL = new Set(["supernova"]);
 
+// rounds a card deliberately leaves alone: the card's effect is the NUMBER of
+// rounds, not the round, so it lends neither sprite nor trail colour
+const PLAIN = new Set(["double-dutch"]);
+
 // where the drawn round does not look like its sprite, the trail follows the
 // DRAWN round — Supernova flies as a white-hot star, so it trails white-hot
 const COLOR_OVERRIDE = { supernova: "#fff0c0" };
@@ -51,8 +55,9 @@ for (const f of files) {
   colours[f.replace(".png", "")] = n ? `#${hex(lift(r))}${hex(lift(g))}${hex(lift(b))}` : "#ffffff";
 }
 
-const ids = [...new Set([...Object.keys(colours), ...Object.keys(TWEAKS), ...PROCEDURAL])].sort();
+const ids = [...new Set([...Object.keys(colours), ...Object.keys(TWEAKS), ...PROCEDURAL, ...PLAIN])].sort();
 const rows = ids.map(id => {
+  if (PLAIN.has(id)) return `    "${id}": { plain: true }`;
   const t = TWEAKS[id] || {};
   const bits = [];
   const colour = COLOR_OVERRIDE[id] || colours[id];
@@ -77,6 +82,10 @@ const file = `// Rounders — how each card's round is DRAWN.
 //   scale       size multiplier for the sprite, dialled in the workbench
 //   rotation    degrees to turn the sprite so its barrel points along flight
 //   procedural  ignore the sprite; the hand-drawn round reads better
+//   plain       this card changes nothing about how the round looks — no
+//               sprite, no trail colour. For a card whose whole effect is in
+//               the number of rounds, not the round (Double Dutch fires two of
+//               whatever you were already firing)
 //
 // Cards absent from this table fall back to the player's colour and an
 // untransformed sprite, so a new bullet PNG works without an entry.

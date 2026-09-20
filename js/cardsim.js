@@ -40,17 +40,21 @@
   // Same floors the engine applies (js/gameplay.js gun.minFireDelay /
   // gun.minReload), so the preview never shows a rate the match will not run at
   const GUN = () => (window.ROUNDERS.GAMEPLAY || { gun: {} }).gun;
+  const AMMO_RETURN_TIME = 0.42;   // seconds a Waste Not refund takes to fly home
+  const SAW_KNOCKBACK = 2.6;       // how hard Sawblade's disc throws what it bites
   const fireDelayOf = st => Math.max(GUN().minFireDelay ?? 0, st.fireDelay);
   const reloadOf = st => Math.max(GUN().minReload ?? 0, st.reload);
 
   function bulletLook(cardId) {
     const k = (window.ROUNDERS.BULLET_ART || {})[cardId] || {};
+    // `plain` means the card leaves the round alone (Double Dutch), so the
+    // preview shows the default round, same as the match would
     return {
-      art: k.procedural ? null : bulletArt(cardId),
-      scale: k.scale || 1,
-      rotation: (k.rotation || 0) * Math.PI / 180,
-      color: k.color || null,
-      procedural: Boolean(k.procedural)
+      art: k.procedural || k.plain ? null : bulletArt(cardId),
+      scale: k.plain ? 1 : k.scale || 1,
+      rotation: k.plain ? 0 : (k.rotation || 0) * Math.PI / 180,
+      color: k.plain ? null : k.color || null,
+      procedural: Boolean(k.procedural || k.plain)
     };
   }
   window.ROUNDERS.bulletLook = bulletLook;
@@ -293,7 +297,7 @@
     if (on("repel")) watch.push("incoming bullets bend away from them");
     if (on("guardian") || on("revives")) watch.push("a lethal hit doesn't finish them");
     if (on("pellets")) watch.push("one trigger pull throws several pellets");
-    if (on("burstFire")) watch.push("each pull is followed by echo shots");
+    if (on("burstFire")) watch.push("each pull is followed, a beat later, by echo shots");
     if (on("encore")) watch.push("a ghost of the shot fires again a beat later");
     if (on("scavenge") || on("blockReload")) watch.push("watch the ammo pips refill");
     if (on("reloadPulse")) watch.push("pulses go off while reloading");
@@ -508,18 +512,18 @@
       puff(from.x, from.y, "#74f08b", 6, 150);
     }
 
-    // Waste Not: the spent round comes back out of the wound and flies home
+    // Waste Not: the spent round comes back out of the wound and flies home as
+    // a box of ammo — slow enough to watch, the same as the match
     function returnAmmo(from, to) {
       if (!to) return;
       const x = from.x + rand(-4, 4), y = from.y + rand(-4, 4);
       const dx = to.x - x, dy = to.y - y;
       const d = Math.hypot(dx, dy) || 1;
-      // straight home and fast enough that it could never be dodged
-      const speed = Math.max(2800 * SCALE, d / 0.08);
+      const speed = Math.max(620 * SCALE, d / AMMO_RETURN_TIME);
       siphons.push({
         kind: "ammo", x, y,
         vx: (dx / d) * speed, vy: (dy / d) * speed,
-        to, amount: 0, t: 0, delay: 0
+        to, amount: 0, t: 0, delay: 0, rock: rand(0, 6.3), spin: rand(-1, 1)
       });
     }
 
@@ -529,7 +533,7 @@
         s.t += dt;
         if (s.kind === "ammo") {
           s.x += s.vx * dt; s.y += s.vy * dt;
-          if (Math.hypot(s.to.x - s.x, s.to.y - s.y) < s.to.stats.radius || s.t > 0.35) {
+          if (Math.hypot(s.to.x - s.x, s.to.y - s.y) < s.to.stats.radius || s.t > AMMO_RETURN_TIME * 2) {
             puff(s.to.x, s.to.y, "#ffe169", 5, 120);
             float(s.to.x, s.to.y - s.to.stats.radius - 12, "+1 AMMO", "#ffe169");
             s.dead = true;
@@ -558,19 +562,21 @@
       for (const s of siphons) {
         if (s.delay > 0) continue;
         if (s.kind === "ammo") {
-          // a ghost of the round, stretched down its own line
+          // the box of rounds on its way home, with a short streak down its line
           ctx.save();
           ctx.translate(s.x, s.y);
+          ctx.save();
           ctx.rotate(Math.atan2(s.vy, s.vx));
-          ctx.globalAlpha = 0.5;
-          const tail = ctx.createLinearGradient(-34, 0, 0, 0);
+          ctx.globalAlpha = 0.45;
+          const tail = ctx.createLinearGradient(-24, 0, 0, 0);
           tail.addColorStop(0, "rgba(255,225,105,0)");
-          tail.addColorStop(1, "rgba(255,238,170,0.75)");
+          tail.addColorStop(1, "rgba(255,238,170,0.7)");
           ctx.fillStyle = tail;
-          ctx.beginPath(); ctx.moveTo(-34, -1.1); ctx.lineTo(0, -3.2); ctx.lineTo(0, 3.2); ctx.lineTo(-34, 1.1);
+          ctx.beginPath(); ctx.moveTo(-24, -1); ctx.lineTo(0, -2.8); ctx.lineTo(0, 2.8); ctx.lineTo(-24, 1);
           ctx.closePath(); ctx.fill();
-          ctx.fillStyle = "rgba(255,240,180,0.75)";
-          ctx.beginPath(); ctx.ellipse(0, 0, 5.5, 2.9, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+          ctx.rotate(Math.sin(s.t * 9 + (s.rock || 0)) * 0.22 + (s.spin || 0) * 0.12);
+          if (window.ROUNDERS.drawAmmoBox) window.ROUNDERS.drawAmmoBox(ctx, 8);
           ctx.restore();
           continue;
         }
@@ -614,7 +620,9 @@
       if (extra > 0 && who.stats.overflow) who.temp = Math.min(who.stats.overflow, who.temp + extra);
     }
 
-    function damage(who, amount, from, kx = 0, ky = 0, direct = true) {
+    // `kbScale` multiplies the shove alone — Sawblade's disc throws harder than
+    // its damage would, the same as the match
+    function damage(who, amount, from, kx = 0, ky = 0, direct = true, kbScale = 1) {
       if (who.blockT > 0 && direct) {
         puff(who.x, who.y, "#ffffff", 10, 220);
         float(who.x, who.y - 46, "BLOCK", "#ffffff");
@@ -631,8 +639,8 @@
       // knockback, with the attacker's kbDeal and the victim's resistance
       const kb = (1 - Math.min(0.9, who.stats.kbResist)) * (from ? 1 + from.stats.kbDeal : 1);
       const mag = Math.hypot(kx, ky) || 1;
-      who.vx += (kx / mag) * Math.min(620, amount * 16) * kb * SCALE;
-      who.vy += ((ky / mag) * Math.min(320, amount * 8) - Math.min(220, amount * 2)) * kb * SCALE;
+      who.vx += (kx / mag) * Math.min(620, amount * 16) * kb * kbScale * SCALE;
+      who.vy += ((ky / mag) * Math.min(320, amount * 8) - Math.min(220, amount * 2)) * kb * kbScale * SCALE;
 
       if (from && from.stats.thorns && direct) {
         from.hp -= amount * from.stats.thorns * 0; // thorns belong to the victim
@@ -802,7 +810,10 @@
       // only a real trigger pull spawns echoes — an echo that echoed itself
       // would feed back forever
       if (!ghost) {
-        for (let i = 1; i <= st.burstFire; i += 1) who.queue.push({ t: i * 0.09, mul: 0.45 });
+        // the echoes keep the match's beat: a pause after the shot, then a pair
+        for (let i = 1; i <= st.burstFire; i += 1) {
+          who.queue.push({ t: (GUN().burstEchoDelay ?? 0.7) + (i - 1) * (GUN().burstEchoGap ?? 0.09), mul: 0.45 });
+        }
         for (let i = 1; i <= st.encore; i += 1) {
           who.queue.push({ t: 1 * i, mul: 0.5, angle: ang, pellets: 2, from: { x: who.x, y: who.y } });
         }
@@ -1563,7 +1574,14 @@
           f.angle += dt * 9;
           const o = f.owner;
           f.x = o.x; f.y = o.y;
-          for (const e of enemies(o)) if (Math.hypot(e.x - f.x, e.y - f.y) < e.stats.radius + f.r && (f.cd || 0) <= 0) { damage(e, f.dmg, o, e.x - o.x, -40, false); f.cd = 0.35; }
+          for (const e of enemies(o)) {
+            if (Math.hypot(e.x - f.x, e.y - f.y) < e.stats.radius + f.r && (f.cd || 0) <= 0) {
+              const dx = Math.abs(e.x - o.x) > 1 ? e.x - o.x : (o.aimX < 0 ? -1 : 1);
+              damage(e, f.dmg, o, dx, -40, false, SAW_KNOCKBACK);
+              f.cd = 0.35;
+              puff(e.x, e.y, "#ffe9a8", 10, 300);
+            }
+          }
           f.cd = Math.max(0, (f.cd || 0) - dt);
         }
         // the shockwave swats loose rounds off at random, once
@@ -1947,9 +1965,11 @@
           ctx.restore();
         } else if (f.type === "saw") {
           const sawT = FX() ? FX().tune("sawblade") : { scale: 1, rotation: 0 };
+          // mirrored with its owner, exactly as the match draws it
           window.ROUNDERS.drawSawblade(ctx, f.x, f.y, f.r * (sawT.scale || 1),
             t * 9 + (sawT.rotation || 0) * Math.PI / 180,
-            FX() && FX().image("sawblade"));
+            FX() && FX().image("sawblade"),
+            Boolean(f.owner && f.owner.aimX < 0));
         } else if (f.type === "void" || f.type === "vortex") {
           const a01 = Math.min(1, f.life);
           // the painted maw the game uses, over the procedural swirl

@@ -242,6 +242,40 @@ Pillars:
       niche is still solid wall, and the deck beside a shaft still holds you.
       Guarded by `npm run audit-holes` (live match, every arena with the
       geometry for it)
+- [x] **Paused shows every card a fighter holds 2026-08-24**: the margin cards
+      open up while paused — the whole hand instead of the last three, each
+      chip still carrying its emblem and rarity colour, and shown even in the
+      cramped `crowded`/`tight` layouts that drop the list during play. A pause
+      is the one moment there is time to read the board. `updateHud()` renders
+      the full list off `world.state`, and `togglePause()` refreshes by hand
+      because the world is not updating
+- [x] **Card reference, generated 2026-08-24**: [`CARDS.md`](CARDS.md) lists all
+      83 cards — what each does, what it costs, what it asks you to press, and
+      each rarity's draft odds — written from `js/cards.js` itself by
+      `npm run cards-doc` (`--check` fails when it is stale), so it cannot
+      drift from the game. README now links it, the two audits, and every tool
+      and workbench, and its stale "77 cards" is corrected to 83
+- [x] **Power-card feel pass 2026-08-24**:
+      **Sawblade** — the disc throws what it bites (`hurt()` takes a knockback
+      scale; the saw uses 2.6×, so a 12-damage bite shoves at ~500px/s instead
+      of ~190) and throws sparks on contact, because a hit that only tickled
+      read as no hit at all. Its spin is now mirrored with its owner rather
+      than always turning one way: the teeth on the side a fighter faces always
+      sweep DOWNWARD, so the blade bites down the face it is walked into, and
+      the left-facing disc is the right-facing one in a mirror — painted
+      shading and all (measured: front-face teeth travel +4px per beat both
+      ways; before the change, facing left they travelled −4px).
+      **Triple Tap** — its two echoes now go off 0.7s after the trigger pull
+      (`gun.burstEchoDelay`) instead of 0.09s, so they read as echoes you can
+      turn or jump between rather than one long burst.
+      **Double Dutch** — leaves the round's look alone entirely: a new `plain`
+      flag in `js/bullet-art.js` means a card lends neither sprite nor trail
+      colour, because its whole effect is the NUMBER of rounds, not the round.
+      **Waste Not** — the refund flies home in 0.42s instead of 0.08s (~22
+      frames in the air, not ~5) and is drawn as an ammo box — olive crate,
+      brass catch, a round poking out of the lid — tumbling as it comes.
+      Every one of these lands in the card preview too (`js/cardsim.js`), so
+      the workbench shows what the match does
 - [x] **Workbench**: the duplicate card face above the preview is gone, and
       card art is drawn with real `<img>` elements (scene → emblem → a plain
       "no art yet" badge), so a missing file is visible instead of silently

@@ -53,10 +53,12 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 
 ## What's inside
 
-- **77 hand-designed power cards** across six color-coded rarities — Common,
+- **83 hand-designed power cards** across six color-coded rarities — Common,
   Uncommon, Rare, Epic, Legendary, and **Mythic** (active abilities on their own
   button). Every card states exactly what it does, and every one is painted:
   a 256×256 emblem for the HUD chip and a full-bleed scene for the card face.
+  **[`CARDS.md`](CARDS.md) lists every card and what it does**, generated from the
+  card set itself. Pausing also opens each fighter's whole hand in the margin.
 - **25 themed arenas**, each with its own palette, weather, and signature mechanic:
   ice, conveyors, wind gusts, low gravity, bounce pads, moving platforms,
   teleporters, crumbling floors, rising tides, timed lightning, syrup pools,
@@ -100,13 +102,45 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 
 ## Project docs
 
-- `PROJECT-STATE.md` — workstream tracker for the redesign
-- `image-requests.md` — open art requests (prompts + file paths)
-- `image-requests-history.md` — the same for art already generated and in the repo
-- `intake/README.md` — how to bring delivered art into the game
-- `AUDIT.md` — variety/balance audit findings
-- `STATS.md` — how the visitor dashboard at `/stats/` works and how to switch it on
-- `CLAUDE.md` — repo policies
+**What the cards do**
+
+- **[`CARDS.md`](CARDS.md)** — **every card in the game**: what it does, what it
+  costs you, what it asks you to press, and how likely each rarity is to turn up.
+  Generated from [`js/cards.js`](js/cards.js) by `npm run cards-doc`, so it cannot
+  drift from the game. The same set is browsable in game (*Settings → Choose
+  Cards*) and at full size in the [card workbench](workbench/cards.html).
+- [`CARD-GAP-AUDIT.md`](CARD-GAP-AUDIT.md) — our set measured against ROUNDS'
+  card-for-card, and what was added to close the gaps
+- [`AUDIT.md`](AUDIT.md) — variety/balance audit findings, and what was done about each
+
+**Everything else**
+
+- [`PROJECT-STATE.md`](PROJECT-STATE.md) — workstream tracker for the redesign
+- [`image-requests.md`](image-requests.md) — open art requests (prompts + file paths)
+- [`image-requests-history.md`](image-requests-history.md) — the same for art already generated and in the repo
+- [`intake/README.md`](intake/README.md) — how to bring delivered art into the game
+- [`STATS.md`](STATS.md) — how the visitor dashboard at `/stats/` works and how to switch it on
+- [`CLAUDE.md`](CLAUDE.md) — repo policies
+
+## Tools and workbenches
+
+Run `npm start` first — the workbench pages are served from the same static server.
+
+| | What it is for |
+|---|---|
+| [`/workbench/cards.html`](workbench/cards.html) | **Card workbench** — browse every card at full size, and run a live preview of what it actually does in a match (`js/cardsim.js`) |
+| [`/workbench/`](workbench/index.html) | **Sprite workbench** — pose composed characters, drag the hand/weapon anchors, save to `rigs.json` |
+| [`/workbench/intake.html`](workbench/intake.html) | **Art intake** — drop delivered art in, key its backdrop out, file it under the right name |
+| `npm run cards-doc` | Rewrite [`CARDS.md`](CARDS.md) from the card set (`--check` fails if it is stale) |
+| `npm run audit-arenas` | Arena geometry: gaps that look passable but are not |
+| `npm run audit-holes` | Breakthrough's bored holes really are doorways, in every arena |
+| `npm run audit-combos` | Plays random card builds in a live match, watching for errors, NaNs and stutter |
+| `npm run audit-stats` | Sweeps thousands of random builds for where the damage tail goes |
+| `npm run audit-ttk` | Time-to-kill across builds |
+| `npm run audit-keys` | Scans delivered PNGs for leftover backdrop |
+| `npm run bullet-colors` | Re-derives each round's trail colour from its own art |
+| `npm run intake` / `npm run intake-art` | Command-line art intake |
+| `npm run fitrig` | Measures hand size against the canonical art into `rigs.json` |
 
 ## Code layout
 
@@ -114,7 +148,7 @@ Join the lobby with your **shoot** button (or any pad button), pick one of the
 |---|---|
 | `game.js` | Engine: physics, combat, arena features, draft flow, rendering, menus |
 | `js/strings.js` | **All UI wording** — every menu and in-game string in one editable file |
-| `js/cards.js` | The 77-card set + rarity metadata |
+| [`js/cards.js`](js/cards.js) | The 83-card set + rarity metadata (→ [`CARDS.md`](CARDS.md)) |
 | `js/levels.js` | The 25 arenas |
 | `js/characters.js` | The 24 characters + procedural renderer |
 | `js/music.js` | Soundtrack manifest: the 28 tracks, their themes and pairs |

@@ -485,6 +485,8 @@
         // shows its real round rather than an untransformed one.
         function baseLook(id) {
           const k = (window.ROUNDERS.BULLET_ART || {})[id] || {};
+          // `plain` cards (Double Dutch) show the default round: no sprite, no tweak
+          if (k.plain) return { scale: 1, rotation: 0, procedural: true };
           return { scale: k.scale ?? 1, rotation: k.rotation ?? 0, procedural: Boolean(k.procedural) };
         }
         function liveLook(id) {

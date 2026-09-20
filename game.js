@@ -2981,6 +2981,11 @@
   // waits on the block cooldown nor spends it — your manual parry is still
   // there the instant you want it.
   const SAW_LIFE = 3;                 // how long Sawblade's disc rides you
+  const SAW_KNOCKBACK = 2.6;          // ...and how hard it throws what it bites
+  // Triple Tap: how long after the trigger pull its echoes go off, and how far
+  // apart they then land (js/gameplay.js, so the preview quotes the same beat)
+  const BURST_ECHO_DELAY = GP.gun.burstEchoDelay;
+  const BURST_ECHO_GAP = GP.gun.burstEchoGap;
 
   function tryBlock(p, free = false) {
     if (p.silenceTimer > 0) return;
@@ -3251,10 +3256,13 @@
       p.reloadTimer = reloadOf(p);
       p.fireTimer = Math.max(p.fireTimer, rest * 0.06 + 0.05);
     }
-    // Triple Tap: the echoes follow on their own, aimed wherever you are then
+    // Triple Tap: the echoes follow on their own, aimed wherever you are then.
+    // They come most of a second later — long enough that you hear the shot
+    // land before they go, and can have turned or jumped by the time they do —
+    // and then arrive as a tight pair.
     if (p.stats.burstFire) {
       for (let i = 1; i <= p.stats.burstFire; i += 1) {
-        p.burstQueue.push({ t: i * 0.09, mul: 0.45 });
+        p.burstQueue.push({ t: BURST_ECHO_DELAY + (i - 1) * BURST_ECHO_GAP, mul: 0.45 });
       }
     }
     // Encore: one ghost of this shot per stack, a beat apart
@@ -4005,8 +4013,15 @@
         for (const p of players) {
           if (!p.alive || p === o || allied(p, o) || p.spawnGrace > 0 || p.sawGrace > 0) continue;
           if (Math.hypot(p.x - f.x, p.y - f.y) < p.stats.radius + f.r) {
-            hurt(p, f.dmg, o, p.x - o.x, p.y - o.y - 60);
+            // Standing dead on top of the owner leaves no direction to be
+            // thrown in, so the blade throws you off the way it is turned.
+            const dx = Math.abs(p.x - o.x) > 1 ? p.x - o.x : (o.aimX < 0 ? -1 : 1);
+            hurt(p, f.dmg, o, dx, p.y - o.y - 60, SAW_KNOCKBACK);
             p.sawGrace = 0.35;
+            // sparks off the teeth, so a hit reads as a hit even through a
+            // crowd — the shove alone can be lost behind two bodies
+            burst(p.x, p.y, "#ffe9a8", 10, 300);
+            burst(p.x, p.y, "#ff9a3c", 6, 220);
           }
         }
         for (const dcy of decoys) {
@@ -4225,7 +4240,10 @@
     }
   }
 
-  function hurt(p, amount, attacker, kx, ky) {
+  // `kbScale` multiplies the shove alone, for a source that should throw you
+  // further than its damage would (Sawblade's disc is a wall of teeth, not a
+  // scratch — you want to SEE it fling people off).
+  function hurt(p, amount, attacker, kx, ky, kbScale = 1) {
     if (!p.alive || p.blockTimer > 0 || p.spawnGrace > 0) return;
     // teammates cannot hurt each other, with damage or with the shove
     if (allied(attacker, p)) return;
@@ -4237,8 +4255,8 @@
     const kb = (1 - clamp(p.stats.kbResist, 0, 0.9))
       // Boxing Glove: the attacker's gloves add shove on top of the damage
       * (attacker && attacker.stats ? 1 + attacker.stats.kbDeal : 1);
-    p.vx += (kx / mag) * Math.min(620, amount * 16) * kb;
-    p.vy += ((ky / mag) * Math.min(320, amount * 8) - Math.min(220, amount * 2)) * kb;
+    p.vx += (kx / mag) * Math.min(620, amount * 16) * kb * kbScale;
+    p.vy += ((ky / mag) * Math.min(320, amount * 8) - Math.min(220, amount * 2)) * kb * kbScale;
     if (amount > 4) {
       sfx("hit");
       pulse(p, Math.min(0.55, amount / 90), Math.min(190, 50 + amount));
@@ -5192,12 +5210,16 @@
       world.state = "paused";
       world.pausedThisFrame = true;
       pausePanel.classList.remove("hidden");
+      // the world stops updating here, so the margin cards — which open up to
+      // the full hand while paused — are refreshed by hand
+      updateHud(true);
       setMenuIndex(0);
       duckMusic(DUCK.paused);
       sfx("card");
     } else if (!shouldPause && world.state === "paused") {
       world.state = "playing";
       pausePanel.classList.add("hidden");
+      updateHud(true);
       duckMusic(DUCK.none);
     }
   }
@@ -5296,16 +5318,25 @@
   }
 
   function updateHud(force = false) {
+    // A pause is the one moment there is time to READ the board, so the margin
+    // cards open up: every card a fighter holds instead of the last three, and
+    // shown even in the cramped layouts that normally drop the list entirely.
+    const full = world.state === "paused";
+    if (world.hudFull !== full) {
+      world.hudFull = full;
+      hud.classList.toggle("paused", full);
+      force = true;
+    }
     for (const ref of hudRefs) {
       const p = ref.p;
       ref.el.classList.toggle("dead", !p.alive);
       ref.score.textContent = str("hud.score", { score: fmtScore(p.score), limit: settings.scoreLimit });
       if (force || p.cards.length !== ref.lastCards) {
         ref.lastCards = p.cards.length;
-        const shown = p.cards.slice(-3);
+        const shown = full ? p.cards : p.cards.slice(-3);
         ref.cards.innerHTML = shown.map(c =>
-          `<span style="--rcol:${RARITIES[c.rarity].color};--art:url('${cardArtUrl(c.id)}')">${c.name}</span>`).join("") +
-          (p.cards.length > 3 ? `<span class="more">${escapeHtml(str("hud.more", { count: p.cards.length - 3 }))}</span>` : "") ||
+          `<span style="--rcol:${RARITIES[c.rarity].color};--art:url('${cardArtUrl(c.id)}')">${escapeHtml(c.name)}</span>`).join("") +
+          (!full && p.cards.length > 3 ? `<span class="more">${escapeHtml(str("hud.more", { count: p.cards.length - 3 }))}</span>` : "") ||
           `<span class="none">${escapeHtml(str("hud.noCards"))}</span>`;
       }
       const activeReady = p.stats.active &&
@@ -6920,8 +6951,12 @@
       } else if (f.type === "saw") {
         // Drawn at the FULL radius it hurts in, spinning on its own axis and
         // sitting behind the fighter (drawFields runs before drawPlayersAll).
+        // The disc is mirrored with its owner, so the teeth on the side they
+        // face always sweep downward — the blade bites down the face it is
+        // walked into, whichever way that is.
         window.ROUNDERS.drawSawblade(ctx, f.x, f.y, f.r * (FX.tune("sawblade").scale || 1),
-        world.time * 9 + (FX.tune("sawblade").rotation || 0) * Math.PI / 180, fxImage("sawblade"));
+        world.time * 9 + (FX.tune("sawblade").rotation || 0) * Math.PI / 180, fxImage("sawblade"),
+        Boolean(f.owner && f.owner.aimX < 0));
       } else {
         const alpha = clamp(f.life / 0.18, 0, 1);
         ctx.strokeStyle = `rgba(255,255,255,${0.3 * alpha})`;
@@ -6997,19 +7032,22 @@
   // Waste Not: the round that just landed comes back out of the wound and
   // flies home to the magazine. Pure show — the ammo is already back — but it
   // is what makes the refund legible.
+  const AMMO_RETURN_TIME = 0.42;   // seconds a refunded round takes to fly home
+
   function returnAmmo(from, to) {
     if (!to || !to.alive) return;
     const x = from.x + rand(-4, 4), y = from.y + rand(-4, 4);
     const dx = to.x - x, dy = to.y - y;
     const d = Math.hypot(dx, dy) || 1;
-    // Straight home and FAST — the whole trip inside a tenth of a second — so
-    // it reads as a round jetting back to the magazine rather than something
-    // flying at the shooter that they might have to dodge.
-    const speed = Math.max(2800, d / 0.08);
+    // Straight home, and slow enough to WATCH: the refund is the whole point of
+    // the card, so the box wants to be read on its way back, not gone in a
+    // frame. A floor on the speed keeps a point-blank hit from crawling.
+    const speed = Math.max(620, d / AMMO_RETURN_TIME);
     siphons.push({
       kind: "ammo", x, y,
       vx: (dx / d) * speed, vy: (dy / d) * speed,
-      to, amount: 0, t: 0, delay: 0
+      // every box tumbles its own way, so a pair of refunds does not fly as one
+      to, amount: 0, t: 0, delay: 0, rock: rand(0, 6.3), spin: rand(-1, 1)
     });
   }
 
@@ -7073,7 +7111,7 @@
         // dead straight, no correction — it was aimed when it left
         s.x += s.vx * dt;
         s.y += s.vy * dt;
-        if (Math.hypot(s.to.x - s.x, s.to.y - s.y) < s.to.stats.radius || s.t > 0.35) {
+        if (Math.hypot(s.to.x - s.x, s.to.y - s.y) < s.to.stats.radius || s.t > AMMO_RETURN_TIME * 2) {
           puff(s.to.x, s.to.y, "#ffe169", 5, 140);
           sfx("pop");
           s.dead = true;
@@ -7111,21 +7149,24 @@
     for (const s of siphons) {
       if (s.delay > 0) continue;
       if (s.kind === "ammo") {
-        // the ghost of the round, jetting back down its own line with a long
-        // streak behind it — at this speed the streak is most of what you see
+        // Waste Not's refund, flying home as an ammo box — the thing it gives
+        // back, drawn as the thing itself. A short streak marks the line it is
+        // travelling; the box rocks as it goes so it reads as thrown.
         ctx.save();
         ctx.translate(s.x, s.y);
-        ctx.rotate(Math.atan2(s.vy, s.vx));
-        ctx.globalAlpha = 0.5;
-        const tail = ctx.createLinearGradient(-46, 0, 0, 0);
+        const heading = Math.atan2(s.vy, s.vx);
+        ctx.save();
+        ctx.rotate(heading);
+        ctx.globalAlpha = 0.45;
+        const tail = ctx.createLinearGradient(-30, 0, 0, 0);
         tail.addColorStop(0, "rgba(255,225,105,0)");
-        tail.addColorStop(1, "rgba(255,238,170,0.75)");
+        tail.addColorStop(1, "rgba(255,238,170,0.7)");
         ctx.fillStyle = tail;
-        ctx.beginPath(); ctx.moveTo(-46, -1.4); ctx.lineTo(0, -4); ctx.lineTo(0, 4); ctx.lineTo(-46, 1.4);
+        ctx.beginPath(); ctx.moveTo(-30, -1.2); ctx.lineTo(0, -3.4); ctx.lineTo(0, 3.4); ctx.lineTo(-30, 1.2);
         ctx.closePath(); ctx.fill();
-        ctx.shadowColor = "#ffe169"; ctx.shadowBlur = 10;
-        ctx.fillStyle = "rgba(255,240,180,0.75)";
-        ctx.beginPath(); ctx.ellipse(0, 0, 7, 3.6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.rotate(Math.sin(s.t * 9 + (s.rock || 0)) * 0.22 + (s.spin || 0) * 0.12);
+        window.ROUNDERS.drawAmmoBox(ctx, 11);
         ctx.restore();
         continue;
       }
@@ -8328,6 +8369,9 @@
     const colours = [];
     for (const card of p.cards) {
       const k = cfg[card.id];
+      // a card marked plain leaves the round exactly as it found it: Double
+      // Dutch fires two of whatever you were already firing
+      if (k && k.plain) continue;
       if (k && k.color) colours.push(k.color);
       // a card marked procedural never lends its sprite — its hand-drawn round
       // is the one worth seeing
@@ -8344,7 +8388,7 @@
     if (painted.length) tuned = cfg[painted[painted.length - 1]] || {};
     else for (const card of p.cards) {
       const k = cfg[card.id];
-      if (k && (k.scale != null || k.rotation != null)) tuned = k;
+      if (k && !k.plain && (k.scale != null || k.rotation != null)) tuned = k;
     }
     return {
       art: painted.length ? mixBulletArt(painted.slice(-MIX_TOP)) : null,
@@ -8436,6 +8480,12 @@
     },
     // chronoshift tape: is the world running backwards, and how much is left
     rewind: () => ({ active: rewind.active, cursor: rewind.cursor, frames: history.length }),
+    // what is in flight between fighters: Waste Not's ammo boxes on their way
+    // home, and the health a siphon is carrying
+    siphons: () => siphons.filter(s => s.delay <= 0).map(s => ({
+      kind: s.kind || "heal", x: Math.round(s.x), y: Math.round(s.y),
+      t: +s.t.toFixed(3), speed: Math.round(Math.hypot(s.vx, s.vy))
+    })),
     slabs: () => props.slabs.filter(s => !s.dead).map(s => ({
       x: Math.round(s.x), y: Math.round(s.y), w: s.w, h: s.h, brick: Boolean(s.brickOwner)
     })),

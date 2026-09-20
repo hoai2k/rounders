@@ -1162,9 +1162,17 @@
   // Sawblade's disc, drawn at the FULL radius it damages in so the thing you
   // can see is the thing that hurts. Spun on its own axis and stroked in near
   // black all round, so it stays legible against a grey arena or a grey wall.
-  function drawSawblade(ctx, x, y, r, angle, art) {
+  //
+  // `flip` mirrors the whole disc for a fighter facing left. Mirroring, rather
+  // than negating the angle, is what makes the two facings read as one blade:
+  // the left-facing disc is the right-facing one seen in a mirror, painted
+  // shading and all, and a mirror also reverses the spin — which is the point.
+  // The teeth on the side the fighter is turned to always sweep DOWNWARD, so
+  // the blade bites down the face of whatever it is being carried into.
+  function drawSawblade(ctx, x, y, r, angle, art, flip = false) {
     ctx.save();
     ctx.translate(x, y);
+    if (flip) ctx.scale(-1, 1);
     ctx.rotate(angle);
     if (art) {
       // the painted blade still gets the outline, traced round its disc
@@ -1441,6 +1449,47 @@
     ctx.restore();
   }
 
+  // A stubby crate of rounds, drawn `w` wide about its own centre: olive body,
+  // brass lid, two straps and a round poking out of the top. Outlined in near
+  // black so it reads against a bright arena as well as a dark one.
+  function drawAmmoBox(ctx, w) {
+    const h = w * 0.74;
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(10,9,6,0.9)";
+    ctx.lineWidth = 2;
+    // the round riding in the top, drawn first so the lid overlaps its base
+    ctx.fillStyle = "#e8c65a";
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.2, -h * 0.62);
+    ctx.lineTo(-w * 0.2, -h * 1.15);
+    ctx.quadraticCurveTo(0, -h * 1.5, w * 0.2, -h * 1.15);
+    ctx.lineTo(w * 0.2, -h * 0.62);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // body
+    ctx.fillStyle = "#5f6b3c";
+    ctx.beginPath();
+    ctx.rect(-w, -h * 0.62, w * 2, h * 1.5);
+    ctx.fill(); ctx.stroke();
+    // lid
+    ctx.fillStyle = "#8a9a52";
+    ctx.beginPath();
+    ctx.rect(-w, -h * 0.62, w * 2, h * 0.46);
+    ctx.fill(); ctx.stroke();
+    // straps
+    ctx.fillStyle = "rgba(38,34,20,0.85)";
+    ctx.fillRect(-w * 0.62, -h * 0.62, w * 0.22, h * 1.5);
+    ctx.fillRect(w * 0.4, -h * 0.62, w * 0.22, h * 1.5);
+    // a brass catch on the front, and the warm glow of a refund
+    ctx.fillStyle = "#d8b24a";
+    ctx.fillRect(-w * 0.12, h * 0.1, w * 0.24, h * 0.3);
+    ctx.strokeStyle = "rgba(255,225,105,0.5)";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-w, -h * 0.62, w * 2, h * 1.5);
+    ctx.restore();
+  }
+
   window.ROUNDERS.CHARACTERS = CHARACTERS;
   window.ROUNDERS.drawCharacter = drawCharacter;
   window.ROUNDERS.drawIronHull = drawIronHull;
@@ -1451,6 +1500,7 @@
   window.ROUNDERS.drawSawblade = drawSawblade;
   window.ROUNDERS.drawHoverWings = drawHoverWings;
   window.ROUNDERS.drawLemonade = drawLemonade;
+  window.ROUNDERS.drawAmmoBox = drawAmmoBox;
   window.ROUNDERS.setProceduralCharacters = setProceduralCharacters;
   window.ROUNDERS.characterImage = { has: hasImage, get: getImage };
 })();

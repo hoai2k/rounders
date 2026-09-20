@@ -187,8 +187,8 @@
 
     card("triple-tap", "Triple Tap", "uncommon",
       "Once more, with feeling. Twice.",
-      "Every trigger pull is followed by two lighter echo shots in a tight burst.",
-      ["+2 burst echoes (45% damage)", "+0.1s fire delay"], ["firerate"],
+      "Every trigger pull comes back as two lighter echo shots, three quarters of a second later.",
+      ["+2 echoes, 0.7s later (45% damage)", "+0.1s fire delay"], ["firerate"],
       p => { p.stats.burstFire += 2; p.stats.fireDelay += 0.1; }),
 
     card("hot-streak", "Hot Streak", "uncommon",
@@ -321,8 +321,8 @@
 
     card("sawblade", "Sawblade", "rare",
       "Mind the blade.",
-      "Blocking wraps you in a spinning sawblade for 3 seconds; the block cooldown starts when it stops.",
-      ["block = spinning saw (3s)", "cooldown starts after it"], ["block", "aoe"],
+      "Blocking wraps you in a spinning sawblade for 3 seconds. It carves anyone it touches and throws them clear; the block cooldown starts when it stops.",
+      ["block = spinning saw (3s)", "cuts and flings enemies", "cooldown starts after it"], ["block", "aoe"],
       p => { p.stats.sawBlock += 1; }),
 
     card("bank-shot", "Bank Shot", "rare",

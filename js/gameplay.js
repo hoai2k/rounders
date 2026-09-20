@@ -46,6 +46,13 @@
       pellets: 1,
       spread: 0.04,
 
+      // Triple Tap's echoes are not part of the volley: they go off this long
+      // after the trigger pull — late enough to read as an echo, and long
+      // enough that you can have turned or moved before they do — and then
+      // this far apart from one another.
+      burstEchoDelay: 0.7,
+      burstEchoGap: 0.09,
+
       // Floors, not baselines. Fire-rate cards multiply these down, and four
       // stacked copies of Blood Money reach a 0.0004s delay — the whole
       // magazine leaving the barrel inside a single 16ms frame, which turns a
